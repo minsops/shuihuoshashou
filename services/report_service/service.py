@@ -58,6 +58,22 @@ REPORT_TEMPLATE = Template(
         {% for note in score.risk_notes %}<p class="risk">{{ note }}</p>{% endfor %}
         {% for flag in flags %}<p class="risk">{{ flag.description }}</p>{% endfor %}
       </section>
+      <section>
+        <h2>转写全文</h2>
+        <table>
+          <tr><th>序号</th><th>来源</th><th>问题</th><th>回答</th><th>时间</th><th>追问目标</th></tr>
+          {% for turn in transcript %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ turn.question_source }}</td>
+            <td>{{ turn.question }}</td>
+            <td>{{ turn.answer }}</td>
+            <td>{{ turn.answer_start_ms }}ms - {{ turn.answer_end_ms }}ms</td>
+            <td>{{ turn.probe_target or "" }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </section>
     </body>
     </html>
     """
@@ -147,6 +163,7 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
         score=score,
         summary=summary,
         flags=ctx.flags,
+        transcript=ctx.turns,
         radar_chart_uri=_radar_chart_uri(score),
     )
     settings = get_settings()
@@ -171,6 +188,7 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
         score=score,
         aigc_results=aigc,
         consistency_flags=ctx.flags,
+        transcript=ctx.turns,
         summary=summary,
         html_path=str(html_path),
         pdf_path=str(pdf_path),

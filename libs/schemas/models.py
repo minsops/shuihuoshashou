@@ -233,6 +233,7 @@ class Report(BaseModel):
     score: InterviewScore
     aigc_results: list[AIGCResult]
     consistency_flags: list[ConsistencyFlag]
+    transcript: list[QATurn] = Field(default_factory=list)
     summary: str
     html_path: str | None = None
     pdf_path: str | None = None

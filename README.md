@@ -19,6 +19,7 @@ as a local-first Python MVP:
 - Runtime database URL parsing distinguishes SQLite and PostgreSQL targets.
 - JD knowledge base exposes local lexical retrieval for competency-specific probe patterns.
 - Report artifacts expose storage URIs, using local files by default and S3-style URIs when configured.
+- Reports include structured scores, AIGC checks, consistency flags, and full interview transcripts.
 - AIGC/template checks use a local answer-template corpus with character n-gram cosine similarity.
 
 ## Important Secret Handling

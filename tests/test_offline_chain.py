@@ -52,8 +52,13 @@ def test_offline_interview_chain(tmp_path: Path, monkeypatch) -> None:
     report = end_interview(interview.id)
     assert report.score.total_score > 0
     assert report.aigc_results
+    assert report.transcript
+    assert report.transcript[0].answer == "我主要负责整体架构设计并推动项目落地最终取得显著提升"
     assert (tmp_path / "reports" / f"{interview.id}.html").exists()
-    assert "data:image/png;base64" in Path(report.html_path or "").read_text(encoding="utf-8")
+    html = Path(report.html_path or "").read_text(encoding="utf-8")
+    assert "data:image/png;base64" in html
+    assert "转写全文" in html
+    assert report.transcript[0].answer in html
     assert report.artifact_uris["html"].startswith("file://")
     assert report.artifact_uris["pdf"].startswith("file://")
     assert get_interview(interview.id).status == InterviewStatus.reported
