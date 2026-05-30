@@ -212,9 +212,15 @@ def test_gateway_end_interview_can_return_queued_task(tmp_path: Path, monkeypatc
 
 def test_gateway_metrics_records_requests(tmp_path: Path, monkeypatch) -> None:
     client = _client(tmp_path, monkeypatch)
-    health = client.get("/health", headers={"x-request-id": "trace-123"})
+    traceparent = "00-1234567890abcdef1234567890abcdef-1234567890abcdef-01"
+    health = client.get(
+        "/health",
+        headers={"x-request-id": "trace-123", "traceparent": traceparent},
+    )
     assert health.status_code == 200
     assert health.headers["x-request-id"] == "trace-123"
+    assert health.headers["traceparent"].startswith("00-1234567890abcdef1234567890abcdef-")
+    assert health.headers["traceparent"] != traceparent
 
     response = client.get("/metrics")
     assert response.status_code == 200
@@ -236,6 +242,8 @@ def test_gateway_writes_structured_request_log(
     payloads = [json.loads(record.message) for record in caplog.records if record.name == "shuihuo"]
     request_log = next(item for item in payloads if item["event"] == "http.request")
     assert request_log["request_id"] == "trace-log"
+    assert len(request_log["trace_id"]) == 32
+    assert len(request_log["span_id"]) == 16
     assert request_log["method"] == "GET"
     assert request_log["path"] == "/health"
     assert request_log["status_code"] == 200

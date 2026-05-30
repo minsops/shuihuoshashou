@@ -11,7 +11,13 @@ from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Res
 
 from libs.common.config import get_settings
 from libs.common.database import init_db
-from libs.common.observability import log_event, metrics_registry, rate_limiter, request_id_from_header
+from libs.common.observability import (
+    log_event,
+    metrics_registry,
+    rate_limiter,
+    request_id_from_header,
+    trace_context_from_header,
+)
 from libs.common.runtime import RuntimeStatus, get_runtime_status
 from libs.schemas import (
     CandidateCreate,
@@ -89,6 +95,7 @@ async def observe_and_rate_limit(request: Request, call_next):
     start = perf_counter()
     status_code = 500
     request_id = request_id_from_header(request.headers.get("x-request-id"))
+    trace_context = trace_context_from_header(request.headers.get("traceparent"))
     path = request.url.path
     if request.url.path.startswith("/api/") and not _gateway_authorized(
         request.headers,
@@ -100,7 +107,7 @@ async def observe_and_rate_limit(request: Request, call_next):
         response = PlainTextResponse(
             "unauthorized",
             status_code=status_code,
-            headers={"X-Request-ID": request_id},
+            headers={"X-Request-ID": request_id, "traceparent": trace_context.traceparent},
         )
         metrics_registry.record_request(
             request.method, path, status_code, duration
@@ -108,6 +115,8 @@ async def observe_and_rate_limit(request: Request, call_next):
         log_event(
             "http.request",
             request_id=request_id,
+            trace_id=trace_context.trace_id,
+            span_id=trace_context.span_id,
             method=request.method,
             path=path,
             status_code=status_code,
@@ -126,6 +135,7 @@ async def observe_and_rate_limit(request: Request, call_next):
                 headers={
                     "Retry-After": str(decision.retry_after_seconds),
                     "X-Request-ID": request_id,
+                    "traceparent": trace_context.traceparent,
                 },
             )
             metrics_registry.record_request(
@@ -134,6 +144,8 @@ async def observe_and_rate_limit(request: Request, call_next):
             log_event(
                 "http.request",
                 request_id=request_id,
+                trace_id=trace_context.trace_id,
+                span_id=trace_context.span_id,
                 method=request.method,
                 path=path,
                 status_code=status_code,
@@ -145,6 +157,7 @@ async def observe_and_rate_limit(request: Request, call_next):
         response: Response = await call_next(request)
         status_code = response.status_code
         response.headers["X-Request-ID"] = request_id
+        response.headers["traceparent"] = trace_context.traceparent
         return response
     finally:
         duration = perf_counter() - start
@@ -155,6 +168,8 @@ async def observe_and_rate_limit(request: Request, call_next):
         log_event(
             "http.request",
             request_id=request_id,
+            trace_id=trace_context.trace_id,
+            span_id=trace_context.span_id,
             method=request.method,
             path=route_path,
             status_code=status_code,

@@ -94,8 +94,10 @@ curl -s http://127.0.0.1:8000/metrics
 RATE_LIMIT_ENABLED=true RATE_LIMIT_REQUESTS_PER_MINUTE=120 uvicorn services.gateway.app:app --port 8000
 ```
 
-HTTP responses include `X-Request-ID`; clients may send the same header to correlate API calls,
-structured JSON logs, and Prometheus request metrics.
+HTTP responses include `X-Request-ID` and W3C `traceparent`; clients may send the same headers to
+correlate API calls, structured JSON logs, and Prometheus request metrics. Set
+`OTEL_EXPORTER_OTLP_ENDPOINT` when deploying behind an OpenTelemetry collector; the current local
+runtime emits trace-compatible IDs without requiring the SDK.
 
 Check runtime configuration without exposing secrets:
 

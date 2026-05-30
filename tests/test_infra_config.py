@@ -36,6 +36,7 @@ def test_env_example_lists_runtime_integration_knobs() -> None:
         "ASR_PROVIDER=",
         "ASR_BASE_URL=",
         "GATEWAY_API_KEY=",
+        "OTEL_EXPORTER_OTLP_ENDPOINT=",
         "SPEAKER_DIARIZATION_PROVIDER=",
         "SPEAKER_DIARIZATION_BASE_URL=",
         "OFFLINE_TASK_EXECUTION=",

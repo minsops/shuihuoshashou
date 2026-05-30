@@ -38,6 +38,7 @@ The local implementation is complete as a runnable MVP:
 - Safe runtime config and LLM smoke-test scripts.
 - Prometheus-style `/metrics` endpoint for local HTTP request counters and duration sums.
 - Structured JSON request logs with propagated `X-Request-ID` correlation IDs.
+- W3C `traceparent` propagation with trace/span IDs included in request logs.
 - Optional in-memory per-client rate limit gate for the gateway.
 - Docker Compose entrypoint for gateway, PostgreSQL, Redis, and MinIO.
 

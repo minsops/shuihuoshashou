@@ -2,14 +2,22 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
+from secrets import token_hex
 from threading import Lock
 from time import monotonic
 from uuid import uuid4
 
 LOGGER_NAME = "shuihuo"
 logger = logging.getLogger(LOGGER_NAME)
+TRACEPARENT_RE = re.compile(
+    r"^(?P<version>[0-9a-f]{2})-"
+    r"(?P<trace_id>[0-9a-f]{32})-"
+    r"(?P<span_id>[0-9a-f]{16})-"
+    r"(?P<flags>[0-9a-f]{2})$"
+)
 
 
 def _label_value(value: str) -> str:
@@ -18,6 +26,30 @@ def _label_value(value: str) -> str:
 
 def request_id_from_header(value: str | None) -> str:
     return value.strip() if value and value.strip() else str(uuid4())
+
+
+@dataclass(frozen=True)
+class TraceContext:
+    trace_id: str
+    span_id: str
+    sampled: bool = True
+
+    @property
+    def traceparent(self) -> str:
+        flags = "01" if self.sampled else "00"
+        return f"00-{self.trace_id}-{self.span_id}-{flags}"
+
+
+def trace_context_from_header(value: str | None) -> TraceContext:
+    if value:
+        match = TRACEPARENT_RE.match(value.strip().lower())
+        if match and match.group("trace_id") != "0" * 32 and match.group("span_id") != "0" * 16:
+            return TraceContext(
+                trace_id=match.group("trace_id"),
+                span_id=token_hex(8),
+                sampled=match.group("flags") == "01",
+            )
+    return TraceContext(trace_id=token_hex(16), span_id=token_hex(8))
 
 
 def log_event(event: str, **fields: object) -> None:
