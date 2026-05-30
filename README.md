@@ -12,6 +12,7 @@ as a local-first Python MVP:
 - Unified LLM client with mock mode and OpenAI-compatible HTTP mode for `mimo2.5pro`.
 - End-to-end offline demo from JD + interview turns to probe, scoring, AIGC checks, and report.
 - Interview turns are stored in both the interview context and a `qa_turns` table for auditability.
+- WebSocket transcripts carry speaker/finality/timestamp metadata and emit separate credibility events.
 
 ## Important Secret Handling
 
@@ -87,6 +88,10 @@ returns 401, generate a fresh key and set it through `LLM_API_KEY` without commi
 - `GET /api/interviews/{id}/report.html`
 - `GET /api/interviews/{id}/report.pdf`
 - `WS /ws/interview/{id}`
+
+WebSocket `audio_chunk` events may include `speaker`, `is_final`, `start_ms`, `end_ms`, and
+`confidence`. Only final candidate segments trigger a probe. Downstream events include
+`transcript`, `probe`, `credibility`, optional `signal`, and `report`.
 
 ## One-Shot Offline Evaluation
 

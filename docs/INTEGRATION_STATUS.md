@@ -7,7 +7,8 @@ The local implementation is complete as a runnable MVP:
 - FastAPI gateway and API docs.
 - Local demo UI at `/`.
 - One-shot offline evaluation at `/api/offline/evaluate`.
-- WebSocket real-time text/audio-stub probe flow.
+- WebSocket real-time text/audio-stub probe flow with speaker/finality/timestamp metadata.
+- Separate `credibility` WebSocket event after probe generation.
 - Pydantic v2 shared schemas.
 - SQLite local persistence.
 - Separate `qa_turns` persistence for auditable answer evidence.

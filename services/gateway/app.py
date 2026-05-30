@@ -38,6 +38,8 @@ from services.jd_kb_service.service import create_job, get_job
 from services.probe_service.service import generate_probe
 from services.signal_service.service import extract_behavior_signal
 
+VALID_SPEAKERS = {"interviewer", "candidate", "unknown"}
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -130,10 +132,27 @@ async def _send_probe_for_segment(websocket: WebSocket, interview_id: str, recor
         )
     )
     await websocket.send_json({"type": "probe", "payload": probe.model_dump()})
-    signal = extract_behavior_signal(turn)
+    await websocket.send_json({"type": "credibility", "payload": probe.credibility.model_dump()})
+    signal = extract_behavior_signal(turn) if record.signal_enabled else None
     if signal is not None:
         await websocket.send_json({"type": "signal", "payload": signal.model_dump()})
     return record
+
+
+def _event_speaker(event: dict) -> str | None:
+    speaker = event.get("speaker")
+    if speaker in VALID_SPEAKERS:
+        return str(speaker)
+    return None
+
+
+def _event_bool(event: dict, key: str, default: bool) -> bool:
+    value = event.get(key, default)
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.lower() not in {"0", "false", "no"}
+    return bool(value)
 
 
 @app.post("/api/jobs")
@@ -261,6 +280,11 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                     session_id=interview_id,
                     seq=int(event.get("seq", 0)),
                     audio_b64=event.get("audio", ""),
+                    speaker=_event_speaker(event),
+                    start_ms=event.get("start_ms"),
+                    end_ms=event.get("end_ms"),
+                    is_final=_event_bool(event, "is_final", True),
+                    confidence=event.get("confidence"),
                 )
                 await websocket.send_json({"type": "transcript", "payload": segment.model_dump()})
                 if should_probe(segment, record):
@@ -268,13 +292,22 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
             elif event.get("type") == "text_turn":
                 text = str(event.get("answer", ""))
                 encoded = base64.b64encode(text.encode("utf-8")).decode("ascii")
-                segment = await engine.transcribe_chunk(interview_id, int(event.get("seq", 1)), encoded)
+                segment = await engine.transcribe_chunk(
+                    interview_id,
+                    int(event.get("seq", 1)),
+                    encoded,
+                    speaker=_event_speaker(event) or "candidate",
+                    start_ms=event.get("start_ms"),
+                    end_ms=event.get("end_ms"),
+                    is_final=_event_bool(event, "is_final", True),
+                    confidence=event.get("confidence"),
+                )
                 await websocket.send_json({"type": "transcript", "payload": segment.model_dump()})
                 if should_probe(segment, record):
                     record = await _send_probe_for_segment(websocket, interview_id, record, segment)
             elif event.get("type") == "end":
                 report = end_interview(interview_id)
-                await websocket.send_json({"type": "report", "payload": report.model_dump()})
+                await websocket.send_json({"type": "report", "payload": report.model_dump(mode="json")})
                 break
     except WebSocketDisconnect:
         return

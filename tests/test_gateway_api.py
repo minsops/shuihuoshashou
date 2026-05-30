@@ -21,6 +21,7 @@ def _client(
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'api.db'}")
     monkeypatch.setenv("REPORT_DIR", str(tmp_path / "reports"))
     monkeypatch.setenv("LLM_PROVIDER", "mock")
+    monkeypatch.setenv("SIGNAL_ENABLED", "false")
     monkeypatch.setenv("RATE_LIMIT_ENABLED", str(rate_limit_enabled).lower())
     monkeypatch.setenv("RATE_LIMIT_REQUESTS_PER_MINUTE", str(rate_limit_requests_per_minute))
     get_settings.cache_clear()
@@ -153,9 +154,12 @@ def test_gateway_websocket_probe_flow(tmp_path: Path, monkeypatch) -> None:
         )
         transcript = websocket.receive_json()
         probe = websocket.receive_json()
+        credibility = websocket.receive_json()
         assert transcript["type"] == "transcript"
         assert probe["type"] == "probe"
         assert probe["payload"]["credibility"]["level"] in {"vague", "suspicious"}
+        assert credibility["type"] == "credibility"
+        assert credibility["payload"]["level"] == probe["payload"]["credibility"]["level"]
 
 
 def test_gateway_websocket_text_turn_probe_flow(tmp_path: Path, monkeypatch) -> None:
@@ -177,10 +181,66 @@ def test_gateway_websocket_text_turn_probe_flow(tmp_path: Path, monkeypatch) -> 
         )
         transcript = websocket.receive_json()
         probe = websocket.receive_json()
+        credibility = websocket.receive_json()
         assert transcript["type"] == "transcript"
         assert transcript["payload"]["speaker"] == "candidate"
         assert probe["type"] == "probe"
         assert probe["payload"]["suggestions"]
+        assert credibility["type"] == "credibility"
+
+
+def test_gateway_websocket_ignores_non_final_and_interviewer_segments(
+    tmp_path: Path, monkeypatch
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+
+    text = "我主要负责优化，做了很多事情，效果比较好。"
+    audio = base64.b64encode(text.encode("utf-8")).decode("ascii")
+    with client.websocket_connect(f"/ws/interview/{interview['id']}") as websocket:
+        websocket.send_json(
+            {
+                "type": "audio_chunk",
+                "session_id": interview["id"],
+                "seq": 1,
+                "audio": audio,
+                "speaker": "candidate",
+                "is_final": False,
+                "start_ms": 100,
+                "end_ms": 600,
+                "confidence": 0.6,
+            }
+        )
+        transcript = websocket.receive_json()
+        assert transcript["type"] == "transcript"
+        assert transcript["payload"]["speaker"] == "candidate"
+        assert transcript["payload"]["is_final"] is False
+        assert transcript["payload"]["start_ms"] == 100
+        assert transcript["payload"]["end_ms"] == 600
+        assert transcript["payload"]["confidence"] == 0.6
+
+        websocket.send_json(
+            {
+                "type": "audio_chunk",
+                "session_id": interview["id"],
+                "seq": 3,
+                "audio": audio,
+                "speaker": "interviewer",
+                "is_final": True,
+            }
+        )
+        interviewer_transcript = websocket.receive_json()
+        assert interviewer_transcript["type"] == "transcript"
+        assert interviewer_transcript["payload"]["speaker"] == "interviewer"
+
+        websocket.send_json({"type": "end"})
+        report = websocket.receive_json()
+        assert report["type"] == "report"
 
 
 def test_gateway_one_shot_offline_evaluate(tmp_path: Path, monkeypatch) -> None:
