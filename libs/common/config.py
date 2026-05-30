@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     rate_limit_requests_per_minute: int = 120
     offline_task_backend: str = "local"
     redis_url: str = "redis://localhost:6379/0"
+    redis_stream_prefix: str = "shuihuo"
     object_storage_endpoint: str = ""
     object_storage_bucket: str = "shuihuo-killer"
     object_storage_access_key: str = ""

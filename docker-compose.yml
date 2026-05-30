@@ -26,6 +26,7 @@ services:
       RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-false}
       RATE_LIMIT_REQUESTS_PER_MINUTE: ${RATE_LIMIT_REQUESTS_PER_MINUTE:-120}
       OFFLINE_TASK_BACKEND: ${OFFLINE_TASK_BACKEND:-local}
+      REDIS_STREAM_PREFIX: ${REDIS_STREAM_PREFIX:-shuihuo}
     volumes:
       - app-data:/app/data
     depends_on:

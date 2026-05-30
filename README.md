@@ -8,8 +8,8 @@ as a local-first Python MVP:
 - Python 3.11+ with Pydantic v2 schemas.
 - FastAPI services and gateway.
 - Local SQLite persistence by default, with a PostgreSQL runtime adapter for deployment profiles.
-- In-memory async events instead of Redis/MQ for local development, with explicit offline scoring events.
-- Local task queue boundary for offline scoring, ready to swap for Celery/Redis workers.
+- In-memory async events for local development, with explicit offline scoring events.
+- Local task queue boundary for offline scoring, with optional Redis Streams task publication.
 - Unified LLM client with mock mode and OpenAI-compatible HTTP mode for `mimo2.5pro`.
 - End-to-end offline demo from JD + interview turns to probe, scoring, AIGC checks, and report.
 - Interview turns are stored in both the interview context and a `qa_turns` table for auditability.
@@ -127,12 +127,15 @@ WebSocket `audio_chunk` events may include `speaker`, `is_final`, `start_ms`, `e
 Use this endpoint for the first demo path: paste JD and interview Q&A, then receive the structured
 report plus generated HTML/PDF paths.
 
-In the local profile, `POST /api/interviews/{id}/end` publishes local task events and runs the
-offline pipeline synchronously so demos still return the report immediately. The persisted interview
-state still follows the spec flow: `FINISHED -> SCORING -> REPORTED`.
+In the local profile, `POST /api/interviews/{id}/end` publishes task events and runs the offline
+pipeline synchronously so demos still return the report immediately. The persisted interview state
+still follows the spec flow: `FINISHED -> SCORING -> REPORTED`.
 
-The offline scoring task uses `OFFLINE_TASK_BACKEND=local` by default. It records task enqueue,
-completion, and failure events so the Celery/Redis worker boundary is explicit.
+The offline scoring task uses `OFFLINE_TASK_BACKEND=local` by default. Set
+`OFFLINE_TASK_BACKEND=redis_stream` and install `.[redis]` to also publish task payloads to Redis
+Streams under `{REDIS_STREAM_PREFIX}:tasks:{task_name}` while retaining synchronous local execution.
+It records task enqueue, completion, and failure events so the Celery/Redis worker boundary is
+explicit.
 
 ```bash
 curl -s http://127.0.0.1:8000/api/offline/evaluate \
