@@ -8,6 +8,7 @@ from pathlib import Path
 from jinja2 import Template
 
 from libs.common.config import get_settings
+from libs.common.storage import get_artifact_store
 from libs.schemas import AIGCResult, InterviewContext, InterviewScore, Report
 
 
@@ -154,6 +155,17 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
     pdf_path = Path(settings.report_dir / f"{ctx.session_id}.pdf")
     html_path.write_text(html, encoding="utf-8")
     _write_pdf(html, pdf_path)
+    artifact_store = get_artifact_store()
+    html_artifact = artifact_store.put_file(
+        f"reports/{ctx.session_id}.html",
+        html_path,
+        "text/html; charset=utf-8",
+    )
+    pdf_artifact = artifact_store.put_file(
+        f"reports/{ctx.session_id}.pdf",
+        pdf_path,
+        "application/pdf",
+    )
     report = Report(
         interview_id=ctx.session_id,
         score=score,
@@ -162,5 +174,6 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
         summary=summary,
         html_path=str(html_path),
         pdf_path=str(pdf_path),
+        artifact_uris={"html": html_artifact.uri, "pdf": pdf_artifact.uri},
     )
     return report, html

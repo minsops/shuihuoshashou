@@ -14,6 +14,7 @@ The local implementation is complete as a runnable MVP:
 - Separate `qa_turns` persistence for auditable answer evidence.
 - JD knowledge base local retrieval for competency-specific probe patterns.
 - Probe generation, scoring, AIGC/template checks, consistency checks, HTML/PDF report generation.
+- Report artifact metadata includes local `file://` URIs or configured S3-style URIs.
 - Local offline scoring task flow with `FINISHED -> SCORING -> REPORTED` state transitions.
 - In-memory event bus topics for `qa_turn.created`, `interview.finished`,
   `interview.scoring_started`, and `interview.reported`.
@@ -86,4 +87,4 @@ LLM smoke test ok
 - Replace local SQLite with PostgreSQL/pgvector and Redis-backed state where deployment requires it.
 - Replace the in-memory event bus with Redis Streams, RabbitMQ, Kafka, or Celery workers.
 - Plug a real streaming ASR/diarization engine behind the existing `ASREngine` interface.
-- Move report artifacts to S3-compatible object storage for multi-node deployments.
+- Add concrete S3/MinIO upload client behind the report artifact store for multi-node deployments.

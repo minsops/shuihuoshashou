@@ -236,4 +236,5 @@ class Report(BaseModel):
     summary: str
     html_path: str | None = None
     pdf_path: str | None = None
+    artifact_uris: dict[str, str] = Field(default_factory=dict)
     generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

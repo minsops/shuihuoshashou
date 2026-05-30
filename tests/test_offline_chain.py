@@ -52,6 +52,8 @@ def test_offline_interview_chain(tmp_path: Path, monkeypatch) -> None:
     assert report.aigc_results
     assert (tmp_path / "reports" / f"{interview.id}.html").exists()
     assert "data:image/png;base64" in Path(report.html_path or "").read_text(encoding="utf-8")
+    assert report.artifact_uris["html"].startswith("file://")
+    assert report.artifact_uris["pdf"].startswith("file://")
     assert get_interview(interview.id).status == InterviewStatus.reported
     assert [turn.turn_id for turn in list_turns(interview.id)]
     assert [topic for topic, _ in event_bus.history()] == [
@@ -92,6 +94,37 @@ def test_offline_pipeline_exposes_scoring_state(tmp_path: Path, monkeypatch) -> 
     topics = [topic for topic, _ in event_bus.history()]
     assert "interview.scoring_started" in topics
     assert "interview.reported" in topics
+
+
+def test_report_artifact_uris_use_object_storage_when_configured(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'object.db'}")
+    monkeypatch.setenv("REPORT_DIR", str(tmp_path / "reports"))
+    monkeypatch.setenv("OBJECT_STORAGE_ENDPOINT", "http://minio:9000")
+    monkeypatch.setenv("OBJECT_STORAGE_BUCKET", "reports-bucket")
+    get_settings.cache_clear()
+    event_bus.reset()
+    init_db()
+    job = create_job(JobCreate(title="Backend", jd_text="Python FastAPI"))
+    candidate = create_candidate(CandidateCreate(name="Lin"))
+    interview = create_interview(InterviewCreate(job_id=job.id, candidate_id=candidate.id))
+    add_turn(
+        interview.id,
+        QATurn(
+            question="讲项目",
+            answer="我写了 FastAPI 编排、模型重试和 JSON 校验，因为线上有格式漂移。",
+        ),
+    )
+
+    report = end_interview(interview.id)
+
+    assert report.artifact_uris == {
+        "html": f"s3://reports-bucket/reports/{interview.id}.html",
+        "pdf": f"s3://reports-bucket/reports/{interview.id}.pdf",
+    }
+    assert Path(report.html_path or "").exists()
+    assert Path(report.pdf_path or "").exists()
 
 
 def test_probe_fallback_returns_three_suggestions() -> None:

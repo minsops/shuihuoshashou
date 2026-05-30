@@ -15,6 +15,7 @@ as a local-first Python MVP:
 - WebSocket transcripts carry speaker/finality/timestamp metadata and emit separate credibility events.
 - Docker Compose declares the gateway plus PostgreSQL, Redis, and MinIO for local infrastructure.
 - JD knowledge base exposes local lexical retrieval for competency-specific probe patterns.
+- Report artifacts expose storage URIs, using local files by default and S3-style URIs when configured.
 
 ## Important Secret Handling
 
@@ -63,6 +64,9 @@ docker compose up --build
 The gateway still uses SQLite in the current local profile while PostgreSQL/Redis/MinIO are available
 for the production adapters. This keeps the runnable MVP stable and makes the remaining adapter work
 explicit instead of hidden.
+
+Set `OBJECT_STORAGE_ENDPOINT` and `OBJECT_STORAGE_BUCKET` to make report metadata use S3-style
+artifact URIs while still writing a local copy for development.
 
 Operational endpoints:
 
