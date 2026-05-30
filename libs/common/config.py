@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     asr_candidate_channels: str = "1,right,candidate"
     probe_min_answer_chars: int = 20
     probe_min_interval_ms: int = 1000
+    probe_require_topic_match: bool = True
+    probe_topic_keywords: str = (
+        "项目,技术,架构,方案,决策,优化,性能,指标,数据,负责,实现,"
+        "上线,故障,异常,成本,延迟,吞吐,FastAPI,LLM,Python"
+    )
     speaker_diarization_provider: str = "local"
     speaker_diarization_base_url: str = ""
     speaker_diarization_api_path: str = "/diarize"

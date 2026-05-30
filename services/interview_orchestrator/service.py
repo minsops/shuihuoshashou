@@ -238,10 +238,22 @@ def should_probe(segment: TranscriptSegment, record: InterviewRecord) -> bool:
         return False
     if len(segment.text.strip()) < settings.probe_min_answer_chars:
         return False
+    if settings.probe_require_topic_match and not _is_drill_down_topic(segment.text):
+        return False
     if not record.context.turns:
         return True
     last_turn = record.context.turns[-1]
     return segment.start_ms - last_turn.answer_end_ms >= settings.probe_min_interval_ms
+
+
+def _is_drill_down_topic(text: str) -> bool:
+    normalized = text.strip().lower()
+    keywords = [
+        item.strip().lower()
+        for item in get_settings().probe_topic_keywords.split(",")
+        if item.strip()
+    ]
+    return any(keyword in normalized for keyword in keywords)
 
 
 def finish_interview(interview_id: str) -> InterviewRecord:

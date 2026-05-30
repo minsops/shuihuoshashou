@@ -436,7 +436,7 @@ def test_should_probe_uses_configurable_thresholds(monkeypatch) -> None:
     early = TranscriptSegment(
         session_id=record.id,
         speaker="candidate",
-        text="足够长的回答",
+        text="我负责项目里的接口优化",
         start_ms=3000,
         end_ms=3200,
         is_final=True,
@@ -446,3 +446,33 @@ def test_should_probe_uses_configurable_thresholds(monkeypatch) -> None:
 
     assert should_probe(early, record) is False
     assert should_probe(late, record) is True
+
+
+def test_should_probe_requires_drill_down_topic_by_default(monkeypatch) -> None:
+    monkeypatch.delenv("PROBE_REQUIRE_TOPIC_MATCH", raising=False)
+    monkeypatch.setenv("PROBE_MIN_ANSWER_CHARS", "5")
+    get_settings.cache_clear()
+    model = generate_competency_model("job-local", "Backend", "Python 服务端岗位")
+    record = InterviewRecord(
+        job_id=model.job_id,
+        candidate_id="candidate-local",
+        context=InterviewContext(
+            session_id="session-local",
+            job_id=model.job_id,
+            candidate_id="candidate-local",
+            competency_model=model,
+        ),
+    )
+    casual = TranscriptSegment(
+        session_id=record.id,
+        speaker="candidate",
+        text="今天状态还可以，整体感觉比较顺利。",
+        start_ms=0,
+        end_ms=1000,
+        is_final=True,
+        confidence=0.9,
+    )
+    project = casual.model_copy(update={"text": "我负责项目里的 FastAPI 架构优化。"})
+
+    assert should_probe(casual, record) is False
+    assert should_probe(project, record) is True

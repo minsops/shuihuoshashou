@@ -28,6 +28,7 @@ from libs.schemas import (
     OfflineInterviewResult,
     ProbeRequest,
     QATurn,
+    TranscriptSegment,
 )
 from services.asr_service.service import asr_session_manager, get_asr_engine
 from services.interview_orchestrator.service import (
@@ -218,6 +219,19 @@ async def _send_probe_for_segment(websocket: WebSocket, interview_id: str, recor
     if signal is not None:
         await websocket.send_json({"type": "signal", "payload": signal.model_dump()})
     return record
+
+
+def _manual_probe_segment(interview_id: str, event: dict) -> TranscriptSegment:
+    text = str(event.get("answer") or event.get("latest_answer") or "").strip()
+    return TranscriptSegment(
+        session_id=interview_id,
+        speaker="candidate",
+        text=text,
+        start_ms=int(event.get("start_ms", 0) or 0),
+        end_ms=int(event.get("end_ms", event.get("start_ms", 0) or 0) or 0),
+        is_final=True,
+        confidence=float(event.get("confidence", 1.0) or 1.0),
+    )
 
 
 def _event_speaker(event: dict) -> str | None:
@@ -441,6 +455,14 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                 await websocket.send_json({"type": "transcript", "payload": segment.model_dump()})
                 if should_probe(segment, record):
                     record = await _send_probe_for_segment(websocket, interview_id, record, segment)
+            elif event.get("type") == "manual_probe":
+                segment = _manual_probe_segment(interview_id, event)
+                if not segment.text:
+                    await websocket.send_json(
+                        {"type": "error", "detail": "manual_probe requires answer"}
+                    )
+                    continue
+                record = await _send_probe_for_segment(websocket, interview_id, record, segment)
             elif event.get("type") == "end":
                 report = end_interview(interview_id)
                 await websocket.send_json({"type": "report", "payload": report.model_dump(mode="json")})

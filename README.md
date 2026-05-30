@@ -152,7 +152,10 @@ with the same sequence are deduplicated and returned as `asr_warning` events ins
 duplicate probe generation. When ASR returns `unknown` speaker, the session manager first tries to
 resolve it from a previously observed local audio cluster, then falls back to short-gap continuity.
 Tune `PROBE_MIN_ANSWER_CHARS` and `PROBE_MIN_INTERVAL_MS` to control when candidate final segments
-are eligible for probe generation.
+are eligible for probe generation. `PROBE_REQUIRE_TOPIC_MATCH` and `PROBE_TOPIC_KEYWORDS` keep
+automatic probes focused on drill-down topics such as projects, technical decisions, metrics, and
+incidents. Send a WebSocket `manual_probe` event with an `answer` to model the interviewer clicking
+"ask a probe now"; manual probes bypass the automatic length, topic, and interval gates.
 
 Set `ASR_PROVIDER=http`, `ASR_BASE_URL`, `ASR_API_PATH`, and `ASR_API_KEY` to forward audio chunks to
 a cloud ASR endpoint. Response mapping is configurable with `ASR_TEXT_PATH`, `ASR_SPEAKER_PATH`,

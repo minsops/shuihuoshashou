@@ -98,6 +98,8 @@ def test_gateway_config_status_hides_secrets(tmp_path: Path, monkeypatch) -> Non
     assert payload["asr_channel_diarization_configured"] is True
     assert payload["probe_min_answer_chars"] == 20
     assert payload["probe_min_interval_ms"] == 1000
+    assert payload["probe_require_topic_match"] is True
+    assert payload["probe_topic_keywords_configured"] is True
     assert payload["speaker_diarization_provider"] == "local"
     assert payload["speaker_diarization_base_url_configured"] is False
     assert payload["speaker_diarization_api_key_configured"] is False
@@ -375,6 +377,26 @@ def test_gateway_websocket_text_turn_probe_flow(tmp_path: Path, monkeypatch) -> 
         credibility = websocket.receive_json()
         assert transcript["type"] == "transcript"
         assert transcript["payload"]["speaker"] == "candidate"
+        assert probe["type"] == "probe"
+        assert probe["payload"]["suggestions"]
+        assert credibility["type"] == "credibility"
+
+
+def test_gateway_websocket_manual_probe_bypasses_auto_gates(
+    tmp_path: Path, monkeypatch
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+
+    with client.websocket_connect(f"/ws/interview/{interview['id']}") as websocket:
+        websocket.send_json({"type": "manual_probe", "answer": "好"})
+        probe = websocket.receive_json()
+        credibility = websocket.receive_json()
         assert probe["type"] == "probe"
         assert probe["payload"]["suggestions"]
         assert credibility["type"] == "credibility"
