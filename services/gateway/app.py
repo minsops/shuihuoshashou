@@ -314,7 +314,11 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                     is_final=_event_bool(event, "is_final", True),
                     confidence=event.get("confidence"),
                 )
-                decision = asr_session_manager.accept_segment(seq, segment)
+                decision = asr_session_manager.accept_segment(
+                    seq,
+                    segment,
+                    audio_b64=event.get("audio", ""),
+                )
                 if not decision.accepted or decision.segment is None:
                     await websocket.send_json(
                         {"type": "asr_warning", "payload": {"reason": decision.reason, "seq": seq}}
@@ -338,7 +342,7 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                     is_final=_event_bool(event, "is_final", True),
                     confidence=event.get("confidence"),
                 )
-                decision = asr_session_manager.accept_segment(seq, segment)
+                decision = asr_session_manager.accept_segment(seq, segment, audio_b64=encoded)
                 if not decision.accepted or decision.segment is None:
                     await websocket.send_json(
                         {"type": "asr_warning", "payload": {"reason": decision.reason, "seq": seq}}

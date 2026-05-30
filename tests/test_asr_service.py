@@ -155,3 +155,33 @@ def test_asr_session_manager_smooths_unknown_speaker_by_continuity() -> None:
     assert decision.accepted is True
     assert decision.segment is not None
     assert decision.segment.speaker == "candidate"
+
+
+def test_asr_session_manager_resolves_unknown_speaker_from_audio_cluster() -> None:
+    manager = ASRSessionManager(speaker_continuity_gap_ms=0)
+    audio = base64.b64encode(b"candidate-voiceprint").decode("ascii")
+    known = TranscriptSegment(
+        session_id="session-1",
+        speaker="candidate",
+        text="第一段",
+        start_ms=0,
+        end_ms=500,
+        is_final=True,
+        confidence=0.9,
+    )
+    unknown_same_voice = TranscriptSegment(
+        session_id="session-1",
+        speaker="unknown",
+        text="同一个说话人稍后补充",
+        start_ms=5000,
+        end_ms=5600,
+        is_final=True,
+        confidence=0.7,
+    )
+
+    manager.accept_segment(1, known, audio_b64=audio)
+    decision = manager.accept_segment(2, unknown_same_voice, audio_b64=audio)
+
+    assert decision.accepted is True
+    assert decision.segment is not None
+    assert decision.segment.speaker == "candidate"

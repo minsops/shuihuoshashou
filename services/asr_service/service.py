@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from threading import Lock
@@ -28,6 +29,55 @@ class ASRSessionDecision:
 
 
 @dataclass
+class SpeakerDiarizationState:
+    cluster_roles: dict[str, Speaker] = field(default_factory=dict)
+
+
+class SpeakerDiarizer(ABC):
+    @abstractmethod
+    def resolve_speaker(
+        self,
+        session_id: str,
+        audio_b64: str | None,
+        speaker: Speaker,
+    ) -> Speaker:
+        raise NotImplementedError
+
+    def close(self, session_id: str) -> None:
+        return None
+
+    def reset(self) -> None:
+        return None
+
+
+class LocalSpeakerDiarizer(SpeakerDiarizer):
+    def __init__(self) -> None:
+        self._sessions: dict[str, SpeakerDiarizationState] = {}
+
+    def resolve_speaker(
+        self,
+        session_id: str,
+        audio_b64: str | None,
+        speaker: Speaker,
+    ) -> Speaker:
+        fingerprint = _audio_fingerprint(audio_b64)
+        if fingerprint is None:
+            return speaker
+
+        state = self._sessions.setdefault(session_id, SpeakerDiarizationState())
+        if speaker in {"interviewer", "candidate"}:
+            state.cluster_roles[fingerprint] = speaker
+            return speaker
+        return state.cluster_roles.get(fingerprint, speaker)
+
+    def close(self, session_id: str) -> None:
+        self._sessions.pop(session_id, None)
+
+    def reset(self) -> None:
+        self._sessions.clear()
+
+
+@dataclass
 class ASRSessionState:
     chunks: dict[int, ASRSessionChunk] = field(default_factory=dict)
     last_final_seq: int = -1
@@ -36,12 +86,23 @@ class ASRSessionState:
 
 
 class ASRSessionManager:
-    def __init__(self, speaker_continuity_gap_ms: int = 1500) -> None:
+    def __init__(
+        self,
+        speaker_continuity_gap_ms: int = 1500,
+        speaker_diarizer: SpeakerDiarizer | None = None,
+    ) -> None:
         self.speaker_continuity_gap_ms = speaker_continuity_gap_ms
+        self.speaker_diarizer = speaker_diarizer or LocalSpeakerDiarizer()
         self._sessions: dict[str, ASRSessionState] = {}
         self._lock = Lock()
 
-    def accept_segment(self, seq: int, segment: TranscriptSegment) -> ASRSessionDecision:
+    def accept_segment(
+        self,
+        seq: int,
+        segment: TranscriptSegment,
+        *,
+        audio_b64: str | None = None,
+    ) -> ASRSessionDecision:
         with self._lock:
             state = self._sessions.setdefault(segment.session_id, ASRSessionState())
             existing = state.chunks.get(seq)
@@ -50,6 +111,13 @@ class ASRSessionManager:
             if segment.is_final and seq <= state.last_final_seq:
                 return ASRSessionDecision(False, reason="late_final_segment")
 
+            resolved_speaker = self.speaker_diarizer.resolve_speaker(
+                segment.session_id,
+                audio_b64,
+                segment.speaker,
+            )
+            if resolved_speaker != segment.speaker:
+                segment = segment.model_copy(update={"speaker": resolved_speaker})
             segment = self._smooth_speaker(state, segment)
             state.chunks[seq] = ASRSessionChunk(seq=seq, segment=segment)
             if segment.is_final:
@@ -62,10 +130,12 @@ class ASRSessionManager:
     def close(self, session_id: str) -> None:
         with self._lock:
             self._sessions.pop(session_id, None)
+            self.speaker_diarizer.close(session_id)
 
     def reset(self) -> None:
         with self._lock:
             self._sessions.clear()
+            self.speaker_diarizer.reset()
 
     def _smooth_speaker(
         self,
@@ -222,6 +292,18 @@ def _coerce_speaker(value: Any) -> Speaker:
     if value in {"interviewer", "candidate", "unknown"}:
         return value
     return "unknown"
+
+
+def _audio_fingerprint(audio_b64: str | None) -> str | None:
+    if not audio_b64:
+        return None
+    try:
+        raw = base64.b64decode(audio_b64)
+    except Exception:
+        return None
+    if not raw:
+        return None
+    return hashlib.sha256(raw).hexdigest()
 
 
 def get_asr_engine() -> ASREngine:
