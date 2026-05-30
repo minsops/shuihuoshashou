@@ -4,6 +4,8 @@ import pytest
 
 from libs.common.events import event_bus
 from libs.common.tasks import (
+    CeleryBackedTaskQueue,
+    CeleryTaskPublisher,
     LocalTaskQueue,
     RedisBackedTaskQueue,
     RedisStreamPublisher,
@@ -44,6 +46,31 @@ class FakeRedis:
 
     def xack(self, stream: str, group: str, message_id: str) -> None:
         self.acked.append((stream, group, message_id))
+
+
+class FakeCeleryResult:
+    id = "celery-task-1"
+
+
+class FakeCelerySender:
+    def __init__(self) -> None:
+        self.sent: list[tuple[str, dict]] = []
+
+    def send_task(self, name: str, kwargs: dict, task_id: str) -> FakeCeleryResult:
+        self.sent.append((name, {"kwargs": kwargs, "task_id": task_id}))
+        return FakeCeleryResult()
+
+
+class FakeCeleryApp:
+    def __init__(self) -> None:
+        self.tasks: dict[str, object] = {}
+
+    def task(self, name: str):
+        def decorate(func):
+            self.tasks[name] = func
+            return func
+
+        return decorate
 
 
 def test_local_task_queue_records_success() -> None:
@@ -203,3 +230,79 @@ def test_redis_stream_worker_publishes_failure_without_ack() -> None:
     history = event_bus.history()
     assert [topic for topic, _ in history] == ["task.worker_failed"]
     assert history[0][1]["error"] == "boom"
+
+
+def test_celery_task_publisher_sends_named_task() -> None:
+    sender = FakeCelerySender()
+    publisher = CeleryTaskPublisher(
+        broker_url="redis://localhost:6379/1",
+        result_backend="redis://localhost:6379/2",
+        sender=sender,
+    )
+
+    celery_task_id = publisher.publish_task(
+        "task-1",
+        "interview.offline_scoring",
+        {"interview_id": "abc"},
+    )
+
+    assert celery_task_id == "celery-task-1"
+    assert sender.sent == [
+        (
+            "interview.offline_scoring",
+            {"kwargs": {"interview_id": "abc"}, "task_id": "task-1"},
+        )
+    ]
+
+
+def test_celery_backed_task_queue_defers_to_celery() -> None:
+    event_bus.reset()
+    sender = FakeCelerySender()
+    publisher = CeleryTaskPublisher(
+        broker_url="redis://localhost:6379/1",
+        result_backend="redis://localhost:6379/2",
+        sender=sender,
+    )
+    queue = CeleryBackedTaskQueue(publisher=publisher)
+
+    record = queue.enqueue_deferred("interview.offline_scoring", {"interview_id": "abc"})
+
+    assert record.status == "queued"
+    assert sender.sent[0][0] == "interview.offline_scoring"
+    history = event_bus.history()
+    assert [topic for topic, _ in history] == ["task.enqueued"]
+    assert history[0][1]["celery_task_id"] == "celery-task-1"
+
+
+def test_celery_backed_task_queue_publishes_and_runs_handler() -> None:
+    event_bus.reset()
+    sender = FakeCelerySender()
+    publisher = CeleryTaskPublisher(
+        broker_url="redis://localhost:6379/1",
+        result_backend="redis://localhost:6379/2",
+        sender=sender,
+    )
+    queue = CeleryBackedTaskQueue(publisher=publisher)
+
+    record = queue.enqueue(
+        "interview.offline_scoring",
+        {"value": 2},
+        lambda payload: payload["value"] + 3,
+    )
+
+    assert record.status == "completed"
+    assert record.result == 5
+    assert sender.sent[0][0] == "interview.offline_scoring"
+    history = event_bus.history()
+    assert [topic for topic, _ in history] == ["task.enqueued", "task.completed"]
+    assert history[0][1]["celery_task_id"] == "celery-task-1"
+    assert history[1][1]["celery_task_id"] == "celery-task-1"
+
+
+def test_celery_task_registration_uses_offline_scoring_task_name() -> None:
+    from services.offline_worker.celery_tasks import OFFLINE_SCORING_TASK, register_tasks
+
+    app = FakeCeleryApp()
+    task_func = register_tasks(app)
+
+    assert app.tasks[OFFLINE_SCORING_TASK] is task_func

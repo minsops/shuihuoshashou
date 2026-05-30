@@ -29,6 +29,13 @@ def test_dockerfile_packages_gateway_app() -> None:
     assert "services.gateway.app:app" in dockerfile
 
 
+def test_pyproject_declares_optional_worker_dependencies() -> None:
+    pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+
+    assert 'redis = ["redis>=5.0.0"]' in pyproject
+    assert 'celery = ["celery[redis]>=5.3.0"]' in pyproject
+
+
 def test_env_example_lists_runtime_integration_knobs() -> None:
     env_example = (ROOT / ".env.example").read_text(encoding="utf-8")
 
@@ -41,6 +48,8 @@ def test_env_example_lists_runtime_integration_knobs() -> None:
         "SPEAKER_DIARIZATION_PROVIDER=",
         "SPEAKER_DIARIZATION_BASE_URL=",
         "OFFLINE_TASK_EXECUTION=",
+        "CELERY_BROKER_URL=",
+        "CELERY_RESULT_BACKEND=",
         "REDIS_STREAM_PREFIX=",
         "JD_VECTOR_BACKEND=",
         "OBJECT_STORAGE_ACCESS_KEY=",

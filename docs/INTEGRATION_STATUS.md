@@ -29,6 +29,7 @@ The local implementation is complete as a runnable MVP:
 - Report artifacts support local `file://` storage and SigV4 uploads to S3-compatible storage.
 - Local offline scoring task flow with `FINISHED -> SCORING -> REPORTED` state transitions.
 - Local task queue boundary for offline scoring with Redis Streams task publication and worker consumption.
+- Optional Celery task publication and worker registration for `interview.offline_scoring`.
 - Configurable async end-interview mode returns queued task metadata while workers generate reports.
 - In-memory event bus topics for `qa_turn.created`, `interview.finished`,
   `task.enqueued`, `interview.scoring_started`, `interview.reported`, and `task.completed`.

@@ -103,6 +103,8 @@ def test_gateway_config_status_hides_secrets(tmp_path: Path, monkeypatch) -> Non
     assert payload["rate_limit_requests_per_minute"] == 120
     assert payload["offline_task_backend"] == "local"
     assert payload["offline_task_execution"] == "sync"
+    assert payload["celery_broker_configured"] is True
+    assert payload["celery_result_backend_configured"] is True
     assert payload["redis_url_configured"] is True
     assert payload["redis_stream_prefix"] == "shuihuo"
     assert payload["jd_vector_backend"] == "local"

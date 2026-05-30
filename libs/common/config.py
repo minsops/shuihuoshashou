@@ -48,6 +48,8 @@ class Settings(BaseSettings):
     rate_limit_requests_per_minute: int = 120
     offline_task_backend: str = "local"
     offline_task_execution: str = "sync"
+    celery_broker_url: str = "redis://localhost:6379/1"
+    celery_result_backend: str = "redis://localhost:6379/2"
     redis_url: str = "redis://localhost:6379/0"
     redis_stream_prefix: str = "shuihuo"
     jd_vector_backend: str = "local"

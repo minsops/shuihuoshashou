@@ -169,8 +169,9 @@ still follows the spec flow: `FINISHED -> SCORING -> REPORTED`.
 The offline scoring task uses `OFFLINE_TASK_BACKEND=local` by default. Set
 `OFFLINE_TASK_BACKEND=redis_stream` and install `.[redis]` to also publish task payloads to Redis
 Streams under `{REDIS_STREAM_PREFIX}:tasks:{task_name}` while retaining synchronous local execution.
-It records task enqueue, completion, and failure events so the Celery/Redis worker boundary is
-explicit.
+Set `OFFLINE_TASK_BACKEND=celery` and install `.[celery]` to publish the same
+`interview.offline_scoring` task through Celery using `CELERY_BROKER_URL` and
+`CELERY_RESULT_BACKEND`.
 
 Set `OFFLINE_TASK_EXECUTION=async` to make `POST /api/interviews/{id}/end` return a queued task
 instead of blocking for the report. The worker then consumes the Redis Stream and creates the report.
@@ -183,6 +184,12 @@ OFFLINE_TASK_BACKEND=redis_stream python scripts/run_offline_worker.py
 ```
 
 Use `--once` for a single poll cycle in deployment smoke tests.
+
+Run a Celery worker for offline scoring tasks with:
+
+```bash
+OFFLINE_TASK_BACKEND=celery celery -A services.offline_worker.celery_tasks:celery_app worker --loglevel=info
+```
 
 ```bash
 curl -s http://127.0.0.1:8000/api/offline/evaluate \
