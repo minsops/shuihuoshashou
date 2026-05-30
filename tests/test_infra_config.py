@@ -35,6 +35,7 @@ def test_env_example_lists_runtime_integration_knobs() -> None:
     for key in [
         "ASR_PROVIDER=",
         "ASR_BASE_URL=",
+        "GATEWAY_API_KEY=",
         "SPEAKER_DIARIZATION_PROVIDER=",
         "SPEAKER_DIARIZATION_BASE_URL=",
         "OFFLINE_TASK_EXECUTION=",

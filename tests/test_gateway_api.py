@@ -4,6 +4,7 @@ import base64
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 
 from libs.common.config import get_settings
 from libs.common.events import event_bus
@@ -19,6 +20,7 @@ def _client(
     *,
     rate_limit_enabled: bool = False,
     rate_limit_requests_per_minute: int = 120,
+    gateway_api_key: str = "",
 ) -> TestClient:
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'api.db'}")
     monkeypatch.setenv("REPORT_DIR", str(tmp_path / "reports"))
@@ -26,6 +28,7 @@ def _client(
     monkeypatch.setenv("SIGNAL_ENABLED", "false")
     monkeypatch.setenv("RATE_LIMIT_ENABLED", str(rate_limit_enabled).lower())
     monkeypatch.setenv("RATE_LIMIT_REQUESTS_PER_MINUTE", str(rate_limit_requests_per_minute))
+    monkeypatch.setenv("GATEWAY_API_KEY", gateway_api_key)
     monkeypatch.setenv("OFFLINE_TASK_BACKEND", "local")
     get_settings.cache_clear()
     event_bus.reset()
@@ -85,6 +88,7 @@ def test_gateway_config_status_hides_secrets(tmp_path: Path, monkeypatch) -> Non
     assert response.status_code == 200
     payload = response.json()
     assert payload["llm_api_key_configured"] is True
+    assert payload["gateway_auth_enabled"] is False
     assert payload["asr_provider"] == "stub"
     assert payload["asr_base_url_configured"] is False
     assert payload["asr_api_key_configured"] is False
@@ -102,6 +106,61 @@ def test_gateway_config_status_hides_secrets(tmp_path: Path, monkeypatch) -> Non
     assert payload["object_storage_endpoint_configured"] is False
     assert payload["object_storage_bucket"] == "shuihuo-killer"
     assert "super-secret" not in response.text
+
+
+def test_gateway_api_key_auth_can_be_enabled(tmp_path: Path, monkeypatch) -> None:
+    client = _client(tmp_path, monkeypatch, gateway_api_key="gateway-secret")
+
+    assert client.get("/health").status_code == 200
+    assert client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).status_code == 401
+
+    created = client.post(
+        "/api/jobs",
+        headers={"x-api-key": "gateway-secret"},
+        json={"title": "Backend", "jd_text": "Python"},
+    )
+    assert created.status_code == 200
+    status = client.get(
+        "/api/config/status",
+        headers={"authorization": "Bearer gateway-secret"},
+    )
+    assert status.status_code == 200
+    payload = status.json()
+    assert payload["gateway_auth_enabled"] is True
+    assert "gateway-secret" not in status.text
+
+
+def test_gateway_websocket_requires_api_key_when_enabled(tmp_path: Path, monkeypatch) -> None:
+    client = _client(tmp_path, monkeypatch, gateway_api_key="gateway-secret")
+    headers = {"x-api-key": "gateway-secret"}
+    job = client.post(
+        "/api/jobs",
+        headers=headers,
+        json={"title": "Backend", "jd_text": "Python"},
+    ).json()
+    candidate = client.post(
+        "/api/candidates",
+        headers=headers,
+        json={"name": "Candidate"},
+    ).json()
+    interview = client.post(
+        "/api/interviews",
+        headers=headers,
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+
+    try:
+        with client.websocket_connect(f"/ws/interview/{interview['id']}"):
+            raise AssertionError("expected websocket auth failure")
+    except WebSocketDisconnect as exc:
+        assert exc.code == 1008
+
+    with client.websocket_connect(
+        f"/ws/interview/{interview['id']}",
+        headers=headers,
+    ) as websocket:
+        websocket.send_json({"type": "end"})
+        assert websocket.receive_json()["type"] == "report"
 
 
 def test_gateway_job_probe_pattern_search(tmp_path: Path, monkeypatch) -> None:

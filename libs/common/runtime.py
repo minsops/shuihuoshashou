@@ -7,6 +7,7 @@ from libs.common.config import get_settings
 
 class RuntimeStatus(BaseModel):
     app_env: str
+    gateway_auth_enabled: bool
     database_url: str
     llm_provider: str
     llm_model: str
@@ -42,6 +43,7 @@ def get_runtime_status() -> RuntimeStatus:
     settings = get_settings()
     return RuntimeStatus(
         app_env=settings.app_env,
+        gateway_auth_enabled=bool(settings.gateway_api_key),
         database_url=settings.database_url,
         llm_provider=settings.llm_provider,
         llm_model=settings.llm_model,

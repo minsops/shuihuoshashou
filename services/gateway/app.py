@@ -6,6 +6,7 @@ from pathlib import Path
 from time import perf_counter
 
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from starlette.datastructures import Headers
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
 
 from libs.common.config import get_settings
@@ -65,12 +66,40 @@ def _route_path(request: Request) -> str:
     return getattr(route, "path", request.url.path)
 
 
+def _extract_gateway_api_key(headers: Headers, query_key: str | None = None) -> str:
+    header_key = headers.get("x-api-key", "")
+    if header_key:
+        return header_key
+    authorization = headers.get("authorization", "")
+    if authorization.lower().startswith("bearer "):
+        return authorization[7:].strip()
+    return query_key or ""
+
+
+def _gateway_authorized(headers: Headers, expected_key: str, query_key: str | None = None) -> bool:
+    if not expected_key:
+        return True
+    return _extract_gateway_api_key(headers, query_key) == expected_key
+
+
 @app.middleware("http")
 async def observe_and_rate_limit(request: Request, call_next):
     settings = get_settings()
     rate_limiter.requests_per_minute = settings.rate_limit_requests_per_minute
     start = perf_counter()
     status_code = 500
+    if request.url.path.startswith("/api/") and not _gateway_authorized(
+        request.headers,
+        settings.gateway_api_key,
+        request.query_params.get("api_key"),
+    ):
+        status_code = 401
+        response = PlainTextResponse("unauthorized", status_code=status_code)
+        metrics_registry.record_request(
+            request.method, request.url.path, status_code, perf_counter() - start
+        )
+        return response
+
     if settings.rate_limit_enabled:
         decision = rate_limiter.check(_client_key(request))
         if not decision.allowed:
@@ -296,6 +325,14 @@ def api_report_pdf(interview_id: str):
 
 @app.websocket("/ws/interview/{interview_id}")
 async def ws_interview(websocket: WebSocket, interview_id: str):
+    settings = get_settings()
+    if not _gateway_authorized(
+        websocket.headers,
+        settings.gateway_api_key,
+        websocket.query_params.get("api_key"),
+    ):
+        await websocket.close(code=1008)
+        return
     await websocket.accept()
     engine = get_asr_engine()
     try:

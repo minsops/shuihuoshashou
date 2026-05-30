@@ -7,6 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_env: str = "local"
+    gateway_api_key: str = ""
     database_url: str = "sqlite:///data/shuihuo_killer.db"
     llm_provider: str = "mock"
     llm_model: str = "mimo-v2.5-pro"

@@ -46,6 +46,9 @@ If `LLM_PROVIDER=mock` or no API key is present, the system runs with determinis
 The default values follow the MiMo OpenAI-compatible chat completions protocol. If the provider changes
 the endpoint, auth header, or response JSON shape, change only the `LLM_*` environment variables above.
 
+Set `GATEWAY_API_KEY` in deployed environments to require `X-API-Key: ...` or
+`Authorization: Bearer ...` for `/api/*` and WebSocket traffic. It is empty by default for local demos.
+
 ## Run Locally
 
 ```bash
@@ -99,6 +102,9 @@ python scripts/diagnose_llm_network.py
 LLM_API_KEY=your-key python scripts/diagnose_llm_auth.py
 curl -s http://127.0.0.1:8000/api/config/status
 ```
+
+When `GATEWAY_API_KEY` is set, include `X-API-Key` or a bearer token on API requests. WebSocket
+clients can pass the same key in headers or as `?api_key=...`.
 
 If `check_llm.py` fails with a connection error, run `diagnose_llm_network.py`. It checks DNS, TCP,
 and TLS for the configured `LLM_BASE_URL` without printing your API key.

@@ -5,6 +5,7 @@
 The local implementation is complete as a runnable MVP:
 
 - FastAPI gateway and API docs.
+- Optional gateway API-key authentication for `/api/*` and WebSocket traffic.
 - Local demo UI at `/`.
 - One-shot offline evaluation at `/api/offline/evaluate`.
 - WebSocket real-time text/audio-stub probe flow with speaker/finality/timestamp metadata and channel-based speaker mapping.
