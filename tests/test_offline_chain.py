@@ -51,6 +51,7 @@ def test_offline_interview_chain(tmp_path: Path, monkeypatch) -> None:
     assert report.score.total_score > 0
     assert report.aigc_results
     assert (tmp_path / "reports" / f"{interview.id}.html").exists()
+    assert "data:image/png;base64" in Path(report.html_path or "").read_text(encoding="utf-8")
     assert get_interview(interview.id).status == InterviewStatus.reported
     assert [turn.turn_id for turn in list_turns(interview.id)]
     assert [topic for topic, _ in event_bus.history()] == [

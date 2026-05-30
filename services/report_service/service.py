@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from pathlib import Path
+import base64
 from contextlib import redirect_stderr, redirect_stdout
-from io import StringIO
+from io import BytesIO, StringIO
+from pathlib import Path
 
 from jinja2 import Template
 
@@ -35,10 +36,14 @@ REPORT_TEMPLATE = Template(
       </section>
       <section>
         <h2>维度得分</h2>
+        {% if radar_chart_uri %}
+        <img src="{{ radar_chart_uri }}" alt="维度雷达图" style="max-width: 520px; width: 100%; margin: 8px 0 18px;">
+        {% endif %}
         <table>
-          <tr><th>维度</th><th>分数</th><th>权重</th><th>证据</th></tr>
+          <tr><th>编号</th><th>维度</th><th>分数</th><th>权重</th><th>证据</th></tr>
           {% for d in score.dimensions %}
           <tr>
+            <td>D{{ loop.index }}</td>
             <td>{{ d.dimension }}</td>
             <td>{{ d.score }}</td>
             <td>{{ d.weight }}</td>
@@ -56,6 +61,42 @@ REPORT_TEMPLATE = Template(
     </html>
     """
 )
+
+
+def _radar_chart_uri(score: InterviewScore) -> str:
+    if not score.dimensions:
+        return ""
+
+    with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        import numpy as np
+
+        labels = [f"D{index}" for index, _ in enumerate(score.dimensions, start=1)]
+        values = [dimension.score for dimension in score.dimensions]
+        angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False).tolist()
+        values += values[:1]
+        angles += angles[:1]
+
+        fig = plt.figure(figsize=(4.8, 4.2), dpi=150)
+        ax = fig.add_subplot(111, polar=True)
+        ax.plot(angles, values, color="#2563eb", linewidth=2)
+        ax.fill(angles, values, color="#60a5fa", alpha=0.25)
+        ax.set_ylim(0, 100)
+        ax.set_xticks(angles[:-1])
+        ax.set_xticklabels(labels)
+        ax.set_yticks([20, 40, 60, 80, 100])
+        ax.grid(color="#cbd5e1", linewidth=0.8)
+        fig.tight_layout()
+
+        image = BytesIO()
+        fig.savefig(image, format="png", bbox_inches="tight", transparent=False)
+        plt.close(fig)
+
+    encoded = base64.b64encode(image.getvalue()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
 
 
 def _write_pdf(html: str, pdf_path: Path) -> None:
@@ -101,7 +142,12 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
         f"候选人在本场面试中获得 {score.total_score} 分，系统建议为 {score.recommendation}。"
         "报告中的每项评分均绑定原始回答证据，注水风险需由面试官结合上下文复核。"
     )
-    html = REPORT_TEMPLATE.render(score=score, summary=summary, flags=ctx.flags)
+    html = REPORT_TEMPLATE.render(
+        score=score,
+        summary=summary,
+        flags=ctx.flags,
+        radar_chart_uri=_radar_chart_uri(score),
+    )
     settings = get_settings()
     settings.report_dir.mkdir(parents=True, exist_ok=True)
     html_path = Path(settings.report_dir / f"{ctx.session_id}.html")
