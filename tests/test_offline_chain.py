@@ -76,6 +76,9 @@ def test_offline_interview_chain(tmp_path: Path, monkeypatch) -> None:
     assert (tmp_path / "reports" / f"{interview.id}.html").exists()
     html = Path(report.html_path or "").read_text(encoding="utf-8")
     assert "data:image/png;base64" in html
+    assert "亮点" in html
+    assert "AIGC 察重" in html
+    assert "疑似注水/模板化" in html
     assert "转写全文" in html
     assert report.transcript[0].answer in html
     assert report.artifact_uris["html"].startswith("file://")

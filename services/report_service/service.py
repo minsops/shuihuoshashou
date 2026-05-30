@@ -26,6 +26,8 @@ REPORT_TEMPLATE = Template(
         table { border-collapse: collapse; width: 100%; }
         td, th { border: 1px solid #d9dee8; padding: 8px; text-align: left; }
         .risk { color: #b42318; font-weight: 700; }
+        .flagged { background: #fff1f0; color: #912018; font-weight: 700; }
+        .highlight { background: #ecfdf3; color: #05603a; font-weight: 700; }
       </style>
     </head>
     <body>
@@ -34,6 +36,18 @@ REPORT_TEMPLATE = Template(
       <section>
         <h2>总评</h2>
         <p>{{ summary }}</p>
+      </section>
+      <section>
+        <h2>亮点</h2>
+        {% if strengths %}
+        <ul>
+          {% for item in strengths %}
+          <li class="highlight">{{ item }}</li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p>暂无明确高可信亮点，建议结合追问继续观察。</p>
+        {% endif %}
       </section>
       <section>
         <h2>维度得分</h2>
@@ -59,6 +73,21 @@ REPORT_TEMPLATE = Template(
         {% for flag in flags %}<p class="risk">{{ flag.description }}</p>{% endfor %}
       </section>
       <section>
+        <h2>AIGC 察重</h2>
+        <table>
+          <tr><th>Turn ID</th><th>AI 概率</th><th>模板相似度</th><th>命中模板</th><th>状态</th></tr>
+          {% for item in aigc_results %}
+          <tr class="{{ 'flagged' if item.flagged else '' }}">
+            <td>{{ item.turn_id }}</td>
+            <td>{{ item.ai_generated_prob }}</td>
+            <td>{{ item.template_similarity }}</td>
+            <td>{{ item.matched_template or "" }}</td>
+            <td>{{ "疑似注水/模板化" if item.flagged else "未命中" }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </section>
+      <section>
         <h2>转写全文</h2>
         <table>
           <tr><th>序号</th><th>来源</th><th>问题</th><th>回答</th><th>时间</th><th>追问目标</th></tr>
@@ -78,6 +107,16 @@ REPORT_TEMPLATE = Template(
     </html>
     """
 )
+
+
+def _strengths(score: InterviewScore) -> list[str]:
+    strengths: list[str] = []
+    for dimension in score.dimensions:
+        if dimension.score < 75 or not dimension.evidence:
+            continue
+        excerpt = dimension.evidence[0].excerpt
+        strengths.append(f"{dimension.dimension} 得分 {dimension.score}：{excerpt}")
+    return strengths[:3]
 
 
 def _radar_chart_uri(score: InterviewScore) -> str:
@@ -162,6 +201,8 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
     html = REPORT_TEMPLATE.render(
         score=score,
         summary=summary,
+        strengths=_strengths(score),
+        aigc_results=aigc,
         flags=ctx.flags,
         transcript=ctx.turns,
         radar_chart_uri=_radar_chart_uri(score),

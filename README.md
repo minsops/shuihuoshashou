@@ -22,7 +22,8 @@ as a local-first Python MVP:
 - Runtime database URL parsing supports SQLite and PostgreSQL targets.
 - JD knowledge base indexes competency-specific probe patterns with deterministic embeddings and optional pgvector search.
 - Report artifacts write local files by default and upload to S3-compatible storage when credentials are configured.
-- Reports include structured scores, AIGC checks, consistency flags, and full interview transcripts.
+- Reports include structured scores, radar charts, highlights, AIGC checks, consistency flags,
+  risk highlights, recommendations, and full interview transcripts.
 - AIGC/template checks use a local answer-template corpus with character n-gram cosine similarity.
 
 ## Important Secret Handling

@@ -25,7 +25,8 @@ The local implementation is complete as a runnable MVP:
 - Probe generation, scoring, AIGC/template checks, consistency checks, HTML/PDF report generation.
 - Runtime probe prompts are kept under `prompts/` and loaded by services instead of being embedded in code.
 - AIGC template checks use a local corpus and character n-gram cosine similarity.
-- Structured JSON and HTML reports include the full interview transcript.
+- Structured JSON and HTML/PDF reports include highlights, radar charts, AIGC risk highlights,
+  recommendation, and the full interview transcript.
 - Report artifacts support local `file://` storage and SigV4 uploads to S3-compatible storage.
 - Local offline scoring task flow with `FINISHED -> SCORING -> REPORTED` state transitions.
 - Local task queue boundary for offline scoring with Redis Streams task publication and worker consumption.
