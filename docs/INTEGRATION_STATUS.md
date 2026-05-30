@@ -18,7 +18,7 @@ The local implementation is complete as a runnable MVP:
 - Probe generation, scoring, AIGC/template checks, consistency checks, HTML/PDF report generation.
 - AIGC template checks use a local corpus and character n-gram cosine similarity.
 - Structured JSON and HTML reports include the full interview transcript.
-- Report artifact metadata includes local `file://` URIs or configured S3-style URIs.
+- Report artifacts support local `file://` storage and SigV4 uploads to S3-compatible storage.
 - Local offline scoring task flow with `FINISHED -> SCORING -> REPORTED` state transitions.
 - Local task queue boundary for offline scoring with enqueue/completion/failure events.
 - In-memory event bus topics for `qa_turn.created`, `interview.finished`,
@@ -93,4 +93,3 @@ LLM smoke test ok
 - Wire the runtime data access layer to PostgreSQL/pgvector where deployment requires it.
 - Replace the local task queue/event bus with Redis Streams, RabbitMQ, Kafka, or Celery workers.
 - Plug a real streaming ASR/diarization engine behind the existing `ASREngine` interface.
-- Add concrete S3/MinIO upload client behind the report artifact store for multi-node deployments.

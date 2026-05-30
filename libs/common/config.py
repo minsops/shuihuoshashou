@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     object_storage_endpoint: str = ""
     object_storage_bucket: str = "shuihuo-killer"
+    object_storage_access_key: str = ""
+    object_storage_secret_key: str = ""
+    object_storage_region: str = "us-east-1"
     report_dir: Path = Field(default=Path("data/reports"))
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")

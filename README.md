@@ -18,7 +18,7 @@ as a local-first Python MVP:
 - PostgreSQL core schema SQL is provided under `db/postgres` for compose initialization.
 - Runtime database URL parsing distinguishes SQLite and PostgreSQL targets.
 - JD knowledge base exposes local lexical retrieval for competency-specific probe patterns.
-- Report artifacts expose storage URIs, using local files by default and S3-style URIs when configured.
+- Report artifacts write local files by default and upload to S3-compatible storage when credentials are configured.
 - Reports include structured scores, AIGC checks, consistency flags, and full interview transcripts.
 - AIGC/template checks use a local answer-template corpus with character n-gram cosine similarity.
 
@@ -75,8 +75,9 @@ candidates, interviews, turns, scores, AIGC results, reports, and consent tables
 Install `.[postgres]` when implementing or running the PostgreSQL repository adapter. The current
 runtime repository still uses SQLite and raises a clear error for PostgreSQL URLs.
 
-Set `OBJECT_STORAGE_ENDPOINT` and `OBJECT_STORAGE_BUCKET` to make report metadata use S3-style
-artifact URIs while still writing a local copy for development.
+Set `OBJECT_STORAGE_ENDPOINT`, `OBJECT_STORAGE_BUCKET`, `OBJECT_STORAGE_ACCESS_KEY`, and
+`OBJECT_STORAGE_SECRET_KEY` to upload report HTML/PDF artifacts to S3-compatible storage such as
+MinIO. The gateway still writes a local copy first for development and auditability.
 
 Operational endpoints:
 
