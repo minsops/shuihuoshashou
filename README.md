@@ -226,7 +226,8 @@ The real-time ASR and optional behavior signal modules are implemented behind in
 stub engines. Production speaker clustering can replace the local audio-cluster diarizer through the
 HTTP diarization provider without changing the shared schemas.
 
-Behavior signals are disabled by default. If an interview sets `signal_enabled=true`, the candidate
-must first grant `behavior_signal` consent through `POST /api/consents`; otherwise the API returns 403.
-Posting the same consent with `granted=false` revokes prior active behavior-signal consent and future
-signal-enabled interviews are rejected until consent is granted again.
+Behavior signals are disabled by default. `SIGNAL_ENABLED=true` must be set by an administrator
+before any interview can request `signal_enabled=true`, and the candidate must also grant
+`behavior_signal` consent through `POST /api/consents`; otherwise the API returns 403. Posting the
+same consent with `granted=false` revokes prior active behavior-signal consent and future
+signal-enabled interviews are rejected until both gates are satisfied again.

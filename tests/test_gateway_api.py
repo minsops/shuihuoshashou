@@ -23,11 +23,12 @@ def _client(
     rate_limit_enabled: bool = False,
     rate_limit_requests_per_minute: int = 120,
     gateway_api_key: str = "",
+    signal_enabled: bool = False,
 ) -> TestClient:
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'api.db'}")
     monkeypatch.setenv("REPORT_DIR", str(tmp_path / "reports"))
     monkeypatch.setenv("LLM_PROVIDER", "mock")
-    monkeypatch.setenv("SIGNAL_ENABLED", "false")
+    monkeypatch.setenv("SIGNAL_ENABLED", str(signal_enabled).lower())
     monkeypatch.setenv("RATE_LIMIT_ENABLED", str(rate_limit_enabled).lower())
     monkeypatch.setenv("RATE_LIMIT_REQUESTS_PER_MINUTE", str(rate_limit_requests_per_minute))
     monkeypatch.setenv("GATEWAY_API_KEY", gateway_api_key)
@@ -275,8 +276,26 @@ def test_gateway_rate_limit_can_be_enabled(tmp_path: Path, monkeypatch) -> None:
     assert limited.headers["retry-after"].isdigit()
 
 
-def test_signal_requires_candidate_consent(tmp_path: Path, monkeypatch) -> None:
+def test_signal_requires_admin_enablement(tmp_path: Path, monkeypatch) -> None:
     client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+
+    consent = client.post(
+        "/api/consents",
+        json={"candidate_id": candidate["id"], "consent_type": "behavior_signal", "granted": True},
+    )
+    assert consent.status_code == 200
+    rejected = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"], "signal_enabled": True},
+    )
+    assert rejected.status_code == 403
+    assert "admin enablement" in rejected.text
+
+
+def test_signal_requires_candidate_consent(tmp_path: Path, monkeypatch) -> None:
+    client = _client(tmp_path, monkeypatch, signal_enabled=True)
     job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
     candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
 
@@ -285,6 +304,7 @@ def test_signal_requires_candidate_consent(tmp_path: Path, monkeypatch) -> None:
         json={"job_id": job["id"], "candidate_id": candidate["id"], "signal_enabled": True},
     )
     assert rejected.status_code == 403
+    assert "explicit candidate consent" in rejected.text
 
     consent = client.post(
         "/api/consents",
@@ -300,7 +320,7 @@ def test_signal_requires_candidate_consent(tmp_path: Path, monkeypatch) -> None:
 
 
 def test_signal_consent_can_be_revoked(tmp_path: Path, monkeypatch) -> None:
-    client = _client(tmp_path, monkeypatch)
+    client = _client(tmp_path, monkeypatch, signal_enabled=True)
     job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
     candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
 

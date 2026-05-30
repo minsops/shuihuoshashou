@@ -98,10 +98,11 @@ def has_active_consent(candidate_id: str, consent_type: str) -> bool:
 
 def create_interview(payload: InterviewCreate) -> InterviewRecord:
     init_db()
-    if payload.signal_enabled and not has_active_consent(
-        payload.candidate_id, "behavior_signal"
-    ):
-        raise PermissionError("behavior signal requires explicit candidate consent")
+    if payload.signal_enabled:
+        if not get_settings().signal_enabled:
+            raise PermissionError("behavior signal requires admin enablement")
+        if not has_active_consent(payload.candidate_id, "behavior_signal"):
+            raise PermissionError("behavior signal requires explicit candidate consent")
     job = get_job(payload.job_id)
     ctx = InterviewContext(
         session_id="",

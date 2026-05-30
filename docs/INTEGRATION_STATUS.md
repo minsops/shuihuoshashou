@@ -38,7 +38,7 @@ The local implementation is complete as a runnable MVP:
 - Configurable async end-interview mode returns queued task metadata while workers generate reports.
 - In-memory event bus topics for `qa_turn.created`, `interview.finished`,
   `task.enqueued`, `interview.scoring_started`, `interview.reported`, and `task.completed`.
-- Behavior signal module with explicit candidate consent gate.
+- Behavior signal module with explicit administrator enablement and candidate consent gates.
 - Candidate behavior-signal consent can be revoked and blocks future signal-enabled interviews.
 - Configurable LLM client with mock mode and OpenAI-compatible HTTP mode.
 - LLM JSON responses are pydantic-validated with configurable retry before deterministic fallback.
