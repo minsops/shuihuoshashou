@@ -11,6 +11,7 @@ as a local-first Python MVP:
 - In-memory async events for local development, with explicit offline scoring events.
 - Local task queue boundary for offline scoring, with optional Redis Streams task publication.
 - Unified LLM client with mock mode and OpenAI-compatible HTTP mode for `mimo2.5pro`.
+- Runtime LLM prompts are stored under `prompts/` and loaded by services instead of being embedded in code.
 - ASR interface supports local stub mode and configurable HTTP cloud ASR adapters.
 - End-to-end offline demo from JD + interview turns to probe, scoring, AIGC checks, and report.
 - Interview turns are stored in both the interview context and a `qa_turns` table for auditability.

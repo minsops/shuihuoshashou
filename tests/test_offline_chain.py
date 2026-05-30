@@ -11,6 +11,8 @@ from libs.common.events import event_bus
 from libs.common.tasks import task_queue
 from libs.schemas import (
     CandidateCreate,
+    CompetencyItem,
+    CompetencyModel,
     InterviewCreate,
     InterviewStatus,
     JobCreate,
@@ -37,7 +39,8 @@ from services.jd_kb_service.service import (
     generate_competency_model,
     retrieve_job_probe_patterns,
 )
-from services.probe_service.service import fallback_probe
+from libs.common.prompts import load_prompt
+from services.probe_service.service import fallback_probe, generate_probe
 
 
 @pytest.fixture(autouse=True)
@@ -201,6 +204,39 @@ def test_probe_fallback_returns_three_suggestions() -> None:
     response = fallback_probe(request)
     assert len(response.suggestions) == 3
     assert response.credibility.level in {"vague", "suspicious"}
+
+
+def test_generate_probe_uses_prompt_file(monkeypatch) -> None:
+    messages = []
+
+    class FakeClient:
+        async def complete_json(self, sent_messages, schema, fallback):
+            messages.extend(sent_messages)
+            return fallback
+
+    model = CompetencyModel(
+        job_id="job-local",
+        job_title="Backend",
+        items=[
+            CompetencyItem(name="项目真实性", description="验证项目经历", weight=1.0),
+            CompetencyItem(name="工程深度", description="验证工程判断", weight=1.0),
+            CompetencyItem(name="异常处理", description="验证故障经验", weight=1.0),
+        ],
+    )
+    request = ProbeRequest(
+        job_id="job-local",
+        competency_model=model,
+        recent_turns=[],
+        latest_answer="我写了 FastAPI 编排、模型重试和 JSON 校验，因为线上有格式漂移。",
+    )
+
+    monkeypatch.setattr("services.probe_service.service.retrieve_job_probe_patterns", lambda *args, **kwargs: [])
+    monkeypatch.setattr("services.probe_service.service.get_llm_client", lambda: FakeClient())
+
+    __import__("asyncio").run(generate_probe(request))
+
+    assert messages[0].role == "system"
+    assert messages[0].content == load_prompt("probe_system.md")
 
 
 def test_jd_kb_retrieves_relevant_probe_patterns(tmp_path: Path, monkeypatch) -> None:

@@ -17,6 +17,7 @@ The local implementation is complete as a runnable MVP:
 - Separate `qa_turns` persistence for auditable answer evidence.
 - JD knowledge base indexes competency-specific probe patterns with deterministic embeddings and optional pgvector nearest-neighbor search.
 - Probe generation, scoring, AIGC/template checks, consistency checks, HTML/PDF report generation.
+- Runtime probe prompts are kept under `prompts/` and loaded by services instead of being embedded in code.
 - AIGC template checks use a local corpus and character n-gram cosine similarity.
 - Structured JSON and HTML reports include the full interview transcript.
 - Report artifacts support local `file://` storage and SigV4 uploads to S3-compatible storage.

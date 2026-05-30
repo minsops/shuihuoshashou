@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from libs.common.prompts import load_prompt
 from libs.llm_client import LLMMessage, get_llm_client
 from libs.schemas import CredibilitySignal, ProbeRequest, ProbeResponse, ProbeSuggestion
 from services.jd_kb_service.service import retrieve_job_probe_patterns, retrieve_probe_patterns
@@ -62,7 +63,7 @@ def fallback_probe(request: ProbeRequest) -> ProbeResponse:
 async def generate_probe(request: ProbeRequest) -> ProbeResponse:
     fallback = fallback_probe(request)
     messages = [
-        LLMMessage(role="system", content="Return strict JSON matching ProbeResponse."),
+        LLMMessage(role="system", content=load_prompt("probe_system.md")),
         LLMMessage(role="user", content=request.model_dump_json()),
     ]
     return await get_llm_client().complete_json(messages, ProbeResponse, fallback)
