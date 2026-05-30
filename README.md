@@ -14,7 +14,7 @@ as a local-first Python MVP:
 - ASR interface supports local stub mode and configurable HTTP cloud ASR adapters.
 - End-to-end offline demo from JD + interview turns to probe, scoring, AIGC checks, and report.
 - Interview turns are stored in both the interview context and a `qa_turns` table for auditability.
-- WebSocket transcripts carry speaker/finality/timestamp metadata and emit separate credibility events.
+- WebSocket transcripts carry speaker/finality/timestamp metadata, support channel-based speaker mapping, and emit separate credibility events.
 - Docker Compose declares the gateway plus PostgreSQL, Redis, and MinIO for local infrastructure.
 - PostgreSQL core schema SQL is provided under `db/postgres` for compose initialization.
 - Runtime database URL parsing supports SQLite and PostgreSQL targets.
@@ -123,8 +123,10 @@ returns 401, generate a fresh key and set it through `LLM_API_KEY` without commi
 - `GET /api/interviews/{id}/report.pdf`
 - `WS /ws/interview/{id}`
 
-WebSocket `audio_chunk` events may include `speaker`, `is_final`, `start_ms`, `end_ms`, and
-`confidence`. Only final candidate segments trigger a probe. Downstream events include
+WebSocket `audio_chunk` events may include `speaker`, `channel`/`audio_channel`/`track`,
+`is_final`, `start_ms`, `end_ms`, and `confidence`. If `speaker` is omitted, channels listed in
+`ASR_INTERVIEWER_CHANNELS` map to `interviewer`, and channels listed in `ASR_CANDIDATE_CHANNELS` map
+to `candidate`. Only final candidate segments trigger a probe. Downstream events include
 `transcript`, `probe`, `credibility`, optional `signal`, and `report`.
 
 Set `ASR_PROVIDER=http`, `ASR_BASE_URL`, `ASR_API_PATH`, and `ASR_API_KEY` to forward audio chunks to
@@ -179,7 +181,7 @@ curl -s http://127.0.0.1:8000/api/offline/evaluate \
 ## Scope Notes
 
 The real-time ASR and optional behavior signal modules are implemented behind interfaces with local
-stub engines. Production diarization can be plugged in without changing the shared schemas.
+stub engines. Production speaker clustering can be plugged in without changing the shared schemas.
 
 Behavior signals are disabled by default. If an interview sets `signal_enabled=true`, the candidate
 must first grant `behavior_signal` consent through `POST /api/consents`; otherwise the API returns 403.

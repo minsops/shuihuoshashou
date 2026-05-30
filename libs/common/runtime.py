@@ -20,6 +20,7 @@ class RuntimeStatus(BaseModel):
     asr_provider: str
     asr_base_url_configured: bool
     asr_api_key_configured: bool
+    asr_channel_diarization_configured: bool
     signal_enabled: bool
     rate_limit_enabled: bool
     rate_limit_requests_per_minute: int
@@ -51,6 +52,9 @@ def get_runtime_status() -> RuntimeStatus:
         asr_provider=settings.asr_provider,
         asr_base_url_configured=bool(settings.asr_base_url),
         asr_api_key_configured=bool(settings.asr_api_key),
+        asr_channel_diarization_configured=bool(
+            settings.asr_interviewer_channels and settings.asr_candidate_channels
+        ),
         signal_enabled=settings.signal_enabled,
         rate_limit_enabled=settings.rate_limit_enabled,
         rate_limit_requests_per_minute=settings.rate_limit_requests_per_minute,

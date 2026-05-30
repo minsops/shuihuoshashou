@@ -86,6 +86,7 @@ def test_gateway_config_status_hides_secrets(tmp_path: Path, monkeypatch) -> Non
     assert payload["asr_provider"] == "stub"
     assert payload["asr_base_url_configured"] is False
     assert payload["asr_api_key_configured"] is False
+    assert payload["asr_channel_diarization_configured"] is True
     assert payload["rate_limit_enabled"] is False
     assert payload["rate_limit_requests_per_minute"] == 120
     assert payload["offline_task_backend"] == "local"
@@ -318,6 +319,57 @@ def test_gateway_websocket_ignores_non_final_and_interviewer_segments(
                 "seq": 3,
                 "audio": audio,
                 "speaker": "interviewer",
+                "is_final": True,
+            }
+        )
+        interviewer_transcript = websocket.receive_json()
+        assert interviewer_transcript["type"] == "transcript"
+        assert interviewer_transcript["payload"]["speaker"] == "interviewer"
+
+        websocket.send_json({"type": "end"})
+        report = websocket.receive_json()
+        assert report["type"] == "report"
+
+
+def test_gateway_websocket_maps_audio_channel_to_speaker(tmp_path: Path, monkeypatch) -> None:
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+
+    text = "我主要负责优化，做了很多事情，效果比较好。"
+    audio = base64.b64encode(text.encode("utf-8")).decode("ascii")
+    with client.websocket_connect(f"/ws/interview/{interview['id']}") as websocket:
+        websocket.send_json(
+            {
+                "type": "audio_chunk",
+                "session_id": interview["id"],
+                "seq": 2,
+                "audio": audio,
+                "channel": "right",
+                "is_final": True,
+            }
+        )
+        transcript = websocket.receive_json()
+        probe = websocket.receive_json()
+        credibility = websocket.receive_json()
+        assert transcript["type"] == "transcript"
+        assert transcript["payload"]["speaker"] == "candidate"
+        assert probe["type"] == "probe"
+        assert credibility["type"] == "credibility"
+
+        interviewer_text = "请介绍一下项目背景。"
+        interviewer_audio = base64.b64encode(interviewer_text.encode("utf-8")).decode("ascii")
+        websocket.send_json(
+            {
+                "type": "audio_chunk",
+                "session_id": interview["id"],
+                "seq": 3,
+                "audio": interviewer_audio,
+                "channel": "left",
                 "is_final": True,
             }
         )

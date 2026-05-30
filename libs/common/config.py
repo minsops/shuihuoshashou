@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     asr_is_final_path: str = "is_final"
     asr_confidence_path: str = "confidence"
     asr_timeout_seconds: int = 30
+    asr_interviewer_channels: str = "0,left,interviewer"
+    asr_candidate_channels: str = "1,right,candidate"
     signal_enabled: bool = False
     rate_limit_enabled: bool = False
     rate_limit_requests_per_minute: int = 120

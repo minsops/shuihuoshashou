@@ -7,7 +7,7 @@ The local implementation is complete as a runnable MVP:
 - FastAPI gateway and API docs.
 - Local demo UI at `/`.
 - One-shot offline evaluation at `/api/offline/evaluate`.
-- WebSocket real-time text/audio-stub probe flow with speaker/finality/timestamp metadata.
+- WebSocket real-time text/audio-stub probe flow with speaker/finality/timestamp metadata and channel-based speaker mapping.
 - Configurable HTTP cloud ASR adapter behind the `ASREngine` interface.
 - Separate `credibility` WebSocket event after probe generation.
 - Pydantic v2 shared schemas.
@@ -92,4 +92,4 @@ LLM smoke test ok
 
 ## Remaining Production Gaps
 
-- Add production-grade streaming ASR session management and diarization beyond HTTP chunk forwarding.
+- Add production-grade streaming ASR session management and speaker clustering beyond channel mapping.

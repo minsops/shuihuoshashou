@@ -143,7 +143,26 @@ def _event_speaker(event: dict) -> str | None:
     speaker = event.get("speaker")
     if speaker in VALID_SPEAKERS:
         return str(speaker)
+    channel = _event_channel(event)
+    if channel is None:
+        return None
+    settings = get_settings()
+    if channel in _channel_aliases(settings.asr_interviewer_channels):
+        return "interviewer"
+    if channel in _channel_aliases(settings.asr_candidate_channels):
+        return "candidate"
     return None
+
+
+def _event_channel(event: dict) -> str | None:
+    for key in ("channel", "audio_channel", "track"):
+        if key in event and event[key] is not None:
+            return str(event[key]).strip().lower()
+    return None
+
+
+def _channel_aliases(raw: str) -> set[str]:
+    return {item.strip().lower() for item in raw.split(",") if item.strip()}
 
 
 def _event_bool(event: dict, key: str, default: bool) -> bool:
