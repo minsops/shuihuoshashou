@@ -26,7 +26,7 @@ as a local-first Python MVP:
   risk highlights, recommendations, and full interview transcripts.
 - Scoring uses the shared LLM JSON client for structured dimension drafts and recomputes final
   totals in Python for auditability and deterministic fallback behavior.
-- AIGC/template checks use a local answer-template corpus with character n-gram cosine similarity.
+- AIGC checks combine a local answer-template corpus with optional HTTP detector integration.
 
 ## Important Secret Handling
 
@@ -167,6 +167,11 @@ Set `SPEAKER_DIARIZATION_PROVIDER=http`, `SPEAKER_DIARIZATION_BASE_URL`,
 `SPEAKER_DIARIZATION_API_PATH`, and `SPEAKER_DIARIZATION_API_KEY` to resolve unknown speakers through
 a production voice-clustering service. The expected response speaker path defaults to
 `SPEAKER_DIARIZATION_SPEAKER_PATH=speaker`.
+
+Set `AIGC_DETECTOR_PROVIDER=http`, `AIGC_DETECTOR_BASE_URL`, `AIGC_DETECTOR_API_PATH`, and
+`AIGC_DETECTOR_API_KEY` to send each answer to an external AI-text detector. The local template
+similarity result is still included and remains part of the final flag decision; HTTP failures fall
+back to the deterministic local detector.
 
 ## One-Shot Offline Evaluation
 

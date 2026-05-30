@@ -5,7 +5,11 @@ import re
 from collections import Counter
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
+import httpx
+
+from libs.common.config import get_settings
 from libs.schemas import AIGCResult, QATurn
 
 
@@ -45,7 +49,18 @@ def _cosine_similarity(a: str, b: str) -> float:
     return overlap / (left_norm * right_norm)
 
 
-def detect_turn(turn: QATurn) -> AIGCResult:
+def detect_turn(turn: QATurn, transport: httpx.BaseTransport | None = None) -> AIGCResult:
+    local = _local_detect_turn(turn)
+    settings = get_settings()
+    if settings.aigc_detector_provider != "http":
+        return local
+    try:
+        return _http_detect_turn(turn, local, transport)
+    except (httpx.HTTPError, KeyError, TypeError, ValueError, RuntimeError):
+        return local
+
+
+def _local_detect_turn(turn: QATurn) -> AIGCResult:
     answer = turn.answer.strip()
     templates = load_templates()
     max_template = max(templates, key=lambda template: _cosine_similarity(answer, template))
@@ -58,7 +73,11 @@ def detect_turn(turn: QATurn) -> AIGCResult:
         + (0.25 if len(answer) > 180 and "我" not in answer[:80] else 0.0)
         + template_similarity * 0.4,
     )
-    flagged = ai_generated_prob >= 0.65 or template_similarity >= 0.45
+    settings = get_settings()
+    flagged = (
+        ai_generated_prob >= settings.aigc_ai_prob_threshold
+        or template_similarity >= settings.aigc_template_similarity_threshold
+    )
     return AIGCResult(
         turn_id=turn.turn_id,
         ai_generated_prob=round(ai_generated_prob, 3),
@@ -68,5 +87,88 @@ def detect_turn(turn: QATurn) -> AIGCResult:
     )
 
 
-def detect_interview(turns: list[QATurn]) -> list[AIGCResult]:
-    return [detect_turn(turn) for turn in turns]
+def _http_detect_turn(
+    turn: QATurn,
+    local: AIGCResult,
+    transport: httpx.BaseTransport | None,
+) -> AIGCResult:
+    settings = get_settings()
+    if not settings.aigc_detector_base_url:
+        raise RuntimeError("AIGC_DETECTOR_PROVIDER=http requires AIGC_DETECTOR_BASE_URL")
+    url = (
+        settings.aigc_detector_base_url.rstrip("/")
+        + "/"
+        + settings.aigc_detector_api_path.lstrip("/")
+    )
+    payload = {
+        "turn_id": turn.turn_id,
+        "question": turn.question,
+        "answer": turn.answer,
+        "local_template_similarity": local.template_similarity,
+        "local_matched_template": local.matched_template,
+    }
+    with httpx.Client(timeout=settings.aigc_detector_timeout_seconds, transport=transport) as client:
+        response = client.post(url, headers=_aigc_headers(), json=payload)
+        response.raise_for_status()
+    data = response.json()
+    probability = float(_extract_path(data, settings.aigc_detector_probability_path))
+    flagged_value = _extract_optional(data, settings.aigc_detector_flagged_path, None)
+    flagged = (
+        _coerce_bool(flagged_value)
+        if flagged_value is not None
+        else probability >= settings.aigc_ai_prob_threshold
+    )
+    flagged = flagged or local.template_similarity >= settings.aigc_template_similarity_threshold
+    return AIGCResult(
+        turn_id=turn.turn_id,
+        ai_generated_prob=round(max(0.0, min(1.0, probability)), 3),
+        template_similarity=local.template_similarity,
+        matched_template=local.matched_template,
+        flagged=flagged,
+    )
+
+
+def _aigc_headers() -> dict[str, str]:
+    settings = get_settings()
+    if not settings.aigc_detector_api_key:
+        return {}
+    auth_value = (
+        f"{settings.aigc_detector_auth_scheme} {settings.aigc_detector_api_key}"
+        if settings.aigc_detector_auth_scheme
+        else settings.aigc_detector_api_key
+    )
+    return {settings.aigc_detector_auth_header: auth_value}
+
+
+def _extract_path(payload: Any, path: str) -> Any:
+    value = payload
+    for part in path.split("."):
+        if isinstance(value, list):
+            value = value[int(part)]
+        elif isinstance(value, dict):
+            value = value[part]
+        else:
+            raise KeyError(path)
+    return value
+
+
+def _extract_optional(payload: Any, path: str, fallback: Any) -> Any:
+    try:
+        return _extract_path(payload, path)
+    except (KeyError, IndexError, TypeError, ValueError):
+        return fallback
+
+
+def _coerce_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() not in {"", "0", "false", "no", "off"}
+    return bool(value)
+
+
+def detect_interview(
+    turns: list[QATurn],
+    transport: httpx.BaseTransport | None = None,
+) -> list[AIGCResult]:
+    return [detect_turn(turn, transport=transport) for turn in turns]

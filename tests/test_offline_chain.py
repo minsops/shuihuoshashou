@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from pathlib import Path
 
+import httpx
 import pytest
 
 from libs.common.config import get_settings
@@ -450,6 +451,45 @@ def test_aigc_detection_uses_template_corpus_for_paraphrase() -> None:
     assert len(load_templates()) >= 5
     assert results[0].matched_template
     assert results[0].template_similarity >= 0.45
+
+
+def test_aigc_detection_can_use_http_detector(monkeypatch) -> None:
+    monkeypatch.setenv("AIGC_DETECTOR_PROVIDER", "http")
+    monkeypatch.setenv("AIGC_DETECTOR_BASE_URL", "https://aigc.example.test/api")
+    monkeypatch.setenv("AIGC_DETECTOR_API_PATH", "/v1/detect")
+    monkeypatch.setenv("AIGC_DETECTOR_API_KEY", "secret")
+    monkeypatch.setenv("AIGC_DETECTOR_AUTH_HEADER", "X-Detector-Key")
+    monkeypatch.setenv("AIGC_DETECTOR_AUTH_SCHEME", "")
+    get_settings.cache_clear()
+    turn = QATurn(question="q", answer="我写了 FastAPI 编排和 JSON 校验。")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert str(request.url) == "https://aigc.example.test/api/v1/detect"
+        assert request.headers["X-Detector-Key"] == "secret"
+        payload = __import__("json").loads(request.content)
+        assert payload["turn_id"] == turn.turn_id
+        assert payload["answer"] == turn.answer
+        assert "local_template_similarity" in payload
+        return httpx.Response(200, json={"ai_generated_prob": 0.91, "flagged": "false"})
+
+    result = detect_interview([turn], transport=httpx.MockTransport(handler))[0]
+
+    assert result.ai_generated_prob == 0.91
+    assert result.flagged is False
+    assert result.template_similarity >= 0.0
+
+
+def test_aigc_http_detector_falls_back_on_failure(monkeypatch) -> None:
+    monkeypatch.setenv("AIGC_DETECTOR_PROVIDER", "http")
+    monkeypatch.setenv("AIGC_DETECTOR_BASE_URL", "https://aigc.example.test")
+    get_settings.cache_clear()
+    turn = QATurn(question="q", answer="我主要负责整体架构设计并推动项目落地最终取得显著提升")
+    transport = httpx.MockTransport(lambda _: httpx.Response(500, json={"error": "boom"}))
+
+    result = detect_interview([turn], transport=transport)[0]
+
+    assert result.flagged is True
+    assert result.template_similarity > 0.9
 
 
 def test_fact_claim_extraction() -> None:

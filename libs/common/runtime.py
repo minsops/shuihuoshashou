@@ -30,6 +30,11 @@ class RuntimeStatus(BaseModel):
     speaker_diarization_provider: str
     speaker_diarization_base_url_configured: bool
     speaker_diarization_api_key_configured: bool
+    aigc_detector_provider: str
+    aigc_detector_base_url_configured: bool
+    aigc_detector_api_key_configured: bool
+    aigc_ai_prob_threshold: float
+    aigc_template_similarity_threshold: float
     signal_enabled: bool
     rate_limit_enabled: bool
     rate_limit_backend: str
@@ -77,6 +82,11 @@ def get_runtime_status() -> RuntimeStatus:
         speaker_diarization_provider=settings.speaker_diarization_provider,
         speaker_diarization_base_url_configured=bool(settings.speaker_diarization_base_url),
         speaker_diarization_api_key_configured=bool(settings.speaker_diarization_api_key),
+        aigc_detector_provider=settings.aigc_detector_provider,
+        aigc_detector_base_url_configured=bool(settings.aigc_detector_base_url),
+        aigc_detector_api_key_configured=bool(settings.aigc_detector_api_key),
+        aigc_ai_prob_threshold=settings.aigc_ai_prob_threshold,
+        aigc_template_similarity_threshold=settings.aigc_template_similarity_threshold,
         signal_enabled=settings.signal_enabled,
         rate_limit_enabled=settings.rate_limit_enabled,
         rate_limit_backend=settings.rate_limit_backend,

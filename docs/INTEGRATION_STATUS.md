@@ -28,7 +28,8 @@ The local implementation is complete as a runnable MVP:
 - Scoring uses the shared LLM JSON client for structured dimension drafts, then normalizes evidence
   and recomputes final totals in Python.
 - Runtime probe prompts are kept under `prompts/` and loaded by services instead of being embedded in code.
-- AIGC template checks use a local corpus and character n-gram cosine similarity.
+- AIGC checks use a local corpus with character n-gram cosine similarity plus optional HTTP detector
+  integration with deterministic local fallback.
 - Structured JSON and HTML/PDF reports include highlights, radar charts, AIGC risk highlights,
   recommendation, and the full interview transcript.
 - Report artifacts support local `file://` storage and SigV4 uploads to S3-compatible storage.

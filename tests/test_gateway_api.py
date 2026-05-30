@@ -104,6 +104,11 @@ def test_gateway_config_status_hides_secrets(tmp_path: Path, monkeypatch) -> Non
     assert payload["speaker_diarization_provider"] == "local"
     assert payload["speaker_diarization_base_url_configured"] is False
     assert payload["speaker_diarization_api_key_configured"] is False
+    assert payload["aigc_detector_provider"] == "local"
+    assert payload["aigc_detector_base_url_configured"] is False
+    assert payload["aigc_detector_api_key_configured"] is False
+    assert payload["aigc_ai_prob_threshold"] == 0.65
+    assert payload["aigc_template_similarity_threshold"] == 0.45
     assert payload["rate_limit_enabled"] is False
     assert payload["rate_limit_backend"] == "local"
     assert payload["rate_limit_requests_per_minute"] == 120

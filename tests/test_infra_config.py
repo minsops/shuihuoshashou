@@ -60,6 +60,10 @@ def test_env_example_lists_runtime_integration_knobs() -> None:
         "PROBE_MIN_INTERVAL_MS=",
         "PROBE_REQUIRE_TOPIC_MATCH=",
         "PROBE_TOPIC_KEYWORDS=",
+        "AIGC_DETECTOR_PROVIDER=",
+        "AIGC_DETECTOR_BASE_URL=",
+        "AIGC_AI_PROB_THRESHOLD=",
+        "AIGC_TEMPLATE_SIMILARITY_THRESHOLD=",
     ]:
         assert key in env_example
 

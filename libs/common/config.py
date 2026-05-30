@@ -50,6 +50,17 @@ class Settings(BaseSettings):
     speaker_diarization_auth_scheme: str = "Bearer"
     speaker_diarization_speaker_path: str = "speaker"
     speaker_diarization_timeout_seconds: int = 10
+    aigc_detector_provider: str = "local"
+    aigc_detector_base_url: str = ""
+    aigc_detector_api_path: str = "/detect"
+    aigc_detector_api_key: str = ""
+    aigc_detector_auth_header: str = "Authorization"
+    aigc_detector_auth_scheme: str = "Bearer"
+    aigc_detector_probability_path: str = "ai_generated_prob"
+    aigc_detector_flagged_path: str = "flagged"
+    aigc_detector_timeout_seconds: int = 10
+    aigc_ai_prob_threshold: float = 0.65
+    aigc_template_similarity_threshold: float = 0.45
     signal_enabled: bool = False
     rate_limit_enabled: bool = False
     rate_limit_backend: str = "local"
