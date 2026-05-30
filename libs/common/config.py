@@ -33,6 +33,14 @@ class Settings(BaseSettings):
     asr_timeout_seconds: int = 30
     asr_interviewer_channels: str = "0,left,interviewer"
     asr_candidate_channels: str = "1,right,candidate"
+    speaker_diarization_provider: str = "local"
+    speaker_diarization_base_url: str = ""
+    speaker_diarization_api_path: str = "/diarize"
+    speaker_diarization_api_key: str = ""
+    speaker_diarization_auth_header: str = "Authorization"
+    speaker_diarization_auth_scheme: str = "Bearer"
+    speaker_diarization_speaker_path: str = "speaker"
+    speaker_diarization_timeout_seconds: int = 10
     signal_enabled: bool = False
     rate_limit_enabled: bool = False
     rate_limit_requests_per_minute: int = 120

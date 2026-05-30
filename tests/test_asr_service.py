@@ -9,9 +9,12 @@ from libs.common.config import get_settings
 from libs.schemas import TranscriptSegment
 from services.asr_service.service import (
     ASRSessionManager,
+    HTTPSpeakerDiarizer,
     HTTPASREngine,
+    LocalSpeakerDiarizer,
     StubASREngine,
     get_asr_engine,
+    get_speaker_diarizer,
 )
 
 
@@ -185,3 +188,46 @@ def test_asr_session_manager_resolves_unknown_speaker_from_audio_cluster() -> No
     assert decision.accepted is True
     assert decision.segment is not None
     assert decision.segment.speaker == "candidate"
+
+
+def test_http_speaker_diarizer_maps_unknown_speaker(monkeypatch) -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json={"result": {"speaker": "candidate"}})
+
+    monkeypatch.setenv("SPEAKER_DIARIZATION_PROVIDER", "http")
+    monkeypatch.setenv("SPEAKER_DIARIZATION_BASE_URL", "https://diarize.example.com/v1")
+    monkeypatch.setenv("SPEAKER_DIARIZATION_API_PATH", "/resolve")
+    monkeypatch.setenv("SPEAKER_DIARIZATION_API_KEY", "diarize-secret")
+    monkeypatch.setenv("SPEAKER_DIARIZATION_SPEAKER_PATH", "result.speaker")
+    get_settings.cache_clear()
+    diarizer = HTTPSpeakerDiarizer(transport=httpx.MockTransport(handler))
+
+    speaker = diarizer.resolve_speaker(
+        "session-1",
+        base64.b64encode(b"audio").decode("ascii"),
+        "unknown",
+    )
+
+    assert speaker == "candidate"
+    assert len(requests) == 1
+    assert str(requests[0].url) == "https://diarize.example.com/v1/resolve"
+    assert requests[0].headers["Authorization"] == "Bearer diarize-secret"
+    assert b'"session_id":"session-1"' in requests[0].content
+
+
+def test_get_speaker_diarizer_uses_http_provider(monkeypatch) -> None:
+    monkeypatch.setenv("SPEAKER_DIARIZATION_PROVIDER", "http")
+    monkeypatch.setenv("SPEAKER_DIARIZATION_BASE_URL", "https://diarize.example.com")
+    get_settings.cache_clear()
+
+    assert isinstance(get_speaker_diarizer(), HTTPSpeakerDiarizer)
+
+
+def test_get_speaker_diarizer_defaults_to_local(monkeypatch) -> None:
+    monkeypatch.delenv("SPEAKER_DIARIZATION_PROVIDER", raising=False)
+    get_settings.cache_clear()
+
+    assert isinstance(get_speaker_diarizer(), LocalSpeakerDiarizer)

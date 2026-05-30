@@ -77,6 +77,55 @@ class LocalSpeakerDiarizer(SpeakerDiarizer):
         self._sessions.clear()
 
 
+class HTTPSpeakerDiarizer(SpeakerDiarizer):
+    def __init__(self, transport: httpx.BaseTransport | None = None) -> None:
+        self._transport = transport
+        self._fallback = LocalSpeakerDiarizer()
+
+    def resolve_speaker(
+        self,
+        session_id: str,
+        audio_b64: str | None,
+        speaker: Speaker,
+    ) -> Speaker:
+        settings = get_settings()
+        if not audio_b64 or speaker in {"interviewer", "candidate"}:
+            return self._fallback.resolve_speaker(session_id, audio_b64, speaker)
+        if not settings.speaker_diarization_base_url:
+            raise RuntimeError(
+                "SPEAKER_DIARIZATION_PROVIDER=http requires SPEAKER_DIARIZATION_BASE_URL"
+            )
+        url = (
+            settings.speaker_diarization_base_url.rstrip("/")
+            + "/"
+            + settings.speaker_diarization_api_path.lstrip("/")
+        )
+        payload = {"session_id": session_id, "audio": audio_b64, "hint_speaker": speaker}
+        try:
+            with httpx.Client(
+                timeout=settings.speaker_diarization_timeout_seconds,
+                transport=self._transport,
+            ) as client:
+                response = client.post(url, headers=_speaker_diarization_headers(), json=payload)
+                response.raise_for_status()
+            resolved = _coerce_speaker(
+                _extract_optional(
+                    response.json(),
+                    settings.speaker_diarization_speaker_path,
+                    speaker,
+                )
+            )
+        except (httpx.HTTPError, KeyError, TypeError, ValueError):
+            return self._fallback.resolve_speaker(session_id, audio_b64, speaker)
+        return resolved
+
+    def close(self, session_id: str) -> None:
+        self._fallback.close(session_id)
+
+    def reset(self) -> None:
+        self._fallback.reset()
+
+
 @dataclass
 class ASRSessionState:
     chunks: dict[int, ASRSessionChunk] = field(default_factory=dict)
@@ -269,6 +318,18 @@ def _asr_headers() -> dict[str, str]:
     return {settings.asr_auth_header: auth_value}
 
 
+def _speaker_diarization_headers() -> dict[str, str]:
+    settings = get_settings()
+    if not settings.speaker_diarization_api_key:
+        return {}
+    auth_value = (
+        f"{settings.speaker_diarization_auth_scheme} {settings.speaker_diarization_api_key}"
+        if settings.speaker_diarization_auth_scheme
+        else settings.speaker_diarization_api_key
+    )
+    return {settings.speaker_diarization_auth_header: auth_value}
+
+
 def _extract_path(payload: Any, path: str) -> Any:
     value = payload
     for part in path.split("."):
@@ -313,4 +374,11 @@ def get_asr_engine() -> ASREngine:
     return StubASREngine()
 
 
-asr_session_manager = ASRSessionManager()
+def get_speaker_diarizer() -> SpeakerDiarizer:
+    settings = get_settings()
+    if settings.speaker_diarization_provider == "http":
+        return HTTPSpeakerDiarizer()
+    return LocalSpeakerDiarizer()
+
+
+asr_session_manager = ASRSessionManager(speaker_diarizer=get_speaker_diarizer())

@@ -138,6 +138,11 @@ Set `ASR_PROVIDER=http`, `ASR_BASE_URL`, `ASR_API_PATH`, and `ASR_API_KEY` to fo
 a cloud ASR endpoint. Response mapping is configurable with `ASR_TEXT_PATH`, `ASR_SPEAKER_PATH`,
 `ASR_START_MS_PATH`, `ASR_END_MS_PATH`, `ASR_IS_FINAL_PATH`, and `ASR_CONFIDENCE_PATH`.
 
+Set `SPEAKER_DIARIZATION_PROVIDER=http`, `SPEAKER_DIARIZATION_BASE_URL`,
+`SPEAKER_DIARIZATION_API_PATH`, and `SPEAKER_DIARIZATION_API_KEY` to resolve unknown speakers through
+a production voice-clustering service. The expected response speaker path defaults to
+`SPEAKER_DIARIZATION_SPEAKER_PATH=speaker`.
+
 ## One-Shot Offline Evaluation
 
 Use this endpoint for the first demo path: paste JD and interview Q&A, then receive the structured
@@ -186,8 +191,8 @@ curl -s http://127.0.0.1:8000/api/offline/evaluate \
 ## Scope Notes
 
 The real-time ASR and optional behavior signal modules are implemented behind interfaces with local
-stub engines. Production speaker clustering can replace the local audio-cluster diarizer without
-changing the shared schemas.
+stub engines. Production speaker clustering can replace the local audio-cluster diarizer through the
+HTTP diarization provider without changing the shared schemas.
 
 Behavior signals are disabled by default. If an interview sets `signal_enabled=true`, the candidate
 must first grant `behavior_signal` consent through `POST /api/consents`; otherwise the API returns 403.

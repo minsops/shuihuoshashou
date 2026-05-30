@@ -12,6 +12,8 @@ The local implementation is complete as a runnable MVP:
 - ASR session manager supports partial-to-final chunk updates, repeated-final deduplication,
   stale-final rejection, local audio-cluster speaker resolution, and conservative short-gap
   speaker continuity smoothing.
+- Speaker diarization is pluggable: local deterministic audio clusters for development, or an
+  HTTP provider for production voice embedding / cloud diarization services.
 - Separate `credibility` WebSocket event after probe generation.
 - Pydantic v2 shared schemas.
 - SQLite local persistence.
@@ -96,5 +98,5 @@ LLM smoke test ok
 
 ## Remaining Production Gaps
 
-- Replace the local deterministic audio-cluster diarizer with production-grade voice embedding
-  clustering such as pyannote or a cloud ASR diarization provider.
+- Use a real production diarization endpoint or pyannote-backed service behind the HTTP provider in
+  deployed environments.

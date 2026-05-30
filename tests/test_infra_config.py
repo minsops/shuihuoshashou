@@ -29,6 +29,23 @@ def test_dockerfile_packages_gateway_app() -> None:
     assert "services.gateway.app:app" in dockerfile
 
 
+def test_env_example_lists_runtime_integration_knobs() -> None:
+    env_example = (ROOT / ".env.example").read_text(encoding="utf-8")
+
+    for key in [
+        "ASR_PROVIDER=",
+        "ASR_BASE_URL=",
+        "SPEAKER_DIARIZATION_PROVIDER=",
+        "SPEAKER_DIARIZATION_BASE_URL=",
+        "OFFLINE_TASK_EXECUTION=",
+        "REDIS_STREAM_PREFIX=",
+        "JD_VECTOR_BACKEND=",
+        "OBJECT_STORAGE_ACCESS_KEY=",
+        "REPORT_DIR=",
+    ]:
+        assert key in env_example
+
+
 def test_postgres_schema_matches_core_spec_tables() -> None:
     schema = (ROOT / "db" / "postgres" / "001_core_schema.sql").read_text(encoding="utf-8")
 
