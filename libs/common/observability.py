@@ -10,6 +10,8 @@ from threading import Lock
 from time import monotonic
 from uuid import uuid4
 
+from libs.common.config import Settings
+
 LOGGER_NAME = "shuihuo"
 logger = logging.getLogger(LOGGER_NAME)
 TRACEPARENT_RE = re.compile(
@@ -161,5 +163,75 @@ class SlidingWindowRateLimiter:
             self._events.clear()
 
 
+class RedisFixedWindowRateLimiter:
+    def __init__(
+        self,
+        redis_url: str,
+        *,
+        prefix: str = "shuihuo:rate_limit",
+        requests_per_minute: int = 120,
+        window_seconds: int = 60,
+        client: object | None = None,
+    ) -> None:
+        self.redis_url = redis_url
+        self.prefix = prefix.strip(":")
+        self.requests_per_minute = requests_per_minute
+        self.window_seconds = window_seconds
+        self.client = client or self._connect(redis_url)
+
+    @staticmethod
+    def _connect(redis_url: str) -> object:
+        try:
+            from redis import Redis
+        except ImportError as exc:
+            raise RuntimeError(
+                "Redis rate limit backend requires optional redis dependencies. "
+                "Install with `pip install -e .[redis]`."
+            ) from exc
+        return Redis.from_url(redis_url, decode_responses=True)
+
+    def check(self, key: str, now: float | None = None) -> RateLimitDecision:
+        if self.requests_per_minute <= 0:
+            return RateLimitDecision(allowed=True)
+
+        current = monotonic() if now is None else now
+        bucket = int(current // self.window_seconds)
+        redis_key = f"{self.prefix}:{key}:{bucket}"
+        count = int(self.client.incr(redis_key))  # type: ignore[attr-defined]
+        if count == 1:
+            self.client.expire(redis_key, self.window_seconds)  # type: ignore[attr-defined]
+        if count > self.requests_per_minute:
+            ttl = int(self.client.ttl(redis_key))  # type: ignore[attr-defined]
+            return RateLimitDecision(allowed=False, retry_after_seconds=max(1, ttl))
+        return RateLimitDecision(allowed=True)
+
+
 metrics_registry = MetricsRegistry()
 rate_limiter = SlidingWindowRateLimiter(requests_per_minute=120)
+_redis_rate_limiters: dict[tuple[str, str, int], RedisFixedWindowRateLimiter] = {}
+
+
+def get_rate_limiter(settings: Settings):
+    if settings.rate_limit_backend == "redis":
+        key = (
+            settings.redis_url,
+            settings.redis_rate_limit_prefix,
+            settings.rate_limit_requests_per_minute,
+        )
+        limiter = _redis_rate_limiters.get(key)
+        if limiter is None:
+            limiter = RedisFixedWindowRateLimiter(
+                redis_url=settings.redis_url,
+                prefix=settings.redis_rate_limit_prefix,
+                requests_per_minute=settings.rate_limit_requests_per_minute,
+            )
+            _redis_rate_limiters[key] = limiter
+        return limiter
+
+    rate_limiter.requests_per_minute = settings.rate_limit_requests_per_minute
+    return rate_limiter
+
+
+def reset_rate_limiters() -> None:
+    rate_limiter.reset()
+    _redis_rate_limiters.clear()

@@ -28,7 +28,9 @@ class RuntimeStatus(BaseModel):
     speaker_diarization_api_key_configured: bool
     signal_enabled: bool
     rate_limit_enabled: bool
+    rate_limit_backend: str
     rate_limit_requests_per_minute: int
+    redis_rate_limit_prefix: str
     offline_task_backend: str
     offline_task_execution: str
     celery_broker_configured: bool
@@ -69,7 +71,9 @@ def get_runtime_status() -> RuntimeStatus:
         speaker_diarization_api_key_configured=bool(settings.speaker_diarization_api_key),
         signal_enabled=settings.signal_enabled,
         rate_limit_enabled=settings.rate_limit_enabled,
+        rate_limit_backend=settings.rate_limit_backend,
         rate_limit_requests_per_minute=settings.rate_limit_requests_per_minute,
+        redis_rate_limit_prefix=settings.redis_rate_limit_prefix,
         offline_task_backend=settings.offline_task_backend,
         offline_task_execution=settings.offline_task_execution,
         celery_broker_configured=bool(settings.celery_broker_url),

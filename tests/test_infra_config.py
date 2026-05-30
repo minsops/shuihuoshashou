@@ -54,6 +54,8 @@ def test_env_example_lists_runtime_integration_knobs() -> None:
         "JD_VECTOR_BACKEND=",
         "OBJECT_STORAGE_ACCESS_KEY=",
         "REPORT_DIR=",
+        "RATE_LIMIT_BACKEND=",
+        "REDIS_RATE_LIMIT_PREFIX=",
     ]:
         assert key in env_example
 

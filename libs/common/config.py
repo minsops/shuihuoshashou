@@ -45,7 +45,9 @@ class Settings(BaseSettings):
     speaker_diarization_timeout_seconds: int = 10
     signal_enabled: bool = False
     rate_limit_enabled: bool = False
+    rate_limit_backend: str = "local"
     rate_limit_requests_per_minute: int = 120
+    redis_rate_limit_prefix: str = "shuihuo:rate_limit"
     offline_task_backend: str = "local"
     offline_task_execution: str = "sync"
     celery_broker_url: str = "redis://localhost:6379/1"

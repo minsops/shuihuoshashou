@@ -10,7 +10,7 @@ from starlette.websockets import WebSocketDisconnect
 
 from libs.common.config import get_settings
 from libs.common.events import event_bus
-from libs.common.observability import metrics_registry, rate_limiter
+from libs.common.observability import metrics_registry, reset_rate_limiters
 from libs.common.tasks import task_queue
 from services.asr_service.service import asr_session_manager
 from services.gateway.app import app
@@ -35,7 +35,7 @@ def _client(
     get_settings.cache_clear()
     event_bus.reset()
     metrics_registry.reset()
-    rate_limiter.reset()
+    reset_rate_limiters()
     asr_session_manager.reset()
     task_queue.reset()
     return TestClient(app)
@@ -100,7 +100,9 @@ def test_gateway_config_status_hides_secrets(tmp_path: Path, monkeypatch) -> Non
     assert payload["speaker_diarization_base_url_configured"] is False
     assert payload["speaker_diarization_api_key_configured"] is False
     assert payload["rate_limit_enabled"] is False
+    assert payload["rate_limit_backend"] == "local"
     assert payload["rate_limit_requests_per_minute"] == 120
+    assert payload["redis_rate_limit_prefix"] == "shuihuo:rate_limit"
     assert payload["offline_task_backend"] == "local"
     assert payload["offline_task_execution"] == "sync"
     assert payload["celery_broker_configured"] is True

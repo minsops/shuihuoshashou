@@ -12,9 +12,9 @@ from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Res
 from libs.common.config import get_settings
 from libs.common.database import init_db
 from libs.common.observability import (
+    get_rate_limiter,
     log_event,
     metrics_registry,
-    rate_limiter,
     request_id_from_header,
     trace_context_from_header,
 )
@@ -91,7 +91,6 @@ def _gateway_authorized(headers: Headers, expected_key: str, query_key: str | No
 @app.middleware("http")
 async def observe_and_rate_limit(request: Request, call_next):
     settings = get_settings()
-    rate_limiter.requests_per_minute = settings.rate_limit_requests_per_minute
     start = perf_counter()
     status_code = 500
     request_id = request_id_from_header(request.headers.get("x-request-id"))
@@ -125,7 +124,7 @@ async def observe_and_rate_limit(request: Request, call_next):
         return response
 
     if settings.rate_limit_enabled:
-        decision = rate_limiter.check(_client_key(request))
+        decision = get_rate_limiter(settings).check(_client_key(request))
         if not decision.allowed:
             status_code = 429
             duration = perf_counter() - start

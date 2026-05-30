@@ -98,6 +98,9 @@ curl -s http://127.0.0.1:8000/metrics
 RATE_LIMIT_ENABLED=true RATE_LIMIT_REQUESTS_PER_MINUTE=120 uvicorn services.gateway.app:app --port 8000
 ```
 
+Set `RATE_LIMIT_BACKEND=redis` and install `.[redis]` to share gateway rate-limit counters across
+processes through Redis. Local development uses the in-memory backend by default.
+
 HTTP responses include `X-Request-ID` and W3C `traceparent`; clients may send the same headers to
 correlate API calls, structured JSON logs, and Prometheus request metrics. Set
 `OTEL_EXPORTER_OTLP_ENDPOINT` when deploying behind an OpenTelemetry collector; the current local
