@@ -14,7 +14,7 @@ from libs.schemas import (
     ProbeRequest,
     QATurn,
 )
-from services.aigc_detect_service.service import detect_interview
+from services.aigc_detect_service.service import detect_interview, load_templates
 from services.interview_orchestrator.consistency import detect_consistency, extract_fact_claim
 from services.interview_orchestrator.service import (
     add_turn,
@@ -186,6 +186,21 @@ def test_aigc_detection_flags_template() -> None:
         ]
     )
     assert results[0].flagged
+    assert results[0].template_similarity > 0.9
+
+
+def test_aigc_detection_uses_template_corpus_for_paraphrase() -> None:
+    results = detect_interview(
+        [
+            QATurn(
+                question="q",
+                answer="首先我分析业务痛点，然后制定技术方案，最后推动落地并持续优化。",
+            )
+        ]
+    )
+    assert len(load_templates()) >= 5
+    assert results[0].matched_template
+    assert results[0].template_similarity >= 0.45
 
 
 def test_fact_claim_extraction() -> None:

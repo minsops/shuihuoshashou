@@ -16,6 +16,7 @@ The local implementation is complete as a runnable MVP:
 - Separate `qa_turns` persistence for auditable answer evidence.
 - JD knowledge base local retrieval for competency-specific probe patterns.
 - Probe generation, scoring, AIGC/template checks, consistency checks, HTML/PDF report generation.
+- AIGC template checks use a local corpus and character n-gram cosine similarity.
 - Report artifact metadata includes local `file://` URIs or configured S3-style URIs.
 - Local offline scoring task flow with `FINISHED -> SCORING -> REPORTED` state transitions.
 - Local task queue boundary for offline scoring with enqueue/completion/failure events.
