@@ -12,6 +12,7 @@ The local implementation is complete as a runnable MVP:
 - Pydantic v2 shared schemas.
 - SQLite local persistence.
 - Separate `qa_turns` persistence for auditable answer evidence.
+- JD knowledge base local retrieval for competency-specific probe patterns.
 - Probe generation, scoring, AIGC/template checks, consistency checks, HTML/PDF report generation.
 - Local offline scoring task flow with `FINISHED -> SCORING -> REPORTED` state transitions.
 - In-memory event bus topics for `qa_turn.created`, `interview.finished`,

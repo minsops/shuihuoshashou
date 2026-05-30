@@ -34,7 +34,7 @@ from services.interview_orchestrator.service import (
     should_probe,
     start_interview,
 )
-from services.jd_kb_service.service import create_job, get_job
+from services.jd_kb_service.service import create_job, get_job, retrieve_job_probe_patterns
 from services.probe_service.service import generate_probe
 from services.signal_service.service import extract_behavior_signal
 
@@ -164,6 +164,14 @@ def api_create_job(payload: JobCreate):
 def api_get_job(job_id: str):
     try:
         return get_job(job_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/api/jobs/{job_id}/probe-patterns")
+def api_job_probe_patterns(job_id: str, q: str = "", limit: int = 5):
+    try:
+        return retrieve_job_probe_patterns(job_id, q, limit=max(1, min(limit, 20)))
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

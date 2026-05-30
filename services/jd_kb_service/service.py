@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime
 
 from libs.common.database import connect, dumps, init_db, loads
-from libs.schemas import CompetencyItem, CompetencyModel, JobCreate, JobRecord
+from libs.schemas import CompetencyItem, CompetencyModel, JobCreate, JobRecord, ProbePatternHit
 
 
 DEFAULT_DIMENSIONS = [
@@ -13,6 +14,24 @@ DEFAULT_DIMENSIONS = [
     ("沟通与逻辑", "表达结构、因果链和信息密度", 0.15),
     ("注水风险", "AIGC、模板化、前后矛盾与追问露馅风险", -0.10),
 ]
+
+
+def _tokens(text: str) -> set[str]:
+    return set(re.findall(r"[a-zA-Z0-9_+\-.#]+|[\u4e00-\u9fff]{2,}", text.lower()))
+
+
+def _score_pattern(query: str, competency: str, pattern: str) -> float:
+    query_tokens = _tokens(query)
+    if not query_tokens:
+        return 0.0
+    haystack = _tokens(f"{competency} {pattern}")
+    overlap = len(query_tokens & haystack)
+    phrase_bonus = 0.0
+    lowered = f"{competency} {pattern}".lower()
+    for token in query_tokens:
+        if token in lowered:
+            phrase_bonus += 0.25
+    return round(overlap + phrase_bonus, 3)
 
 
 def generate_competency_model(job_id: str, title: str, jd_text: str) -> CompetencyModel:
@@ -29,6 +48,33 @@ def generate_competency_model(job_id: str, title: str, jd_text: str) -> Competen
             patterns.append("请追问 LLM 调用、评估、成本、失败降级和安全边界。")
         items.append(CompetencyItem(name=name, description=description, probe_patterns=patterns, weight=weight))
     return CompetencyModel(job_id=job_id, job_title=title, items=items)
+
+
+def retrieve_probe_patterns(
+    competency_model: CompetencyModel,
+    query: str,
+    *,
+    limit: int = 5,
+) -> list[ProbePatternHit]:
+    hits: list[ProbePatternHit] = []
+    for item in competency_model.items:
+        for pattern in item.probe_patterns:
+            score = _score_pattern(query, item.name, pattern)
+            if score > 0:
+                hits.append(
+                    ProbePatternHit(
+                        job_id=competency_model.job_id,
+                        competency=item.name,
+                        pattern=pattern,
+                        score=score,
+                    )
+                )
+    hits.sort(key=lambda hit: (-hit.score, hit.competency, hit.pattern))
+    return hits[:limit]
+
+
+def retrieve_job_probe_patterns(job_id: str, query: str, *, limit: int = 5) -> list[ProbePatternHit]:
+    return retrieve_probe_patterns(get_job(job_id).competency_model, query, limit=limit)
 
 
 def create_job(payload: JobCreate) -> JobRecord:
@@ -66,4 +112,3 @@ def get_job(job_id: str) -> JobRecord:
         competency_model=CompetencyModel.model_validate(loads(row["competency_model"])),
         created_at=datetime.fromisoformat(row["created_at"]),
     )
-

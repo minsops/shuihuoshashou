@@ -88,6 +88,25 @@ def test_gateway_config_status_hides_secrets(tmp_path: Path, monkeypatch) -> Non
     assert "super-secret" not in response.text
 
 
+def test_gateway_job_probe_pattern_search(tmp_path: Path, monkeypatch) -> None:
+    client = _client(tmp_path, monkeypatch)
+    job = client.post(
+        "/api/jobs",
+        json={"title": "LLM Backend", "jd_text": "Python FastAPI LLM 可靠性"},
+    ).json()
+
+    response = client.get(
+        f"/api/jobs/{job['id']}/probe-patterns",
+        params={"q": "LLM 调用失败降级 FastAPI 异常处理", "limit": 3},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload
+    assert payload[0]["job_id"] == job["id"]
+    assert any("LLM" in item["pattern"] or "FastAPI" in item["pattern"] for item in payload)
+
+
 def test_gateway_metrics_records_requests(tmp_path: Path, monkeypatch) -> None:
     client = _client(tmp_path, monkeypatch)
     assert client.get("/health").status_code == 200

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from libs.llm_client import LLMMessage, get_llm_client
 from libs.schemas import CredibilitySignal, ProbeRequest, ProbeResponse, ProbeSuggestion
+from services.jd_kb_service.service import retrieve_probe_patterns
 
 
 VAGUE_MARKERS = ["负责", "参与", "优化", "提升", "很多", "比较", "主要", "一些"]
@@ -33,13 +34,24 @@ def assess_credibility(answer: str) -> CredibilitySignal:
 def fallback_probe(request: ProbeRequest) -> ProbeResponse:
     credibility = assess_credibility(request.latest_answer)
     suggestions: list[ProbeSuggestion] = []
+    pattern_hits = retrieve_probe_patterns(
+        request.competency_model,
+        f"{request.latest_answer} {credibility.drill_down_hint}",
+        limit=3,
+    )
     for index, item in enumerate(request.competency_model.items[:3], start=1):
+        hit = next((candidate for candidate in pattern_hits if candidate.competency == item.name), None)
+        question = (
+            hit.pattern
+            if hit is not None
+            else (
+                f"围绕「{item.name}」，请候选人讲一个最近项目中的具体细节："
+                "他本人负责哪一段、为什么这样设计、遇到过什么异常以及最后指标如何变化？"
+            )
+        )
         suggestions.append(
             ProbeSuggestion(
-                question=(
-                    f"围绕「{item.name}」，请候选人讲一个最近项目中的具体细节："
-                    "他本人负责哪一段、为什么这样设计、遇到过什么异常以及最后指标如何变化？"
-                ),
+                question=question,
                 target="验证项目真实性" if item.name == "项目真实性" else "测试能力深度",
                 competency=item.name,
                 priority=index,
@@ -55,4 +67,3 @@ async def generate_probe(request: ProbeRequest) -> ProbeResponse:
         LLMMessage(role="user", content=request.model_dump_json()),
     ]
     return await get_llm_client().complete_json(messages, ProbeResponse, fallback)
-

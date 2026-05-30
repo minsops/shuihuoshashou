@@ -40,6 +40,13 @@ class CompetencyModel(BaseModel):
         return value
 
 
+class ProbePatternHit(BaseModel):
+    job_id: str
+    competency: str
+    pattern: str
+    score: float = Field(ge=0.0)
+
+
 class TranscriptSegment(BaseModel):
     session_id: str
     speaker: Literal["interviewer", "candidate", "unknown"]

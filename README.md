@@ -14,6 +14,7 @@ as a local-first Python MVP:
 - Interview turns are stored in both the interview context and a `qa_turns` table for auditability.
 - WebSocket transcripts carry speaker/finality/timestamp metadata and emit separate credibility events.
 - Docker Compose declares the gateway plus PostgreSQL, Redis, and MinIO for local infrastructure.
+- JD knowledge base exposes local lexical retrieval for competency-specific probe patterns.
 
 ## Important Secret Handling
 
@@ -97,6 +98,7 @@ returns 401, generate a fresh key and set it through `LLM_API_KEY` without commi
 - `POST /api/offline/evaluate`
 - `GET /api/config/status`
 - `GET /metrics`
+- `GET /api/jobs/{id}/probe-patterns?q=...`
 - `POST /api/interviews/{id}/end`
 - `GET /api/interviews/{id}/report`
 - `GET /api/interviews/{id}/report.html`

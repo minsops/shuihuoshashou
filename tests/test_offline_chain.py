@@ -25,7 +25,7 @@ from services.interview_orchestrator.service import (
     list_turns,
     run_offline_scoring_task,
 )
-from services.jd_kb_service.service import create_job
+from services.jd_kb_service.service import create_job, retrieve_job_probe_patterns
 from services.probe_service.service import fallback_probe
 
 
@@ -105,6 +105,33 @@ def test_probe_fallback_returns_three_suggestions() -> None:
     response = fallback_probe(request)
     assert len(response.suggestions) == 3
     assert response.credibility.level in {"vague", "suspicious"}
+
+
+def test_jd_kb_retrieves_relevant_probe_patterns(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'kb.db'}")
+    get_settings.cache_clear()
+    init_db()
+    job = create_job(JobCreate(title="LLM Backend", jd_text="Python FastAPI LLM 可靠性"))
+
+    hits = retrieve_job_probe_patterns(job.id, "LLM 调用失败降级和 FastAPI 异常处理", limit=3)
+
+    assert hits
+    assert hits[0].score > 0
+    assert any("LLM" in hit.pattern or "FastAPI" in hit.pattern for hit in hits)
+
+
+def test_probe_fallback_uses_retrieved_patterns() -> None:
+    job = create_job(JobCreate(title="LLM Backend", jd_text="Python FastAPI LLM 可靠性"))
+    response = fallback_probe(
+        ProbeRequest(
+            job_id=job.id,
+            competency_model=job.competency_model,
+            recent_turns=[],
+            latest_answer="我主要负责 LLM 调用和 FastAPI 优化，效果比较好。",
+        )
+    )
+
+    assert any("LLM" in suggestion.question or "FastAPI" in suggestion.question for suggestion in response.suggestions)
 
 
 def test_aigc_detection_flags_template() -> None:
