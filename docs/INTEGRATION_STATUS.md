@@ -25,6 +25,8 @@ The local implementation is complete as a runnable MVP:
 - Separate `qa_turns` persistence for auditable answer evidence.
 - JD knowledge base indexes competency-specific probe patterns with deterministic embeddings and optional pgvector nearest-neighbor search.
 - Probe generation, scoring, AIGC/template checks, consistency checks, HTML/PDF report generation.
+- Scoring uses the shared LLM JSON client for structured dimension drafts, then normalizes evidence
+  and recomputes final totals in Python.
 - Runtime probe prompts are kept under `prompts/` and loaded by services instead of being embedded in code.
 - AIGC template checks use a local corpus and character n-gram cosine similarity.
 - Structured JSON and HTML/PDF reports include highlights, radar charts, AIGC risk highlights,

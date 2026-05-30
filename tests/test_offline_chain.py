@@ -13,9 +13,12 @@ from libs.schemas import (
     CandidateCreate,
     CompetencyItem,
     CompetencyModel,
+    DimensionScore,
+    EvidenceRef,
     InterviewCreate,
     InterviewContext,
     InterviewRecord,
+    InterviewScore,
     InterviewStatus,
     JobCreate,
     JobRecord,
@@ -45,6 +48,7 @@ from services.jd_kb_service.service import (
 )
 from libs.common.prompts import load_prompt
 from services.probe_service.service import fallback_probe, generate_probe
+from services.scoring_service.service import score_interview
 
 
 @pytest.fixture(autouse=True)
@@ -244,6 +248,62 @@ def test_generate_probe_uses_prompt_file(monkeypatch) -> None:
 
     assert messages[0].role == "system"
     assert messages[0].content == load_prompt("probe_system.md")
+
+
+def test_score_interview_uses_prompt_and_recomputes_total(monkeypatch) -> None:
+    sent_messages = []
+    model = generate_competency_model("job-local", "Backend", "Python FastAPI")
+    turn = QATurn(
+        question="讲项目",
+        answer="我负责 FastAPI 接口优化，延迟降低 30%。",
+        answer_start_ms=100,
+        answer_end_ms=1200,
+    )
+    ctx = InterviewContext(
+        session_id="session-local",
+        job_id=model.job_id,
+        candidate_id="candidate-local",
+        competency_model=model,
+        turns=[turn],
+    )
+    draft = InterviewScore(
+        session_id=ctx.session_id,
+        dimensions=[
+            DimensionScore(
+                dimension=item.name,
+                score=90.0 if item.weight > 0 else 50.0,
+                weight=999.0,
+                evidence=[
+                    EvidenceRef(
+                        turn_id=turn.turn_id,
+                        quote_start_ms=turn.answer_start_ms,
+                        quote_end_ms=turn.answer_end_ms,
+                        excerpt=turn.answer,
+                    )
+                ],
+            )
+            for item in model.items
+        ],
+        total_score=1.0,
+        risk_notes=["LLM draft risk"],
+        recommendation="no",
+    )
+
+    class FakeClient:
+        def complete_json_sync(self, messages, schema, fallback):
+            sent_messages.extend(messages)
+            return draft
+
+    monkeypatch.setattr("services.scoring_service.service.get_llm_client", lambda: FakeClient())
+
+    score = score_interview(ctx, [])
+
+    assert sent_messages[0].role == "system"
+    assert sent_messages[0].content == load_prompt("scoring_system.md")
+    assert score.total_score == 85.0
+    assert score.recommendation == "yes"
+    assert all(dimension.weight != 999.0 for dimension in score.dimensions)
+    assert score.risk_notes == ["LLM draft risk"]
 
 
 def test_jd_kb_retrieves_relevant_probe_patterns(tmp_path: Path, monkeypatch) -> None:

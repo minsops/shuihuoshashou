@@ -24,6 +24,8 @@ as a local-first Python MVP:
 - Report artifacts write local files by default and upload to S3-compatible storage when credentials are configured.
 - Reports include structured scores, radar charts, highlights, AIGC checks, consistency flags,
   risk highlights, recommendations, and full interview transcripts.
+- Scoring uses the shared LLM JSON client for structured dimension drafts and recomputes final
+  totals in Python for auditability and deterministic fallback behavior.
 - AIGC/template checks use a local answer-template corpus with character n-gram cosine similarity.
 
 ## Important Secret Handling

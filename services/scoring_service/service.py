@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+import json
+from typing import Literal
+
+from libs.common.prompts import load_prompt
+from libs.llm_client import LLMMessage, get_llm_client
 from libs.schemas import AIGCResult, DimensionScore, EvidenceRef, InterviewContext, InterviewScore
 
 
@@ -17,7 +22,10 @@ def _evidence_for_dimension(ctx: InterviewContext, dimension: str) -> list[Evide
     return refs
 
 
-def score_interview(ctx: InterviewContext, aigc_results: list[AIGCResult]) -> InterviewScore:
+def fallback_score_interview(
+    ctx: InterviewContext,
+    aigc_results: list[AIGCResult],
+) -> InterviewScore:
     risk_penalty = 0.0
     risk_notes: list[str] = []
     if ctx.flags:
@@ -68,3 +76,94 @@ def score_interview(ctx: InterviewContext, aigc_results: list[AIGCResult]) -> In
         recommendation=recommendation,
     )
 
+
+def score_interview(ctx: InterviewContext, aigc_results: list[AIGCResult]) -> InterviewScore:
+    fallback = fallback_score_interview(ctx, aigc_results)
+    messages = [
+        LLMMessage(role="system", content=load_prompt("scoring_system.md")),
+        LLMMessage(
+            role="user",
+            content=_scoring_payload(ctx, aigc_results),
+        ),
+    ]
+    draft = get_llm_client().complete_json_sync(messages, InterviewScore, fallback)
+    return _normalize_score(ctx, draft, fallback)
+
+
+def _scoring_payload(ctx: InterviewContext, aigc_results: list[AIGCResult]) -> str:
+    payload = {
+        "job_id": ctx.job_id,
+        "candidate_id": ctx.candidate_id,
+        "competency_model": ctx.competency_model.model_dump(),
+        "turns": [turn.model_dump() for turn in ctx.turns],
+        "consistency_flags": [flag.model_dump() for flag in ctx.flags],
+        "aigc_results": [item.model_dump() for item in aigc_results],
+        "instructions": (
+            "Return JSON matching InterviewScore. Provide one DimensionScore per competency "
+            "dimension with evidence referencing existing turn_id values. Python will recompute "
+            "total_score from dimension scores and weights."
+        ),
+    }
+    return json.dumps(payload, ensure_ascii=False, default=str)
+
+
+def _normalize_score(
+    ctx: InterviewContext,
+    draft: InterviewScore,
+    fallback: InterviewScore,
+) -> InterviewScore:
+    turns_by_id = {turn.turn_id: turn for turn in ctx.turns}
+    fallback_by_dimension = {dimension.dimension: dimension for dimension in fallback.dimensions}
+    normalized_dimensions: list[DimensionScore] = []
+    for item in ctx.competency_model.items:
+        draft_dimension = next(
+            (dimension for dimension in draft.dimensions if dimension.dimension == item.name),
+            None,
+        )
+        if draft_dimension is None:
+            normalized_dimensions.append(fallback_by_dimension[item.name])
+            continue
+        evidence = [
+            ref
+            for ref in draft_dimension.evidence
+            if ref.turn_id in turns_by_id and ref.excerpt.strip()
+        ]
+        if not evidence:
+            evidence = fallback_by_dimension[item.name].evidence
+        normalized_dimensions.append(
+            DimensionScore(
+                dimension=item.name,
+                score=round(max(0.0, min(100.0, draft_dimension.score)), 2),
+                weight=item.weight,
+                evidence=evidence,
+            )
+        )
+
+    total = _compute_total_score(normalized_dimensions)
+    return InterviewScore(
+        session_id=ctx.session_id,
+        dimensions=normalized_dimensions,
+        total_score=total,
+        risk_notes=draft.risk_notes or fallback.risk_notes,
+        recommendation=_recommendation(total),
+    )
+
+
+def _compute_total_score(dimensions: list[DimensionScore]) -> float:
+    positive = [dimension for dimension in dimensions if dimension.weight > 0]
+    weight_sum = sum(dimension.weight for dimension in positive) or 1.0
+    total = sum(dimension.score * dimension.weight for dimension in positive) / weight_sum
+    for dimension in dimensions:
+        if dimension.weight < 0:
+            total -= (100.0 - dimension.score) * abs(dimension.weight)
+    return round(max(0.0, min(100.0, total)), 2)
+
+
+def _recommendation(total_score: float) -> Literal["strong_yes", "yes", "hold", "no"]:
+    if total_score >= 88:
+        return "strong_yes"
+    if total_score >= 75:
+        return "yes"
+    if total_score >= 60:
+        return "hold"
+    return "no"
