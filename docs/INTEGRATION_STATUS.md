@@ -21,6 +21,7 @@ The local implementation is complete as a runnable MVP:
 - Safe runtime config and LLM smoke-test scripts.
 - Prometheus-style `/metrics` endpoint for local HTTP request counters and duration sums.
 - Optional in-memory per-client rate limit gate for the gateway.
+- Docker Compose entrypoint for gateway, PostgreSQL, Redis, and MinIO.
 
 ## MiMo Configuration
 

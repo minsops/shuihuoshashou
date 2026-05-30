@@ -13,6 +13,7 @@ as a local-first Python MVP:
 - End-to-end offline demo from JD + interview turns to probe, scoring, AIGC checks, and report.
 - Interview turns are stored in both the interview context and a `qa_turns` table for auditability.
 - WebSocket transcripts carry speaker/finality/timestamp metadata and emit separate credibility events.
+- Docker Compose declares the gateway plus PostgreSQL, Redis, and MinIO for local infrastructure.
 
 ## Important Secret Handling
 
@@ -48,6 +49,19 @@ uvicorn services.gateway.app:app --reload --port 8000
 Open API docs at `http://127.0.0.1:8000/docs`.
 
 Open the local demo UI at `http://127.0.0.1:8000/`.
+
+## Run With Docker Compose
+
+Docker Compose starts the gateway together with the infrastructure named in the engineering spec:
+PostgreSQL, Redis, and S3-compatible MinIO.
+
+```bash
+docker compose up --build
+```
+
+The gateway still uses SQLite in the current local profile while PostgreSQL/Redis/MinIO are available
+for the production adapters. This keeps the runnable MVP stable and makes the remaining adapter work
+explicit instead of hidden.
 
 Operational endpoints:
 
