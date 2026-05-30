@@ -11,6 +11,7 @@ The local implementation is complete as a runnable MVP:
 - Separate `credibility` WebSocket event after probe generation.
 - Pydantic v2 shared schemas.
 - SQLite local persistence.
+- PostgreSQL core schema SQL for compose initialization.
 - Separate `qa_turns` persistence for auditable answer evidence.
 - JD knowledge base local retrieval for competency-specific probe patterns.
 - Probe generation, scoring, AIGC/template checks, consistency checks, HTML/PDF report generation.
@@ -85,7 +86,7 @@ LLM smoke test ok
 
 ## Remaining Production Gaps
 
-- Replace local SQLite with PostgreSQL/pgvector and Redis-backed state where deployment requires it.
+- Wire the runtime data access layer to PostgreSQL/pgvector where deployment requires it.
 - Replace the local task queue/event bus with Redis Streams, RabbitMQ, Kafka, or Celery workers.
 - Plug a real streaming ASR/diarization engine behind the existing `ASREngine` interface.
 - Add concrete S3/MinIO upload client behind the report artifact store for multi-node deployments.

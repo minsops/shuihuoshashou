@@ -15,6 +15,7 @@ as a local-first Python MVP:
 - Interview turns are stored in both the interview context and a `qa_turns` table for auditability.
 - WebSocket transcripts carry speaker/finality/timestamp metadata and emit separate credibility events.
 - Docker Compose declares the gateway plus PostgreSQL, Redis, and MinIO for local infrastructure.
+- PostgreSQL core schema SQL is provided under `db/postgres` for compose initialization.
 - JD knowledge base exposes local lexical retrieval for competency-specific probe patterns.
 - Report artifacts expose storage URIs, using local files by default and S3-style URIs when configured.
 
@@ -65,6 +66,9 @@ docker compose up --build
 The gateway still uses SQLite in the current local profile while PostgreSQL/Redis/MinIO are available
 for the production adapters. This keeps the runnable MVP stable and makes the remaining adapter work
 explicit instead of hidden.
+
+PostgreSQL initializes from `db/postgres/001_core_schema.sql`, which declares the core jobs,
+candidates, interviews, turns, scores, AIGC results, reports, and consent tables from the spec.
 
 Set `OBJECT_STORAGE_ENDPOINT` and `OBJECT_STORAGE_BUCKET` to make report metadata use S3-style
 artifact URIs while still writing a local copy for development.
