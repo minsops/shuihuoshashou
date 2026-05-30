@@ -69,7 +69,7 @@ def create_consent(payload: ConsentCreate) -> ConsentRecord:
                 record.id,
                 record.candidate_id,
                 record.consent_type,
-                int(record.granted),
+                record.granted,
                 record.granted_at.isoformat(),
                 record.revoked_at.isoformat() if record.revoked_at else None,
             ),
@@ -127,7 +127,7 @@ def create_interview(payload: InterviewCreate) -> InterviewRecord:
                 record.candidate_id,
                 record.status.value,
                 dumps(record.context.model_dump()),
-                int(record.signal_enabled),
+                record.signal_enabled,
                 record.created_at.isoformat(),
                 None,
                 None,
@@ -166,7 +166,7 @@ def save_interview(record: InterviewRecord) -> None:
             (
                 record.status.value,
                 dumps(record.context.model_dump()),
-                int(record.signal_enabled),
+                record.signal_enabled,
                 record.started_at.isoformat() if record.started_at else None,
                 record.ended_at.isoformat() if record.ended_at else None,
                 record.id,
@@ -269,13 +269,38 @@ def run_offline_scoring_task(interview_id: str):
     save_interview(record)
     with connect() as conn:
         conn.execute(
-            "INSERT OR REPLACE INTO scores (interview_id, payload) VALUES (?, ?)",
-            (interview_id, dumps(score.model_dump())),
+            """
+            INSERT OR REPLACE INTO scores
+            (interview_id, dimensions, total_score, risk_notes, recommendation, payload)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                interview_id,
+                dumps([dimension.model_dump() for dimension in score.dimensions]),
+                score.total_score,
+                dumps(score.risk_notes),
+                score.recommendation,
+                dumps(score.model_dump()),
+            ),
         )
         for item in aigc:
             conn.execute(
-                "INSERT OR REPLACE INTO aigc_results (id, interview_id, turn_id, payload) VALUES (?, ?, ?, ?)",
-                (f"{interview_id}:{item.turn_id}", interview_id, item.turn_id, dumps(item.model_dump())),
+                """
+                INSERT OR REPLACE INTO aigc_results
+                (id, interview_id, turn_id, ai_generated_prob, template_similarity,
+                 matched_template, flagged, payload)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    item.turn_id,
+                    interview_id,
+                    item.turn_id,
+                    item.ai_generated_prob,
+                    item.template_similarity,
+                    item.matched_template,
+                    item.flagged,
+                    dumps(item.model_dump()),
+                ),
             )
         conn.execute(
             "INSERT OR REPLACE INTO reports (interview_id, payload, html) VALUES (?, ?, ?)",

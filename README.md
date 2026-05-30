@@ -7,7 +7,7 @@ as a local-first Python MVP:
 
 - Python 3.11+ with Pydantic v2 schemas.
 - FastAPI services and gateway.
-- Local SQLite persistence instead of Docker/PostgreSQL for the first runnable version.
+- Local SQLite persistence by default, with a PostgreSQL runtime adapter for deployment profiles.
 - In-memory async events instead of Redis/MQ for local development, with explicit offline scoring events.
 - Local task queue boundary for offline scoring, ready to swap for Celery/Redis workers.
 - Unified LLM client with mock mode and OpenAI-compatible HTTP mode for `mimo2.5pro`.
@@ -16,7 +16,7 @@ as a local-first Python MVP:
 - WebSocket transcripts carry speaker/finality/timestamp metadata and emit separate credibility events.
 - Docker Compose declares the gateway plus PostgreSQL, Redis, and MinIO for local infrastructure.
 - PostgreSQL core schema SQL is provided under `db/postgres` for compose initialization.
-- Runtime database URL parsing distinguishes SQLite and PostgreSQL targets.
+- Runtime database URL parsing supports SQLite and PostgreSQL targets.
 - JD knowledge base exposes local lexical retrieval for competency-specific probe patterns.
 - Report artifacts write local files by default and upload to S3-compatible storage when credentials are configured.
 - Reports include structured scores, AIGC checks, consistency flags, and full interview transcripts.
@@ -66,14 +66,12 @@ PostgreSQL, Redis, and S3-compatible MinIO.
 docker compose up --build
 ```
 
-The gateway still uses SQLite in the current local profile while PostgreSQL/Redis/MinIO are available
-for the production adapters. This keeps the runnable MVP stable and makes the remaining adapter work
-explicit instead of hidden.
+The gateway uses SQLite in the default local profile. Set `DATABASE_URL` to a `postgresql://...`
+URL and install `.[postgres]` to run the same repository calls against PostgreSQL.
 
 PostgreSQL initializes from `db/postgres/001_core_schema.sql`, which declares the core jobs,
 candidates, interviews, turns, scores, AIGC results, reports, and consent tables from the spec.
-Install `.[postgres]` when implementing or running the PostgreSQL repository adapter. The current
-runtime repository still uses SQLite and raises a clear error for PostgreSQL URLs.
+The runtime adapter translates the local repository parameter style and upserts for PostgreSQL.
 
 Set `OBJECT_STORAGE_ENDPOINT`, `OBJECT_STORAGE_BUCKET`, `OBJECT_STORAGE_ACCESS_KEY`, and
 `OBJECT_STORAGE_SECRET_KEY` to upload report HTML/PDF artifacts to S3-compatible storage such as

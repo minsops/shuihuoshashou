@@ -12,7 +12,7 @@ The local implementation is complete as a runnable MVP:
 - Pydantic v2 shared schemas.
 - SQLite local persistence.
 - PostgreSQL core schema SQL for compose initialization.
-- Database URL dialect detection for SQLite and PostgreSQL targets.
+- Database URL dialect detection and runtime connection support for SQLite and PostgreSQL targets.
 - Separate `qa_turns` persistence for auditable answer evidence.
 - JD knowledge base local retrieval for competency-specific probe patterns.
 - Probe generation, scoring, AIGC/template checks, consistency checks, HTML/PDF report generation.
@@ -90,6 +90,6 @@ LLM smoke test ok
 
 ## Remaining Production Gaps
 
-- Wire the runtime data access layer to PostgreSQL/pgvector where deployment requires it.
+- Add pgvector-backed semantic retrieval for JD/probe-pattern search.
 - Replace the local task queue/event bus with Redis Streams, RabbitMQ, Kafka, or Celery workers.
 - Plug a real streaming ASR/diarization engine behind the existing `ASREngine` interface.
