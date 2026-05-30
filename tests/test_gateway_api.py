@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import base64
+import json
+import logging
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -112,7 +114,9 @@ def test_gateway_api_key_auth_can_be_enabled(tmp_path: Path, monkeypatch) -> Non
     client = _client(tmp_path, monkeypatch, gateway_api_key="gateway-secret")
 
     assert client.get("/health").status_code == 200
-    assert client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).status_code == 401
+    unauthorized = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"})
+    assert unauthorized.status_code == 401
+    assert unauthorized.headers["x-request-id"]
 
     created = client.post(
         "/api/jobs",
@@ -208,7 +212,9 @@ def test_gateway_end_interview_can_return_queued_task(tmp_path: Path, monkeypatc
 
 def test_gateway_metrics_records_requests(tmp_path: Path, monkeypatch) -> None:
     client = _client(tmp_path, monkeypatch)
-    assert client.get("/health").status_code == 200
+    health = client.get("/health", headers={"x-request-id": "trace-123"})
+    assert health.status_code == 200
+    assert health.headers["x-request-id"] == "trace-123"
 
     response = client.get("/metrics")
     assert response.status_code == 200
@@ -216,6 +222,24 @@ def test_gateway_metrics_records_requests(tmp_path: Path, monkeypatch) -> None:
     assert 'shuihuo_http_requests_total{method="GET",path="/health",status="200"} 1' in (
         response.text
     )
+
+
+def test_gateway_writes_structured_request_log(
+    tmp_path: Path, monkeypatch, caplog
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+    caplog.set_level(logging.INFO, logger="shuihuo")
+
+    response = client.get("/health", headers={"x-request-id": "trace-log"})
+
+    assert response.status_code == 200
+    payloads = [json.loads(record.message) for record in caplog.records if record.name == "shuihuo"]
+    request_log = next(item for item in payloads if item["event"] == "http.request")
+    assert request_log["request_id"] == "trace-log"
+    assert request_log["method"] == "GET"
+    assert request_log["path"] == "/health"
+    assert request_log["status_code"] == 200
+    assert request_log["duration_seconds"] >= 0
 
 
 def test_gateway_rate_limit_can_be_enabled(tmp_path: Path, monkeypatch) -> None:

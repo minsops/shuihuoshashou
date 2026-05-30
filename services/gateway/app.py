@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Res
 
 from libs.common.config import get_settings
 from libs.common.database import init_db
-from libs.common.observability import metrics_registry, rate_limiter
+from libs.common.observability import log_event, metrics_registry, rate_limiter, request_id_from_header
 from libs.common.runtime import RuntimeStatus, get_runtime_status
 from libs.schemas import (
     CandidateCreate,
@@ -88,15 +88,30 @@ async def observe_and_rate_limit(request: Request, call_next):
     rate_limiter.requests_per_minute = settings.rate_limit_requests_per_minute
     start = perf_counter()
     status_code = 500
+    request_id = request_id_from_header(request.headers.get("x-request-id"))
+    path = request.url.path
     if request.url.path.startswith("/api/") and not _gateway_authorized(
         request.headers,
         settings.gateway_api_key,
         request.query_params.get("api_key"),
     ):
         status_code = 401
-        response = PlainTextResponse("unauthorized", status_code=status_code)
+        duration = perf_counter() - start
+        response = PlainTextResponse(
+            "unauthorized",
+            status_code=status_code,
+            headers={"X-Request-ID": request_id},
+        )
         metrics_registry.record_request(
-            request.method, request.url.path, status_code, perf_counter() - start
+            request.method, path, status_code, duration
+        )
+        log_event(
+            "http.request",
+            request_id=request_id,
+            method=request.method,
+            path=path,
+            status_code=status_code,
+            duration_seconds=round(duration, 6),
         )
         return response
 
@@ -104,23 +119,46 @@ async def observe_and_rate_limit(request: Request, call_next):
         decision = rate_limiter.check(_client_key(request))
         if not decision.allowed:
             status_code = 429
+            duration = perf_counter() - start
             response = PlainTextResponse(
                 "rate limit exceeded",
                 status_code=status_code,
-                headers={"Retry-After": str(decision.retry_after_seconds)},
+                headers={
+                    "Retry-After": str(decision.retry_after_seconds),
+                    "X-Request-ID": request_id,
+                },
             )
             metrics_registry.record_request(
-                request.method, request.url.path, status_code, perf_counter() - start
+                request.method, path, status_code, duration
+            )
+            log_event(
+                "http.request",
+                request_id=request_id,
+                method=request.method,
+                path=path,
+                status_code=status_code,
+                duration_seconds=round(duration, 6),
             )
             return response
 
     try:
         response: Response = await call_next(request)
         status_code = response.status_code
+        response.headers["X-Request-ID"] = request_id
         return response
     finally:
+        duration = perf_counter() - start
+        route_path = _route_path(request)
         metrics_registry.record_request(
-            request.method, _route_path(request), status_code, perf_counter() - start
+            request.method, route_path, status_code, duration
+        )
+        log_event(
+            "http.request",
+            request_id=request_id,
+            method=request.method,
+            path=route_path,
+            status_code=status_code,
+            duration_seconds=round(duration, 6),
         )
 
 

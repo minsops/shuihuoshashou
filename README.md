@@ -94,6 +94,9 @@ curl -s http://127.0.0.1:8000/metrics
 RATE_LIMIT_ENABLED=true RATE_LIMIT_REQUESTS_PER_MINUTE=120 uvicorn services.gateway.app:app --port 8000
 ```
 
+HTTP responses include `X-Request-ID`; clients may send the same header to correlate API calls,
+structured JSON logs, and Prometheus request metrics.
+
 Check runtime configuration without exposing secrets:
 
 ```bash

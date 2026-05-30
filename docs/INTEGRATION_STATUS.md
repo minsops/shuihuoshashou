@@ -37,6 +37,7 @@ The local implementation is complete as a runnable MVP:
 - Configurable LLM client with mock mode and OpenAI-compatible HTTP mode.
 - Safe runtime config and LLM smoke-test scripts.
 - Prometheus-style `/metrics` endpoint for local HTTP request counters and duration sums.
+- Structured JSON request logs with propagated `X-Request-ID` correlation IDs.
 - Optional in-memory per-client rate limit gate for the gateway.
 - Docker Compose entrypoint for gateway, PostgreSQL, Redis, and MinIO.
 

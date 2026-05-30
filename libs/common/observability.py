@@ -1,13 +1,28 @@
 from __future__ import annotations
 
+import json
+import logging
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from threading import Lock
 from time import monotonic
+from uuid import uuid4
+
+LOGGER_NAME = "shuihuo"
+logger = logging.getLogger(LOGGER_NAME)
 
 
 def _label_value(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+
+
+def request_id_from_header(value: str | None) -> str:
+    return value.strip() if value and value.strip() else str(uuid4())
+
+
+def log_event(event: str, **fields: object) -> None:
+    payload = {"event": event, **fields}
+    logger.info(json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str))
 
 
 @dataclass
