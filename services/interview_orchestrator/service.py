@@ -37,10 +37,26 @@ def create_candidate(payload: CandidateCreate) -> CandidateRecord:
 
 def create_consent(payload: ConsentCreate) -> ConsentRecord:
     init_db()
+    now = datetime.now(UTC)
+    if not payload.granted:
+        with connect() as conn:
+            conn.execute(
+                """
+                UPDATE consents
+                SET revoked_at = ?
+                WHERE candidate_id = ?
+                  AND consent_type = ?
+                  AND granted = 1
+                  AND revoked_at IS NULL
+                """,
+                (now.isoformat(), payload.candidate_id, payload.consent_type),
+            )
     record = ConsentRecord(
         candidate_id=payload.candidate_id,
         consent_type=payload.consent_type,
         granted=payload.granted,
+        granted_at=now,
+        revoked_at=now if not payload.granted else None,
     )
     with connect() as conn:
         conn.execute(

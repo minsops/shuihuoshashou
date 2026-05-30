@@ -160,3 +160,5 @@ plugged in without changing the shared schemas.
 
 Behavior signals are disabled by default. If an interview sets `signal_enabled=true`, the candidate
 must first grant `behavior_signal` consent through `POST /api/consents`; otherwise the API returns 403.
+Posting the same consent with `granted=false` revokes prior active behavior-signal consent and future
+signal-enabled interviews are rejected until consent is granted again.

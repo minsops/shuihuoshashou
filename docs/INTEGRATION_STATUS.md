@@ -23,6 +23,7 @@ The local implementation is complete as a runnable MVP:
 - In-memory event bus topics for `qa_turn.created`, `interview.finished`,
   `task.enqueued`, `interview.scoring_started`, `interview.reported`, and `task.completed`.
 - Behavior signal module with explicit candidate consent gate.
+- Candidate behavior-signal consent can be revoked and blocks future signal-enabled interviews.
 - Configurable LLM client with mock mode and OpenAI-compatible HTTP mode.
 - Safe runtime config and LLM smoke-test scripts.
 - Prometheus-style `/metrics` endpoint for local HTTP request counters and duration sums.

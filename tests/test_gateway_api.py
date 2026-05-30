@@ -163,6 +163,37 @@ def test_signal_requires_candidate_consent(tmp_path: Path, monkeypatch) -> None:
     assert accepted.json()["signal_enabled"] is True
 
 
+def test_signal_consent_can_be_revoked(tmp_path: Path, monkeypatch) -> None:
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+
+    granted = client.post(
+        "/api/consents",
+        json={"candidate_id": candidate["id"], "consent_type": "behavior_signal", "granted": True},
+    )
+    assert granted.status_code == 200
+    accepted = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"], "signal_enabled": True},
+    )
+    assert accepted.status_code == 200
+
+    revoked = client.post(
+        "/api/consents",
+        json={"candidate_id": candidate["id"], "consent_type": "behavior_signal", "granted": False},
+    )
+    assert revoked.status_code == 200
+    assert revoked.json()["granted"] is False
+    assert revoked.json()["revoked_at"] is not None
+
+    rejected = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"], "signal_enabled": True},
+    )
+    assert rejected.status_code == 403
+
+
 def test_gateway_websocket_probe_flow(tmp_path: Path, monkeypatch) -> None:
     client = _client(tmp_path, monkeypatch)
     job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
