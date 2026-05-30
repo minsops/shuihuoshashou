@@ -21,7 +21,7 @@ The local implementation is complete as a runnable MVP:
 - Structured JSON and HTML reports include the full interview transcript.
 - Report artifacts support local `file://` storage and SigV4 uploads to S3-compatible storage.
 - Local offline scoring task flow with `FINISHED -> SCORING -> REPORTED` state transitions.
-- Local task queue boundary for offline scoring with optional Redis Streams task publication.
+- Local task queue boundary for offline scoring with Redis Streams task publication and worker consumption.
 - In-memory event bus topics for `qa_turn.created`, `interview.finished`,
   `task.enqueued`, `interview.scoring_started`, `interview.reported`, and `task.completed`.
 - Behavior signal module with explicit candidate consent gate.
@@ -92,5 +92,5 @@ LLM smoke test ok
 ## Remaining Production Gaps
 
 - Replace the deterministic local embedding scorer with pgvector nearest-neighbor retrieval.
-- Add asynchronous Redis/Celery workers that consume the published offline task stream.
+- Split API completion from offline worker completion for a fully asynchronous production response flow.
 - Add production-grade streaming ASR session management and diarization beyond HTTP chunk forwarding.

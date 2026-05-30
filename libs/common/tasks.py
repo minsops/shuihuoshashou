@@ -6,7 +6,7 @@ from typing import Any, Callable, Generic, TypeVar
 from uuid import uuid4
 
 from libs.common.config import get_settings
-from libs.common.database import dumps
+from libs.common.database import dumps, loads
 from libs.common.events import event_bus
 
 T = TypeVar("T")
@@ -89,7 +89,7 @@ class RedisStreamPublisher:
         return Redis.from_url(redis_url, decode_responses=True)
 
     def publish_task(self, task_id: str, name: str, payload: dict[str, Any]) -> str:
-        stream = f"{self.stream_prefix}:tasks:{name}"
+        stream = redis_task_stream(self.stream_prefix, name)
         message = {
             "task_id": task_id,
             "name": name,
@@ -97,6 +97,79 @@ class RedisStreamPublisher:
             "created_at": datetime.now(UTC).isoformat(),
         }
         return str(self.client.xadd(stream, message))
+
+
+def redis_task_stream(stream_prefix: str, task_name: str) -> str:
+    return f"{stream_prefix.strip(':')}:tasks:{task_name}"
+
+
+class RedisStreamWorker:
+    def __init__(
+        self,
+        task_name: str,
+        handler: Callable[[dict[str, Any]], Any],
+        *,
+        redis_url: str,
+        stream_prefix: str = "shuihuo",
+        group: str = "offline-workers",
+        consumer: str = "worker-1",
+        client: Any | None = None,
+    ) -> None:
+        self.task_name = task_name
+        self.handler = handler
+        self.redis_url = redis_url
+        self.stream_prefix = stream_prefix.strip(":")
+        self.group = group
+        self.consumer = consumer
+        self.client = client or RedisStreamPublisher._connect(redis_url)
+        self.stream = redis_task_stream(self.stream_prefix, task_name)
+
+    def ensure_group(self) -> None:
+        try:
+            self.client.xgroup_create(self.stream, self.group, id="0", mkstream=True)
+        except Exception as exc:
+            if "BUSYGROUP" not in str(exc):
+                raise
+
+    def consume_once(self, *, block_ms: int = 1000, count: int = 1) -> int:
+        self.ensure_group()
+        messages = self.client.xreadgroup(
+            self.group,
+            self.consumer,
+            {self.stream: ">"},
+            count=count,
+            block=block_ms,
+        )
+        processed = 0
+        for stream, entries in messages:
+            for message_id, fields in entries:
+                payload = loads(fields["payload"])
+                try:
+                    self.handler(payload)
+                except Exception as exc:
+                    event_bus.publish_nowait(
+                        "task.worker_failed",
+                        {
+                            "stream": stream,
+                            "message_id": message_id,
+                            "task_id": fields.get("task_id", ""),
+                            "name": fields.get("name", self.task_name),
+                            "error": str(exc),
+                        },
+                    )
+                    raise
+                self.client.xack(stream, self.group, message_id)
+                event_bus.publish_nowait(
+                    "task.worker_completed",
+                    {
+                        "stream": stream,
+                        "message_id": message_id,
+                        "task_id": fields.get("task_id", ""),
+                        "name": fields.get("name", self.task_name),
+                    },
+                )
+                processed += 1
+        return processed
 
 
 @dataclass

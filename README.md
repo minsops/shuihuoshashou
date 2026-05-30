@@ -142,6 +142,14 @@ Streams under `{REDIS_STREAM_PREFIX}:tasks:{task_name}` while retaining synchron
 It records task enqueue, completion, and failure events so the Celery/Redis worker boundary is
 explicit.
 
+Run a Redis Streams consumer for offline scoring tasks with:
+
+```bash
+OFFLINE_TASK_BACKEND=redis_stream python scripts/run_offline_worker.py
+```
+
+Use `--once` for a single poll cycle in deployment smoke tests.
+
 ```bash
 curl -s http://127.0.0.1:8000/api/offline/evaluate \
   -H 'content-type: application/json' \
