@@ -3,11 +3,14 @@ from __future__ import annotations
 import base64
 from contextlib import asynccontextmanager
 from pathlib import Path
+from time import perf_counter
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
 
+from libs.common.config import get_settings
 from libs.common.database import init_db
+from libs.common.observability import metrics_registry, rate_limiter
 from libs.common.runtime import RuntimeStatus, get_runtime_status
 from libs.schemas import (
     CandidateCreate,
@@ -46,9 +49,58 @@ app = FastAPI(title="Shuihuo Killer", version="0.1.0", lifespan=lifespan)
 WEB_INDEX = Path(__file__).resolve().parents[2] / "web" / "index.html"
 
 
+def _client_key(request: Request) -> str:
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if forwarded_for:
+        return forwarded_for.split(",", maxsplit=1)[0].strip()
+    if request.client:
+        return request.client.host
+    return "unknown"
+
+
+def _route_path(request: Request) -> str:
+    route = request.scope.get("route")
+    return getattr(route, "path", request.url.path)
+
+
+@app.middleware("http")
+async def observe_and_rate_limit(request: Request, call_next):
+    settings = get_settings()
+    rate_limiter.requests_per_minute = settings.rate_limit_requests_per_minute
+    start = perf_counter()
+    status_code = 500
+    if settings.rate_limit_enabled:
+        decision = rate_limiter.check(_client_key(request))
+        if not decision.allowed:
+            status_code = 429
+            response = PlainTextResponse(
+                "rate limit exceeded",
+                status_code=status_code,
+                headers={"Retry-After": str(decision.retry_after_seconds)},
+            )
+            metrics_registry.record_request(
+                request.method, request.url.path, status_code, perf_counter() - start
+            )
+            return response
+
+    try:
+        response: Response = await call_next(request)
+        status_code = response.status_code
+        return response
+    finally:
+        metrics_registry.record_request(
+            request.method, _route_path(request), status_code, perf_counter() - start
+        )
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/metrics", response_class=PlainTextResponse)
+def metrics() -> str:
+    return metrics_registry.render_prometheus()
 
 
 @app.get("/api/config/status", response_model=RuntimeStatus)

@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     llm_extra_body_json: str = ""
     llm_timeout_seconds: int = 30
     signal_enabled: bool = False
+    rate_limit_enabled: bool = False
+    rate_limit_requests_per_minute: int = 120
     report_dir: Path = Field(default=Path("data/reports"))
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")

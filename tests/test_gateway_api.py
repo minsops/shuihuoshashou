@@ -6,14 +6,25 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from libs.common.config import get_settings
+from libs.common.observability import metrics_registry, rate_limiter
 from services.gateway.app import app
 
 
-def _client(tmp_path: Path, monkeypatch) -> TestClient:
+def _client(
+    tmp_path: Path,
+    monkeypatch,
+    *,
+    rate_limit_enabled: bool = False,
+    rate_limit_requests_per_minute: int = 120,
+) -> TestClient:
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'api.db'}")
     monkeypatch.setenv("REPORT_DIR", str(tmp_path / "reports"))
     monkeypatch.setenv("LLM_PROVIDER", "mock")
+    monkeypatch.setenv("RATE_LIMIT_ENABLED", str(rate_limit_enabled).lower())
+    monkeypatch.setenv("RATE_LIMIT_REQUESTS_PER_MINUTE", str(rate_limit_requests_per_minute))
     get_settings.cache_clear()
+    metrics_registry.reset()
+    rate_limiter.reset()
     return TestClient(app)
 
 
@@ -66,7 +77,37 @@ def test_gateway_config_status_hides_secrets(tmp_path: Path, monkeypatch) -> Non
     assert response.status_code == 200
     payload = response.json()
     assert payload["llm_api_key_configured"] is True
+    assert payload["rate_limit_enabled"] is False
+    assert payload["rate_limit_requests_per_minute"] == 120
     assert "super-secret" not in response.text
+
+
+def test_gateway_metrics_records_requests(tmp_path: Path, monkeypatch) -> None:
+    client = _client(tmp_path, monkeypatch)
+    assert client.get("/health").status_code == 200
+
+    response = client.get("/metrics")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/plain")
+    assert 'shuihuo_http_requests_total{method="GET",path="/health",status="200"} 1' in (
+        response.text
+    )
+
+
+def test_gateway_rate_limit_can_be_enabled(tmp_path: Path, monkeypatch) -> None:
+    client = _client(
+        tmp_path,
+        monkeypatch,
+        rate_limit_enabled=True,
+        rate_limit_requests_per_minute=2,
+    )
+
+    assert client.get("/health").status_code == 200
+    assert client.get("/health").status_code == 200
+    limited = client.get("/health")
+
+    assert limited.status_code == 429
+    assert limited.headers["retry-after"].isdigit()
 
 
 def test_signal_requires_candidate_consent(tmp_path: Path, monkeypatch) -> None:

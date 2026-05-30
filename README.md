@@ -47,6 +47,13 @@ Open API docs at `http://127.0.0.1:8000/docs`.
 
 Open the local demo UI at `http://127.0.0.1:8000/`.
 
+Operational endpoints:
+
+```bash
+curl -s http://127.0.0.1:8000/metrics
+RATE_LIMIT_ENABLED=true RATE_LIMIT_REQUESTS_PER_MINUTE=120 uvicorn services.gateway.app:app --port 8000
+```
+
 Check runtime configuration without exposing secrets:
 
 ```bash
@@ -73,6 +80,7 @@ returns 401, generate a fresh key and set it through `LLM_API_KEY` without commi
 - `POST /api/probe`
 - `POST /api/offline/evaluate`
 - `GET /api/config/status`
+- `GET /metrics`
 - `POST /api/interviews/{id}/end`
 - `GET /api/interviews/{id}/report`
 - `GET /api/interviews/{id}/report.html`

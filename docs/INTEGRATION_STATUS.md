@@ -14,6 +14,8 @@ The local implementation is complete as a runnable MVP:
 - Behavior signal module with explicit candidate consent gate.
 - Configurable LLM client with mock mode and OpenAI-compatible HTTP mode.
 - Safe runtime config and LLM smoke-test scripts.
+- Prometheus-style `/metrics` endpoint for local HTTP request counters and duration sums.
+- Optional in-memory per-client rate limit gate for the gateway.
 
 ## MiMo Configuration
 
@@ -34,32 +36,25 @@ The API key must be supplied locally through `.env` or the shell. Do not commit 
 The previously documented `https://api.mimo-v2.com/v1` endpoint did not resolve from this machine.
 The current default is the user-provided OpenAI-compatible endpoint above.
 
-## Current Blocker
+## Live Smoke Status
 
-Real MiMo API smoke testing now reaches the current endpoint, but the provided API key is rejected by
-the service. Multiple common OpenAI-compatible auth header variants and model-name variants were
-tested; all returned the same `HTTP 401 Invalid API Key`.
+Real MiMo API smoke testing reaches the current endpoint and succeeds when a valid API key is supplied
+through the shell or local `.env`. Keep the key out of git.
 
-Observed command:
+Recent verified command shape:
 
 ```bash
-python scripts/diagnose_llm_network.py
+LLM_PROVIDER=openai_compatible LLM_API_KEY=<valid-key> python scripts/check_llm.py
 ```
 
-Observed result:
+Expected result:
 
 ```text
-base_url: https://token-plan-cn.xiaomimimo.com/v1
-host: token-plan-cn.xiaomimimo.com
-port: 443
-dns: ok
-tcp: ok
-tls: ok
-LLM smoke test failed: HTTP 401 Invalid API Key
+LLM smoke test ok
 ```
 
-The endpoint, DNS, TCP, TLS, request path, and response-path plumbing are in place. A fresh valid API
-key is needed for the final live smoke test.
+If a future key fails, run `python scripts/diagnose_llm_network.py` first to separate network issues
+from auth or request-format issues.
 
 ## Verification
 
@@ -77,14 +72,4 @@ Expected current local result in mock mode:
 pytest: passing
 ruff: passing
 LLM smoke test ok
-```
-
-## Next Step To Unblock
-
-Use a fresh valid MiMo API key. Then run:
-
-```bash
-python scripts/diagnose_llm_network.py
-LLM_PROVIDER=openai_compatible LLM_API_KEY=<new-key> python scripts/check_llm.py
-LLM_PROVIDER=openai_compatible LLM_API_KEY=<new-key> python scripts/diagnose_llm_auth.py
 ```

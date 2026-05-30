@@ -18,6 +18,8 @@ class RuntimeStatus(BaseModel):
     llm_response_content_path: str
     llm_extra_body_configured: bool
     signal_enabled: bool
+    rate_limit_enabled: bool
+    rate_limit_requests_per_minute: int
     report_dir: str
 
 
@@ -36,5 +38,7 @@ def get_runtime_status() -> RuntimeStatus:
         llm_response_content_path=settings.llm_response_content_path,
         llm_extra_body_configured=bool(settings.llm_extra_body_json),
         signal_enabled=settings.signal_enabled,
+        rate_limit_enabled=settings.rate_limit_enabled,
+        rate_limit_requests_per_minute=settings.rate_limit_requests_per_minute,
         report_dir=str(settings.report_dir),
     )
