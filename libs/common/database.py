@@ -57,6 +57,18 @@ def init_db() -> None:
                 started_at TEXT,
                 ended_at TEXT
             );
+            CREATE TABLE IF NOT EXISTS qa_turns (
+                id TEXT PRIMARY KEY,
+                interview_id TEXT NOT NULL,
+                turn_index INTEGER NOT NULL,
+                question TEXT NOT NULL,
+                question_source TEXT NOT NULL,
+                answer TEXT NOT NULL,
+                answer_start_ms INTEGER NOT NULL,
+                answer_end_ms INTEGER NOT NULL,
+                probe_target TEXT,
+                payload TEXT NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS scores (
                 interview_id TEXT PRIMARY KEY,
                 payload TEXT NOT NULL

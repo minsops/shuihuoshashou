@@ -6,6 +6,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from libs.common.config import get_settings
+from libs.common.events import event_bus
 from libs.common.observability import metrics_registry, rate_limiter
 from services.gateway.app import app
 
@@ -23,6 +24,7 @@ def _client(
     monkeypatch.setenv("RATE_LIMIT_ENABLED", str(rate_limit_enabled).lower())
     monkeypatch.setenv("RATE_LIMIT_REQUESTS_PER_MINUTE", str(rate_limit_requests_per_minute))
     get_settings.cache_clear()
+    event_bus.reset()
     metrics_registry.reset()
     rate_limiter.reset()
     return TestClient(app)

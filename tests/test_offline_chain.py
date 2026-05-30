@@ -4,7 +4,15 @@ from pathlib import Path
 
 from libs.common.config import get_settings
 from libs.common.database import init_db
-from libs.schemas import CandidateCreate, InterviewCreate, JobCreate, ProbeRequest, QATurn
+from libs.common.events import event_bus
+from libs.schemas import (
+    CandidateCreate,
+    InterviewCreate,
+    InterviewStatus,
+    JobCreate,
+    ProbeRequest,
+    QATurn,
+)
 from services.aigc_detect_service.service import detect_interview
 from services.interview_orchestrator.consistency import detect_consistency, extract_fact_claim
 from services.interview_orchestrator.service import (
@@ -12,6 +20,10 @@ from services.interview_orchestrator.service import (
     create_candidate,
     create_interview,
     end_interview,
+    finish_interview,
+    get_interview,
+    list_turns,
+    run_offline_scoring_task,
 )
 from services.jd_kb_service.service import create_job
 from services.probe_service.service import fallback_probe
@@ -21,6 +33,7 @@ def test_offline_interview_chain(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'test.db'}")
     monkeypatch.setenv("REPORT_DIR", str(tmp_path / "reports"))
     get_settings.cache_clear()
+    event_bus.reset()
     init_db()
     job = create_job(JobCreate(title="AI Engineer", jd_text="Python FastAPI LLM"))
     candidate = create_candidate(CandidateCreate(name="Ada"))
@@ -38,6 +51,46 @@ def test_offline_interview_chain(tmp_path: Path, monkeypatch) -> None:
     assert report.score.total_score > 0
     assert report.aigc_results
     assert (tmp_path / "reports" / f"{interview.id}.html").exists()
+    assert get_interview(interview.id).status == InterviewStatus.reported
+    assert [turn.turn_id for turn in list_turns(interview.id)]
+    assert [topic for topic, _ in event_bus.history()] == [
+        "qa_turn.created",
+        "interview.finished",
+        "interview.scoring_started",
+        "interview.reported",
+    ]
+
+
+def test_offline_pipeline_exposes_scoring_state(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'pipeline.db'}")
+    monkeypatch.setenv("REPORT_DIR", str(tmp_path / "reports"))
+    get_settings.cache_clear()
+    event_bus.reset()
+    init_db()
+    job = create_job(JobCreate(title="Backend", jd_text="Python FastAPI"))
+    candidate = create_candidate(CandidateCreate(name="Grace"))
+    interview = create_interview(InterviewCreate(job_id=job.id, candidate_id=candidate.id))
+    add_turn(
+        interview.id,
+        QATurn(
+            question="讲项目",
+            answer="我写了 FastAPI 编排、模型重试和 JSON 校验，因为线上有格式漂移。",
+            answer_start_ms=100,
+            answer_end_ms=1200,
+        ),
+    )
+
+    finished = finish_interview(interview.id)
+    assert finished.status == InterviewStatus.finished
+    assert get_interview(interview.id).status == InterviewStatus.finished
+
+    report = run_offline_scoring_task(interview.id)
+
+    assert report.interview_id == interview.id
+    assert get_interview(interview.id).status == InterviewStatus.reported
+    topics = [topic for topic, _ in event_bus.history()]
+    assert "interview.scoring_started" in topics
+    assert "interview.reported" in topics
 
 
 def test_probe_fallback_returns_three_suggestions() -> None:

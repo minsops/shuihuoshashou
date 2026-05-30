@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from libs.common.database import connect, dumps, init_db, loads
+from libs.common.events import event_bus
 from libs.schemas import (
     CandidateCreate,
     CandidateRecord,
@@ -170,7 +171,46 @@ def add_turn(interview_id: str, turn: QATurn) -> InterviewRecord:
     record.context.turns.append(turn)
     record.context.flags = detect_consistency(record.context.turns)
     save_interview(record)
+    with connect() as conn:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO qa_turns
+            (id, interview_id, turn_index, question, question_source, answer,
+             answer_start_ms, answer_end_ms, probe_target, payload)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                turn.turn_id,
+                interview_id,
+                len(record.context.turns) - 1,
+                turn.question,
+                turn.question_source,
+                turn.answer,
+                turn.answer_start_ms,
+                turn.answer_end_ms,
+                turn.probe_target,
+                dumps(turn.model_dump()),
+            ),
+        )
+    event_bus.publish_nowait(
+        "qa_turn.created",
+        {
+            "interview_id": interview_id,
+            "turn_id": turn.turn_id,
+            "turn_index": len(record.context.turns) - 1,
+        },
+    )
     return record
+
+
+def list_turns(interview_id: str) -> list[QATurn]:
+    init_db()
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT payload FROM qa_turns WHERE interview_id = ? ORDER BY turn_index",
+            (interview_id,),
+        ).fetchall()
+    return [QATurn.model_validate(loads(row["payload"])) for row in rows]
 
 
 def should_probe(segment: TranscriptSegment, record: InterviewRecord) -> bool:
@@ -184,11 +224,27 @@ def should_probe(segment: TranscriptSegment, record: InterviewRecord) -> bool:
     return segment.start_ms - last_turn.answer_end_ms >= 1000
 
 
-def end_interview(interview_id: str):
+def finish_interview(interview_id: str) -> InterviewRecord:
     record = get_interview(interview_id)
     record.status = InterviewStatus.finished
     record.ended_at = datetime.now(UTC)
     record.context.ended_at = record.ended_at
+    save_interview(record)
+    event_bus.publish_nowait(
+        "interview.finished",
+        {"interview_id": interview_id, "ended_at": record.ended_at.isoformat()},
+    )
+    return record
+
+
+def run_offline_scoring_task(interview_id: str):
+    record = get_interview(interview_id)
+    record.status = InterviewStatus.scoring
+    save_interview(record)
+    event_bus.publish_nowait(
+        "interview.scoring_started",
+        {"interview_id": interview_id, "turn_count": len(record.context.turns)},
+    )
     aigc = detect_interview(record.context.turns)
     score = score_interview(record.context, aigc)
     report, html = build_report(record.context, score, aigc)
@@ -208,7 +264,20 @@ def end_interview(interview_id: str):
             "INSERT OR REPLACE INTO reports (interview_id, payload, html) VALUES (?, ?, ?)",
             (interview_id, dumps(report.model_dump()), html),
         )
+    event_bus.publish_nowait(
+        "interview.reported",
+        {
+            "interview_id": interview_id,
+            "total_score": report.score.total_score,
+            "recommendation": report.score.recommendation,
+        },
+    )
     return report
+
+
+def end_interview(interview_id: str):
+    finish_interview(interview_id)
+    return run_offline_scoring_task(interview_id)
 
 
 def get_report(interview_id: str):

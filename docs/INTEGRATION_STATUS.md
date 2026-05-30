@@ -10,7 +10,11 @@ The local implementation is complete as a runnable MVP:
 - WebSocket real-time text/audio-stub probe flow.
 - Pydantic v2 shared schemas.
 - SQLite local persistence.
+- Separate `qa_turns` persistence for auditable answer evidence.
 - Probe generation, scoring, AIGC/template checks, consistency checks, HTML/PDF report generation.
+- Local offline scoring task flow with `FINISHED -> SCORING -> REPORTED` state transitions.
+- In-memory event bus topics for `qa_turn.created`, `interview.finished`,
+  `interview.scoring_started`, and `interview.reported`.
 - Behavior signal module with explicit candidate consent gate.
 - Configurable LLM client with mock mode and OpenAI-compatible HTTP mode.
 - Safe runtime config and LLM smoke-test scripts.
@@ -73,3 +77,10 @@ pytest: passing
 ruff: passing
 LLM smoke test ok
 ```
+
+## Remaining Production Gaps
+
+- Replace local SQLite with PostgreSQL/pgvector and Redis-backed state where deployment requires it.
+- Replace the in-memory event bus with Redis Streams, RabbitMQ, Kafka, or Celery workers.
+- Plug a real streaming ASR/diarization engine behind the existing `ASREngine` interface.
+- Move report artifacts to S3-compatible object storage for multi-node deployments.
