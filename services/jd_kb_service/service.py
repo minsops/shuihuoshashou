@@ -5,7 +5,8 @@ import math
 import re
 from datetime import UTC, datetime
 
-from libs.common.database import connect, dumps, init_db, loads
+from libs.common.config import get_settings
+from libs.common.database import connect, dumps, get_database_target, init_db, loads
 from libs.schemas import (
     CompetencyItem,
     CompetencyModel,
@@ -129,6 +130,10 @@ def retrieve_probe_patterns(
 
 
 def retrieve_job_probe_patterns(job_id: str, query: str, *, limit: int = 5) -> list[ProbePatternHit]:
+    if _use_pgvector():
+        pgvector_hits = _retrieve_pgvector_probe_patterns(job_id, query, limit=limit)
+        if pgvector_hits:
+            return pgvector_hits
     indexed_hits = _retrieve_indexed_probe_patterns(job_id, query, limit=limit)
     if indexed_hits:
         return indexed_hits
@@ -164,26 +169,83 @@ def _retrieve_indexed_probe_patterns(job_id: str, query: str, *, limit: int) -> 
     return hits[:limit]
 
 
+def _retrieve_pgvector_probe_patterns(job_id: str, query: str, *, limit: int) -> list[ProbePatternHit]:
+    init_db()
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT competency, pattern, 1 - (embedding_vector <=> ?::vector) AS score
+            FROM probe_patterns
+            WHERE job_id = ? AND embedding_vector IS NOT NULL
+            ORDER BY embedding_vector <=> ?::vector
+            LIMIT ?
+            """,
+            (
+                _pgvector_literal(embed_text(query)),
+                job_id,
+                _pgvector_literal(embed_text(query)),
+                limit,
+            ),
+        ).fetchall()
+    return [
+        ProbePatternHit(
+            job_id=job_id,
+            competency=row["competency"],
+            pattern=row["pattern"],
+            score=round(float(row["score"]), 6),
+        )
+        for row in rows
+        if row["score"] is not None
+    ]
+
+
 def _index_probe_patterns(record: JobRecord) -> None:
     now = datetime.now(UTC).isoformat()
     with connect() as conn:
         for item in record.competency_model.items:
             for pattern in item.probe_patterns:
-                conn.execute(
-                    """
-                    INSERT INTO probe_patterns
-                    (id, job_id, competency, pattern, embedding, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        new_id(),
-                        record.id,
-                        item.name,
-                        pattern,
-                        dumps(embed_text(_pattern_text(item.name, pattern))),
-                        now,
-                    ),
-                )
+                embedding = embed_text(_pattern_text(item.name, pattern))
+                if _use_pgvector():
+                    conn.execute(
+                        """
+                        INSERT INTO probe_patterns
+                        (id, job_id, competency, pattern, embedding, embedding_vector, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?::vector, ?)
+                        """,
+                        (
+                            new_id(),
+                            record.id,
+                            item.name,
+                            pattern,
+                            dumps(embedding),
+                            _pgvector_literal(embedding),
+                            now,
+                        ),
+                    )
+                else:
+                    conn.execute(
+                        """
+                        INSERT INTO probe_patterns
+                        (id, job_id, competency, pattern, embedding, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            new_id(),
+                            record.id,
+                            item.name,
+                            pattern,
+                            dumps(embedding),
+                            now,
+                        ),
+                    )
+
+
+def _use_pgvector() -> bool:
+    return get_settings().jd_vector_backend == "pgvector" and get_database_target().dialect == "postgresql"
+
+
+def _pgvector_literal(vector: list[float]) -> str:
+    return "[" + ",".join(f"{value:.6f}" for value in vector) + "]"
 
 
 def create_job(payload: JobCreate) -> JobRecord:

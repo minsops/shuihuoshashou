@@ -91,6 +91,7 @@ def test_gateway_config_status_hides_secrets(tmp_path: Path, monkeypatch) -> Non
     assert payload["offline_task_backend"] == "local"
     assert payload["redis_url_configured"] is True
     assert payload["redis_stream_prefix"] == "shuihuo"
+    assert payload["jd_vector_backend"] == "local"
     assert payload["object_storage_endpoint_configured"] is False
     assert payload["object_storage_bucket"] == "shuihuo-killer"
     assert "super-secret" not in response.text

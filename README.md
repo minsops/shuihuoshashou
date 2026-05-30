@@ -18,7 +18,7 @@ as a local-first Python MVP:
 - Docker Compose declares the gateway plus PostgreSQL, Redis, and MinIO for local infrastructure.
 - PostgreSQL core schema SQL is provided under `db/postgres` for compose initialization.
 - Runtime database URL parsing supports SQLite and PostgreSQL targets.
-- JD knowledge base indexes competency-specific probe patterns with deterministic embeddings.
+- JD knowledge base indexes competency-specific probe patterns with deterministic embeddings and optional pgvector search.
 - Report artifacts write local files by default and upload to S3-compatible storage when credentials are configured.
 - Reports include structured scores, AIGC checks, consistency flags, and full interview transcripts.
 - AIGC/template checks use a local answer-template corpus with character n-gram cosine similarity.
@@ -73,6 +73,10 @@ URL and install `.[postgres]` to run the same repository calls against PostgreSQ
 PostgreSQL initializes from `db/postgres/001_core_schema.sql`, which declares the core jobs,
 candidates, interviews, turns, probe-pattern embeddings, scores, AIGC results, reports, and consent tables from the spec.
 The runtime adapter translates the local repository parameter style and upserts for PostgreSQL.
+Set `JD_VECTOR_BACKEND=pgvector` on PostgreSQL deployments with pgvector installed to apply
+`db/postgres/002_pgvector_probe_patterns.sql` and use `embedding_vector <=> query` nearest-neighbor
+retrieval for probe-pattern search. The default `local` backend keeps Docker's plain PostgreSQL image
+runnable.
 
 Set `OBJECT_STORAGE_ENDPOINT`, `OBJECT_STORAGE_BUCKET`, `OBJECT_STORAGE_ACCESS_KEY`, and
 `OBJECT_STORAGE_SECRET_KEY` to upload report HTML/PDF artifacts to S3-compatible storage such as
@@ -171,8 +175,8 @@ curl -s http://127.0.0.1:8000/api/offline/evaluate \
 ## Scope Notes
 
 The real-time ASR and optional behavior signal modules are implemented behind interfaces with local
-stub engines. Production diarization, pgvector nearest-neighbor search, Redis Streams workers, and
-Celery can be plugged in without changing the shared schemas.
+stub engines. Production diarization and a fully asynchronous API/worker split can be plugged in
+without changing the shared schemas.
 
 Behavior signals are disabled by default. If an interview sets `signal_enabled=true`, the candidate
 must first grant `behavior_signal` consent through `POST /api/consents`; otherwise the API returns 403.

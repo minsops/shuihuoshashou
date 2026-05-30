@@ -192,6 +192,11 @@ def init_db() -> None:
         if target.dialect == "postgresql":
             schema = Path("db/postgres/001_core_schema.sql").read_text(encoding="utf-8")
             conn.executescript(schema)
+            if get_settings().jd_vector_backend == "pgvector":
+                vector_schema = Path("db/postgres/002_pgvector_probe_patterns.sql").read_text(
+                    encoding="utf-8"
+                )
+                conn.executescript(vector_schema)
             return
         conn.executescript(
             """

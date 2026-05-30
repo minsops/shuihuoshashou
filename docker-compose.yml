@@ -33,6 +33,7 @@ services:
       RATE_LIMIT_REQUESTS_PER_MINUTE: ${RATE_LIMIT_REQUESTS_PER_MINUTE:-120}
       OFFLINE_TASK_BACKEND: ${OFFLINE_TASK_BACKEND:-local}
       REDIS_STREAM_PREFIX: ${REDIS_STREAM_PREFIX:-shuihuo}
+      JD_VECTOR_BACKEND: ${JD_VECTOR_BACKEND:-local}
     volumes:
       - app-data:/app/data
     depends_on:

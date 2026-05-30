@@ -65,6 +65,15 @@ def test_postgres_query_translation_handles_params_and_upserts() -> None:
     assert "payload = EXCLUDED.payload" in translated
 
 
+def test_postgres_query_translation_preserves_pgvector_cast() -> None:
+    translated = _translate_postgres_query(
+        "SELECT * FROM probe_patterns ORDER BY embedding_vector <=> ?::vector LIMIT ?"
+    )
+
+    assert "embedding_vector <=> %s::vector" in translated
+    assert translated.endswith("LIMIT %s")
+
+
 def test_loads_accepts_postgres_json_values() -> None:
     payload = {"score": 88}
 

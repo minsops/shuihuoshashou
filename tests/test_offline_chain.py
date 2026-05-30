@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from pathlib import Path
+
+import pytest
 
 from libs.common.config import get_settings
 from libs.common.database import connect, init_db, loads
@@ -11,6 +14,7 @@ from libs.schemas import (
     InterviewCreate,
     InterviewStatus,
     JobCreate,
+    JobRecord,
     ProbeRequest,
     QATurn,
 )
@@ -26,8 +30,20 @@ from services.interview_orchestrator.service import (
     list_turns,
     run_offline_scoring_task,
 )
-from services.jd_kb_service.service import create_job, retrieve_job_probe_patterns
+from services.jd_kb_service.service import (
+    _index_probe_patterns,
+    _pgvector_literal,
+    create_job,
+    generate_competency_model,
+    retrieve_job_probe_patterns,
+)
 from services.probe_service.service import fallback_probe
+
+
+@pytest.fixture(autouse=True)
+def clear_settings_cache_between_tests():
+    yield
+    get_settings.cache_clear()
 
 
 def test_offline_interview_chain(tmp_path: Path, monkeypatch) -> None:
@@ -185,6 +201,78 @@ def test_jd_kb_indexes_probe_pattern_embeddings(tmp_path: Path, monkeypatch) -> 
     assert all(loads(row["embedding"]) for row in rows)
     assert hits
     assert hits[0].score > 0
+
+
+def test_jd_kb_pgvector_retrieval_uses_nearest_neighbor_sql(monkeypatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@localhost:5432/app")
+    monkeypatch.setenv("JD_VECTOR_BACKEND", "pgvector")
+    get_settings.cache_clear()
+    executed: list[tuple[str, tuple]] = []
+
+    class Result:
+        def fetchall(self):
+            return [
+                {
+                    "competency": "专业能力深度",
+                    "pattern": "请追问 LLM 调用、评估、成本、失败降级和安全边界。",
+                    "score": 0.83,
+                }
+            ]
+
+    class FakeConnection:
+        def execute(self, query: str, params: tuple):
+            executed.append((query, params))
+            return Result()
+
+    @contextmanager
+    def fake_connect():
+        yield FakeConnection()
+
+    monkeypatch.setattr("services.jd_kb_service.service.init_db", lambda: None)
+    monkeypatch.setattr("services.jd_kb_service.service.connect", fake_connect)
+
+    hits = retrieve_job_probe_patterns("00000000-0000-0000-0000-000000000001", "LLM 降级", limit=3)
+
+    assert hits[0].score == 0.83
+    query, params = executed[0]
+    assert "embedding_vector <=>" in query
+    assert params[0].startswith("[")
+    assert params[0] == params[2]
+    assert params[3] == 3
+
+
+def test_jd_kb_pgvector_index_writes_vector_column(monkeypatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@localhost:5432/app")
+    monkeypatch.setenv("JD_VECTOR_BACKEND", "pgvector")
+    get_settings.cache_clear()
+    inserted: list[tuple[str, tuple]] = []
+    job = JobRecord(
+        title="LLM Backend",
+        jd_text="Python FastAPI LLM",
+        competency_model=generate_competency_model(
+            "00000000-0000-0000-0000-000000000001",
+            "LLM Backend",
+            "Python FastAPI LLM",
+        ),
+    )
+
+    class FakeConnection:
+        def execute(self, query: str, params: tuple):
+            inserted.append((query, params))
+
+    @contextmanager
+    def fake_connect():
+        yield FakeConnection()
+
+    monkeypatch.setattr("services.jd_kb_service.service.connect", fake_connect)
+
+    _index_probe_patterns(job)
+
+    assert inserted
+    query, params = inserted[0]
+    assert "embedding_vector" in query
+    assert "?::vector" in query
+    assert params[5] == _pgvector_literal(loads(params[4]))
 
 
 def test_probe_fallback_uses_retrieved_patterns() -> None:

@@ -26,6 +26,7 @@ class RuntimeStatus(BaseModel):
     offline_task_backend: str
     redis_url_configured: bool
     redis_stream_prefix: str
+    jd_vector_backend: str
     object_storage_endpoint_configured: bool
     object_storage_credentials_configured: bool
     object_storage_bucket: str
@@ -55,6 +56,7 @@ def get_runtime_status() -> RuntimeStatus:
         offline_task_backend=settings.offline_task_backend,
         redis_url_configured=bool(settings.redis_url),
         redis_stream_prefix=settings.redis_stream_prefix,
+        jd_vector_backend=settings.jd_vector_backend,
         object_storage_endpoint_configured=bool(settings.object_storage_endpoint),
         object_storage_credentials_configured=bool(
             settings.object_storage_access_key and settings.object_storage_secret_key

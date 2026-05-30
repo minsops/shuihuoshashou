@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     offline_task_backend: str = "local"
     redis_url: str = "redis://localhost:6379/0"
     redis_stream_prefix: str = "shuihuo"
+    jd_vector_backend: str = "local"
     object_storage_endpoint: str = ""
     object_storage_bucket: str = "shuihuo-killer"
     object_storage_access_key: str = ""
