@@ -22,7 +22,7 @@ from libs.schemas import (
     ProbeRequest,
     QATurn,
 )
-from services.asr_service.service import get_asr_engine
+from services.asr_service.service import asr_session_manager, get_asr_engine
 from services.interview_orchestrator.service import (
     add_turn,
     create_candidate,
@@ -303,9 +303,10 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
         while True:
             event = await websocket.receive_json()
             if event.get("type") == "audio_chunk":
+                seq = int(event.get("seq", 0))
                 segment = await engine.transcribe_chunk(
                     session_id=interview_id,
-                    seq=int(event.get("seq", 0)),
+                    seq=seq,
                     audio_b64=event.get("audio", ""),
                     speaker=_event_speaker(event),
                     start_ms=event.get("start_ms"),
@@ -313,15 +314,23 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                     is_final=_event_bool(event, "is_final", True),
                     confidence=event.get("confidence"),
                 )
+                decision = asr_session_manager.accept_segment(seq, segment)
+                if not decision.accepted or decision.segment is None:
+                    await websocket.send_json(
+                        {"type": "asr_warning", "payload": {"reason": decision.reason, "seq": seq}}
+                    )
+                    continue
+                segment = decision.segment
                 await websocket.send_json({"type": "transcript", "payload": segment.model_dump()})
                 if should_probe(segment, record):
                     record = await _send_probe_for_segment(websocket, interview_id, record, segment)
             elif event.get("type") == "text_turn":
+                seq = int(event.get("seq", 1))
                 text = str(event.get("answer", ""))
                 encoded = base64.b64encode(text.encode("utf-8")).decode("ascii")
                 segment = await engine.transcribe_chunk(
                     interview_id,
-                    int(event.get("seq", 1)),
+                    seq,
                     encoded,
                     speaker=_event_speaker(event) or "candidate",
                     start_ms=event.get("start_ms"),
@@ -329,14 +338,24 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                     is_final=_event_bool(event, "is_final", True),
                     confidence=event.get("confidence"),
                 )
+                decision = asr_session_manager.accept_segment(seq, segment)
+                if not decision.accepted or decision.segment is None:
+                    await websocket.send_json(
+                        {"type": "asr_warning", "payload": {"reason": decision.reason, "seq": seq}}
+                    )
+                    continue
+                segment = decision.segment
                 await websocket.send_json({"type": "transcript", "payload": segment.model_dump()})
                 if should_probe(segment, record):
                     record = await _send_probe_for_segment(websocket, interview_id, record, segment)
             elif event.get("type") == "end":
                 report = end_interview(interview_id)
                 await websocket.send_json({"type": "report", "payload": report.model_dump(mode="json")})
+                asr_session_manager.close(interview_id)
                 break
     except WebSocketDisconnect:
+        asr_session_manager.close(interview_id)
         return
     except KeyError as exc:
+        asr_session_manager.close(interview_id)
         await websocket.send_json({"type": "error", "detail": str(exc)})

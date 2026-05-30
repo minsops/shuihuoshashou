@@ -9,6 +9,8 @@ The local implementation is complete as a runnable MVP:
 - One-shot offline evaluation at `/api/offline/evaluate`.
 - WebSocket real-time text/audio-stub probe flow with speaker/finality/timestamp metadata and channel-based speaker mapping.
 - Configurable HTTP cloud ASR adapter behind the `ASREngine` interface.
+- ASR session manager supports partial-to-final chunk updates, repeated-final deduplication,
+  stale-final rejection, and conservative short-gap speaker continuity smoothing.
 - Separate `credibility` WebSocket event after probe generation.
 - Pydantic v2 shared schemas.
 - SQLite local persistence.
@@ -93,4 +95,4 @@ LLM smoke test ok
 
 ## Remaining Production Gaps
 
-- Add production-grade streaming ASR session management and speaker clustering beyond channel mapping.
+- Add production-grade speaker clustering beyond channel mapping and short-gap continuity smoothing.

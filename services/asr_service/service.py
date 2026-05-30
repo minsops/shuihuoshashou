@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import base64
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from threading import Lock
 from typing import Any, Literal
 
 import httpx
@@ -10,6 +12,74 @@ from libs.common.config import get_settings
 from libs.schemas import TranscriptSegment
 
 Speaker = Literal["interviewer", "candidate", "unknown"]
+
+
+@dataclass
+class ASRSessionChunk:
+    seq: int
+    segment: TranscriptSegment
+
+
+@dataclass
+class ASRSessionDecision:
+    accepted: bool
+    segment: TranscriptSegment | None = None
+    reason: str = ""
+
+
+@dataclass
+class ASRSessionState:
+    chunks: dict[int, ASRSessionChunk] = field(default_factory=dict)
+    last_final_seq: int = -1
+    last_known_speaker: Speaker | None = None
+    last_known_end_ms: int | None = None
+
+
+class ASRSessionManager:
+    def __init__(self, speaker_continuity_gap_ms: int = 1500) -> None:
+        self.speaker_continuity_gap_ms = speaker_continuity_gap_ms
+        self._sessions: dict[str, ASRSessionState] = {}
+        self._lock = Lock()
+
+    def accept_segment(self, seq: int, segment: TranscriptSegment) -> ASRSessionDecision:
+        with self._lock:
+            state = self._sessions.setdefault(segment.session_id, ASRSessionState())
+            existing = state.chunks.get(seq)
+            if existing is not None and existing.segment.is_final and segment.is_final:
+                return ASRSessionDecision(False, reason="duplicate_final_segment")
+            if segment.is_final and seq <= state.last_final_seq:
+                return ASRSessionDecision(False, reason="late_final_segment")
+
+            segment = self._smooth_speaker(state, segment)
+            state.chunks[seq] = ASRSessionChunk(seq=seq, segment=segment)
+            if segment.is_final:
+                state.last_final_seq = max(state.last_final_seq, seq)
+            if segment.speaker in {"interviewer", "candidate"}:
+                state.last_known_speaker = segment.speaker
+                state.last_known_end_ms = segment.end_ms
+            return ASRSessionDecision(True, segment=segment)
+
+    def close(self, session_id: str) -> None:
+        with self._lock:
+            self._sessions.pop(session_id, None)
+
+    def reset(self) -> None:
+        with self._lock:
+            self._sessions.clear()
+
+    def _smooth_speaker(
+        self,
+        state: ASRSessionState,
+        segment: TranscriptSegment,
+    ) -> TranscriptSegment:
+        if segment.speaker != "unknown" or state.last_known_speaker is None:
+            return segment
+        if state.last_known_end_ms is None:
+            return segment
+        gap_ms = segment.start_ms - state.last_known_end_ms
+        if 0 <= gap_ms <= self.speaker_continuity_gap_ms:
+            return segment.model_copy(update={"speaker": state.last_known_speaker})
+        return segment
 
 
 class ASREngine(ABC):
@@ -159,3 +229,6 @@ def get_asr_engine() -> ASREngine:
     if settings.asr_provider == "http":
         return HTTPASREngine()
     return StubASREngine()
+
+
+asr_session_manager = ASRSessionManager()

@@ -6,7 +6,13 @@ import asyncio
 import httpx
 
 from libs.common.config import get_settings
-from services.asr_service.service import HTTPASREngine, StubASREngine, get_asr_engine
+from libs.schemas import TranscriptSegment
+from services.asr_service.service import (
+    ASRSessionManager,
+    HTTPASREngine,
+    StubASREngine,
+    get_asr_engine,
+)
 
 
 def test_stub_asr_decodes_text_and_metadata() -> None:
@@ -95,3 +101,57 @@ def test_get_asr_engine_uses_http_provider(monkeypatch) -> None:
     get_settings.cache_clear()
 
     assert isinstance(get_asr_engine(), HTTPASREngine)
+
+
+def test_asr_session_manager_accepts_partial_then_final_same_seq() -> None:
+    manager = ASRSessionManager()
+    partial = TranscriptSegment(
+        session_id="session-1",
+        speaker="candidate",
+        text="我写了",
+        start_ms=0,
+        end_ms=400,
+        is_final=False,
+        confidence=0.6,
+    )
+    final = partial.model_copy(update={"text": "我写了 FastAPI 编排。", "is_final": True})
+
+    first = manager.accept_segment(1, partial)
+    second = manager.accept_segment(1, final)
+    duplicate = manager.accept_segment(1, final)
+
+    assert first.accepted is True
+    assert second.accepted is True
+    assert second.segment is not None
+    assert second.segment.text == "我写了 FastAPI 编排。"
+    assert duplicate.accepted is False
+    assert duplicate.reason == "duplicate_final_segment"
+
+
+def test_asr_session_manager_smooths_unknown_speaker_by_continuity() -> None:
+    manager = ASRSessionManager(speaker_continuity_gap_ms=1000)
+    known = TranscriptSegment(
+        session_id="session-1",
+        speaker="candidate",
+        text="第一段",
+        start_ms=0,
+        end_ms=500,
+        is_final=True,
+        confidence=0.9,
+    )
+    unknown = TranscriptSegment(
+        session_id="session-1",
+        speaker="unknown",
+        text="连续补充",
+        start_ms=800,
+        end_ms=1200,
+        is_final=True,
+        confidence=0.7,
+    )
+
+    manager.accept_segment(1, known)
+    decision = manager.accept_segment(2, unknown)
+
+    assert decision.accepted is True
+    assert decision.segment is not None
+    assert decision.segment.speaker == "candidate"

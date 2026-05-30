@@ -9,6 +9,7 @@ from libs.common.config import get_settings
 from libs.common.events import event_bus
 from libs.common.observability import metrics_registry, rate_limiter
 from libs.common.tasks import task_queue
+from services.asr_service.service import asr_session_manager
 from services.gateway.app import app
 
 
@@ -30,6 +31,7 @@ def _client(
     event_bus.reset()
     metrics_registry.reset()
     rate_limiter.reset()
+    asr_session_manager.reset()
     task_queue.reset()
     return TestClient(app)
 
@@ -380,6 +382,42 @@ def test_gateway_websocket_maps_audio_channel_to_speaker(tmp_path: Path, monkeyp
         websocket.send_json({"type": "end"})
         report = websocket.receive_json()
         assert report["type"] == "report"
+
+
+def test_gateway_websocket_deduplicates_final_audio_segments(
+    tmp_path: Path, monkeypatch
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+
+    text = "我主要负责优化，做了很多事情，效果比较好。"
+    audio = base64.b64encode(text.encode("utf-8")).decode("ascii")
+    event = {
+        "type": "audio_chunk",
+        "session_id": interview["id"],
+        "seq": 1,
+        "audio": audio,
+        "speaker": "candidate",
+        "is_final": True,
+    }
+    with client.websocket_connect(f"/ws/interview/{interview['id']}") as websocket:
+        websocket.send_json(event)
+        assert websocket.receive_json()["type"] == "transcript"
+        assert websocket.receive_json()["type"] == "probe"
+        assert websocket.receive_json()["type"] == "credibility"
+
+        websocket.send_json(event)
+        warning = websocket.receive_json()
+        assert warning["type"] == "asr_warning"
+        assert warning["payload"]["reason"] == "duplicate_final_segment"
+
+        websocket.send_json({"type": "end"})
+        assert websocket.receive_json()["type"] == "report"
 
 
 def test_gateway_one_shot_offline_evaluate(tmp_path: Path, monkeypatch) -> None:

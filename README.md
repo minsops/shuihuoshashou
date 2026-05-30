@@ -13,6 +13,7 @@ as a local-first Python MVP:
 - Unified LLM client with mock mode and OpenAI-compatible HTTP mode for `mimo2.5pro`.
 - Runtime LLM prompts are stored under `prompts/` and loaded by services instead of being embedded in code.
 - ASR interface supports local stub mode and configurable HTTP cloud ASR adapters.
+- ASR sessions deduplicate repeated final chunks, allow partial-to-final updates, and smooth short unknown-speaker gaps.
 - End-to-end offline demo from JD + interview turns to probe, scoring, AIGC checks, and report.
 - Interview turns are stored in both the interview context and a `qa_turns` table for auditability.
 - WebSocket transcripts carry speaker/finality/timestamp metadata, support channel-based speaker mapping, and emit separate credibility events.
@@ -128,7 +129,9 @@ WebSocket `audio_chunk` events may include `speaker`, `channel`/`audio_channel`/
 `is_final`, `start_ms`, `end_ms`, and `confidence`. If `speaker` is omitted, channels listed in
 `ASR_INTERVIEWER_CHANNELS` map to `interviewer`, and channels listed in `ASR_CANDIDATE_CHANNELS` map
 to `candidate`. Only final candidate segments trigger a probe. Downstream events include
-`transcript`, `probe`, `credibility`, optional `signal`, and `report`.
+`transcript`, `probe`, `credibility`, optional `signal`, and `report`. Repeated final ASR chunks
+with the same sequence are deduplicated and returned as `asr_warning` events instead of triggering
+duplicate probe generation.
 
 Set `ASR_PROVIDER=http`, `ASR_BASE_URL`, `ASR_API_PATH`, and `ASR_API_KEY` to forward audio chunks to
 a cloud ASR endpoint. Response mapping is configurable with `ASR_TEXT_PATH`, `ASR_SPEAKER_PATH`,
