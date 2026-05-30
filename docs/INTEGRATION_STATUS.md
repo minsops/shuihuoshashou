@@ -12,6 +12,7 @@ The local implementation is complete as a runnable MVP:
 - Pydantic v2 shared schemas.
 - SQLite local persistence.
 - PostgreSQL core schema SQL for compose initialization.
+- Database URL dialect detection for SQLite and PostgreSQL targets.
 - Separate `qa_turns` persistence for auditable answer evidence.
 - JD knowledge base local retrieval for competency-specific probe patterns.
 - Probe generation, scoring, AIGC/template checks, consistency checks, HTML/PDF report generation.

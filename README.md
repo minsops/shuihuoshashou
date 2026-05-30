@@ -16,6 +16,7 @@ as a local-first Python MVP:
 - WebSocket transcripts carry speaker/finality/timestamp metadata and emit separate credibility events.
 - Docker Compose declares the gateway plus PostgreSQL, Redis, and MinIO for local infrastructure.
 - PostgreSQL core schema SQL is provided under `db/postgres` for compose initialization.
+- Runtime database URL parsing distinguishes SQLite and PostgreSQL targets.
 - JD knowledge base exposes local lexical retrieval for competency-specific probe patterns.
 - Report artifacts expose storage URIs, using local files by default and S3-style URIs when configured.
 
@@ -69,6 +70,8 @@ explicit instead of hidden.
 
 PostgreSQL initializes from `db/postgres/001_core_schema.sql`, which declares the core jobs,
 candidates, interviews, turns, scores, AIGC results, reports, and consent tables from the spec.
+Install `.[postgres]` when implementing or running the PostgreSQL repository adapter. The current
+runtime repository still uses SQLite and raises a clear error for PostgreSQL URLs.
 
 Set `OBJECT_STORAGE_ENDPOINT` and `OBJECT_STORAGE_BUCKET` to make report metadata use S3-style
 artifact URIs while still writing a local copy for development.
