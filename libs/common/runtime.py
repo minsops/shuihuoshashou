@@ -24,6 +24,7 @@ class RuntimeStatus(BaseModel):
     rate_limit_enabled: bool
     rate_limit_requests_per_minute: int
     offline_task_backend: str
+    offline_task_execution: str
     redis_url_configured: bool
     redis_stream_prefix: str
     jd_vector_backend: str
@@ -54,6 +55,7 @@ def get_runtime_status() -> RuntimeStatus:
         rate_limit_enabled=settings.rate_limit_enabled,
         rate_limit_requests_per_minute=settings.rate_limit_requests_per_minute,
         offline_task_backend=settings.offline_task_backend,
+        offline_task_execution=settings.offline_task_execution,
         redis_url_configured=bool(settings.redis_url),
         redis_stream_prefix=settings.redis_stream_prefix,
         jd_vector_backend=settings.jd_vector_backend,

@@ -22,6 +22,7 @@ The local implementation is complete as a runnable MVP:
 - Report artifacts support local `file://` storage and SigV4 uploads to S3-compatible storage.
 - Local offline scoring task flow with `FINISHED -> SCORING -> REPORTED` state transitions.
 - Local task queue boundary for offline scoring with Redis Streams task publication and worker consumption.
+- Configurable async end-interview mode returns queued task metadata while workers generate reports.
 - In-memory event bus topics for `qa_turn.created`, `interview.finished`,
   `task.enqueued`, `interview.scoring_started`, `interview.reported`, and `task.completed`.
 - Behavior signal module with explicit candidate consent gate.
@@ -91,5 +92,4 @@ LLM smoke test ok
 
 ## Remaining Production Gaps
 
-- Split API completion from offline worker completion for a fully asynchronous production response flow.
 - Add production-grade streaming ASR session management and diarization beyond HTTP chunk forwarding.

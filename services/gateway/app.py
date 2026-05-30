@@ -227,7 +227,7 @@ def api_offline_evaluate(payload: OfflineInterviewInput):
     for turn in payload.turns:
         add_turn(interview.id, turn)
     start_interview(interview.id)
-    report = end_interview(interview.id)
+    report = end_interview(interview.id, execute_inline=True)
     interview = get_interview(interview.id)
     return OfflineInterviewResult(
         job=job,

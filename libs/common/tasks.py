@@ -62,6 +62,18 @@ class LocalTaskQueue:
         event_bus.publish_nowait("task.completed", {"task_id": task_id, "name": name})
         return record
 
+    def enqueue_deferred(self, name: str, payload: dict[str, Any]) -> TaskRecord[Any]:
+        task_id = str(uuid4())
+        record = TaskRecord(
+            task_id=task_id,
+            name=name,
+            payload=payload,
+            status="queued",
+        )
+        self._history.append(record)
+        event_bus.publish_nowait("task.enqueued", {"task_id": task_id, "name": name, "payload": payload})
+        return record
+
     def history(self, name: str | None = None) -> list[TaskRecord[Any]]:
         if name is None:
             return list(self._history)
@@ -224,6 +236,22 @@ class RedisBackedTaskQueue(LocalTaskQueue):
         event_bus.publish_nowait(
             "task.completed",
             {"task_id": task_id, "name": name, "stream_id": stream_id},
+        )
+        return record
+
+    def enqueue_deferred(self, name: str, payload: dict[str, Any]) -> TaskRecord[Any]:
+        task_id = str(uuid4())
+        stream_id = self.publisher.publish_task(task_id, name, payload) if self.publisher else ""
+        record = TaskRecord(
+            task_id=task_id,
+            name=name,
+            payload=payload,
+            status="queued",
+        )
+        self._history.append(record)
+        event_bus.publish_nowait(
+            "task.enqueued",
+            {"task_id": task_id, "name": name, "payload": payload, "stream_id": stream_id},
         )
         return record
 

@@ -228,6 +228,14 @@ class OfflineInterviewResult(BaseModel):
     report: "Report"
 
 
+class OfflineTaskAccepted(BaseModel):
+    interview_id: str
+    task_id: str
+    task_name: str
+    status: Literal["queued"]
+    message: str = "offline scoring task queued"
+
+
 class Report(BaseModel):
     interview_id: str
     score: InterviewScore

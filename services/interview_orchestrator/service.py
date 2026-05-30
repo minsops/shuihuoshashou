@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from libs.common.config import get_settings
 from libs.common.database import connect, dumps, init_db, loads
 from libs.common.events import event_bus
 from libs.common.tasks import task_queue
@@ -14,6 +15,7 @@ from libs.schemas import (
     InterviewCreate,
     InterviewRecord,
     InterviewStatus,
+    OfflineTaskAccepted,
     QATurn,
     TranscriptSegment,
 )
@@ -317,7 +319,20 @@ def run_offline_scoring_task(interview_id: str):
     return report
 
 
-def enqueue_offline_scoring_task(interview_id: str):
+def enqueue_offline_scoring_task(interview_id: str, *, execute_inline: bool | None = None):
+    if execute_inline is None:
+        execute_inline = get_settings().offline_task_execution != "async"
+    if not execute_inline:
+        record = task_queue.enqueue_deferred(
+            "interview.offline_scoring",
+            {"interview_id": interview_id},
+        )
+        return OfflineTaskAccepted(
+            interview_id=interview_id,
+            task_id=record.task_id,
+            task_name=record.name,
+            status="queued",
+        )
     record = task_queue.enqueue(
         "interview.offline_scoring",
         {"interview_id": interview_id},
@@ -326,9 +341,9 @@ def enqueue_offline_scoring_task(interview_id: str):
     return record.result
 
 
-def end_interview(interview_id: str):
+def end_interview(interview_id: str, *, execute_inline: bool | None = None):
     finish_interview(interview_id)
-    return enqueue_offline_scoring_task(interview_id)
+    return enqueue_offline_scoring_task(interview_id, execute_inline=execute_inline)
 
 
 def get_report(interview_id: str):

@@ -74,6 +74,18 @@ def test_local_task_queue_records_failure() -> None:
     assert [topic for topic, _ in event_bus.history()] == ["task.enqueued", "task.failed"]
 
 
+def test_local_task_queue_can_defer_without_handler() -> None:
+    event_bus.reset()
+    queue = LocalTaskQueue()
+
+    record = queue.enqueue_deferred("demo.task", {"value": 2})
+
+    assert record.status == "queued"
+    assert record.result is None
+    assert queue.history("demo.task") == [record]
+    assert [topic for topic, _ in event_bus.history()] == ["task.enqueued"]
+
+
 def test_redis_stream_publisher_writes_task_message() -> None:
     client = FakeRedis()
     publisher = RedisStreamPublisher(
@@ -110,6 +122,25 @@ def test_redis_backed_task_queue_publishes_and_runs_handler() -> None:
     assert queue.history("demo.task") == [record]
     history = event_bus.history()
     assert [topic for topic, _ in history] == ["task.enqueued", "task.completed"]
+    assert history[0][1]["stream_id"] == "1700000000000-0"
+
+
+def test_redis_backed_task_queue_can_defer_to_stream() -> None:
+    event_bus.reset()
+    publisher = RedisStreamPublisher(
+        redis_url="redis://localhost:6379/0",
+        stream_prefix="test",
+        client=FakeRedis(),
+    )
+    queue = RedisBackedTaskQueue(publisher=publisher)
+
+    record = queue.enqueue_deferred("demo.task", {"value": 2})
+
+    assert record.status == "queued"
+    assert record.result is None
+    assert queue.history("demo.task") == [record]
+    history = event_bus.history()
+    assert [topic for topic, _ in history] == ["task.enqueued"]
     assert history[0][1]["stream_id"] == "1700000000000-0"
 
 

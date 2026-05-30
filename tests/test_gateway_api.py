@@ -89,6 +89,7 @@ def test_gateway_config_status_hides_secrets(tmp_path: Path, monkeypatch) -> Non
     assert payload["rate_limit_enabled"] is False
     assert payload["rate_limit_requests_per_minute"] == 120
     assert payload["offline_task_backend"] == "local"
+    assert payload["offline_task_execution"] == "sync"
     assert payload["redis_url_configured"] is True
     assert payload["redis_stream_prefix"] == "shuihuo"
     assert payload["jd_vector_backend"] == "local"
@@ -114,6 +115,30 @@ def test_gateway_job_probe_pattern_search(tmp_path: Path, monkeypatch) -> None:
     assert payload
     assert payload[0]["job_id"] == job["id"]
     assert any("LLM" in item["pattern"] or "FastAPI" in item["pattern"] for item in payload)
+
+
+def test_gateway_end_interview_can_return_queued_task(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("OFFLINE_TASK_EXECUTION", "async")
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+    client.post(
+        f"/api/interviews/{interview['id']}/turns",
+        json={"question": "讲项目", "answer": "我写了 FastAPI 编排。"},
+    )
+
+    response = client.post(f"/api/interviews/{interview['id']}/end")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["interview_id"] == interview["id"]
+    assert payload["status"] == "queued"
+    assert payload["task_name"] == "interview.offline_scoring"
+    assert client.get(f"/api/interviews/{interview['id']}/report").status_code == 404
 
 
 def test_gateway_metrics_records_requests(tmp_path: Path, monkeypatch) -> None:

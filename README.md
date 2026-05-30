@@ -146,6 +146,10 @@ Streams under `{REDIS_STREAM_PREFIX}:tasks:{task_name}` while retaining synchron
 It records task enqueue, completion, and failure events so the Celery/Redis worker boundary is
 explicit.
 
+Set `OFFLINE_TASK_EXECUTION=async` to make `POST /api/interviews/{id}/end` return a queued task
+instead of blocking for the report. The worker then consumes the Redis Stream and creates the report.
+`POST /api/offline/evaluate` remains synchronous for demos and smoke tests.
+
 Run a Redis Streams consumer for offline scoring tasks with:
 
 ```bash
@@ -175,8 +179,7 @@ curl -s http://127.0.0.1:8000/api/offline/evaluate \
 ## Scope Notes
 
 The real-time ASR and optional behavior signal modules are implemented behind interfaces with local
-stub engines. Production diarization and a fully asynchronous API/worker split can be plugged in
-without changing the shared schemas.
+stub engines. Production diarization can be plugged in without changing the shared schemas.
 
 Behavior signals are disabled by default. If an interview sets `signal_enabled=true`, the candidate
 must first grant `behavior_signal` consent through `POST /api/consents`; otherwise the API returns 403.

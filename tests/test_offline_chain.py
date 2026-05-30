@@ -125,6 +125,39 @@ def test_offline_pipeline_exposes_scoring_state(tmp_path: Path, monkeypatch) -> 
     assert "interview.reported" in topics
 
 
+def test_end_interview_can_queue_offline_scoring_without_running_it(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'async.db'}")
+    monkeypatch.setenv("REPORT_DIR", str(tmp_path / "reports"))
+    get_settings.cache_clear()
+    event_bus.reset()
+    task_queue.reset()
+    init_db()
+    job = create_job(JobCreate(title="Backend", jd_text="Python FastAPI"))
+    candidate = create_candidate(CandidateCreate(name="Grace"))
+    interview = create_interview(InterviewCreate(job_id=job.id, candidate_id=candidate.id))
+    add_turn(
+        interview.id,
+        QATurn(
+            question="讲项目",
+            answer="我写了 FastAPI 编排、模型重试和 JSON 校验，因为线上有格式漂移。",
+        ),
+    )
+
+    accepted = end_interview(interview.id, execute_inline=False)
+
+    assert accepted.status == "queued"
+    assert accepted.interview_id == interview.id
+    assert accepted.task_name == "interview.offline_scoring"
+    assert get_interview(interview.id).status == InterviewStatus.finished
+    assert task_queue.history("interview.offline_scoring")[0].status == "queued"
+    assert [topic for topic, _ in event_bus.history()][-2:] == [
+        "interview.finished",
+        "task.enqueued",
+    ]
+
+
 def test_report_artifact_uris_use_object_storage_when_configured(
     tmp_path: Path, monkeypatch
 ) -> None:
