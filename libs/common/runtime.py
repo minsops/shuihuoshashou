@@ -20,6 +20,7 @@ class RuntimeStatus(BaseModel):
     signal_enabled: bool
     rate_limit_enabled: bool
     rate_limit_requests_per_minute: int
+    offline_task_backend: str
     redis_url_configured: bool
     object_storage_endpoint_configured: bool
     object_storage_bucket: str
@@ -43,6 +44,7 @@ def get_runtime_status() -> RuntimeStatus:
         signal_enabled=settings.signal_enabled,
         rate_limit_enabled=settings.rate_limit_enabled,
         rate_limit_requests_per_minute=settings.rate_limit_requests_per_minute,
+        offline_task_backend=settings.offline_task_backend,
         redis_url_configured=bool(settings.redis_url),
         object_storage_endpoint_configured=bool(settings.object_storage_endpoint),
         object_storage_bucket=settings.object_storage_bucket,

@@ -9,6 +9,7 @@ as a local-first Python MVP:
 - FastAPI services and gateway.
 - Local SQLite persistence instead of Docker/PostgreSQL for the first runnable version.
 - In-memory async events instead of Redis/MQ for local development, with explicit offline scoring events.
+- Local task queue boundary for offline scoring, ready to swap for Celery/Redis workers.
 - Unified LLM client with mock mode and OpenAI-compatible HTTP mode for `mimo2.5pro`.
 - End-to-end offline demo from JD + interview turns to probe, scoring, AIGC checks, and report.
 - Interview turns are stored in both the interview context and a `qa_turns` table for auditability.
@@ -121,6 +122,9 @@ report plus generated HTML/PDF paths.
 In the local profile, `POST /api/interviews/{id}/end` publishes local task events and runs the
 offline pipeline synchronously so demos still return the report immediately. The persisted interview
 state still follows the spec flow: `FINISHED -> SCORING -> REPORTED`.
+
+The offline scoring task uses `OFFLINE_TASK_BACKEND=local` by default. It records task enqueue,
+completion, and failure events so the Celery/Redis worker boundary is explicit.
 
 ```bash
 curl -s http://127.0.0.1:8000/api/offline/evaluate \

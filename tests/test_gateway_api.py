@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from libs.common.config import get_settings
 from libs.common.events import event_bus
 from libs.common.observability import metrics_registry, rate_limiter
+from libs.common.tasks import task_queue
 from services.gateway.app import app
 
 
@@ -24,10 +25,12 @@ def _client(
     monkeypatch.setenv("SIGNAL_ENABLED", "false")
     monkeypatch.setenv("RATE_LIMIT_ENABLED", str(rate_limit_enabled).lower())
     monkeypatch.setenv("RATE_LIMIT_REQUESTS_PER_MINUTE", str(rate_limit_requests_per_minute))
+    monkeypatch.setenv("OFFLINE_TASK_BACKEND", "local")
     get_settings.cache_clear()
     event_bus.reset()
     metrics_registry.reset()
     rate_limiter.reset()
+    task_queue.reset()
     return TestClient(app)
 
 
@@ -82,6 +85,7 @@ def test_gateway_config_status_hides_secrets(tmp_path: Path, monkeypatch) -> Non
     assert payload["llm_api_key_configured"] is True
     assert payload["rate_limit_enabled"] is False
     assert payload["rate_limit_requests_per_minute"] == 120
+    assert payload["offline_task_backend"] == "local"
     assert payload["redis_url_configured"] is True
     assert payload["object_storage_endpoint_configured"] is False
     assert payload["object_storage_bucket"] == "shuihuo-killer"

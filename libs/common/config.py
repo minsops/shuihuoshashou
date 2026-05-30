@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     signal_enabled: bool = False
     rate_limit_enabled: bool = False
     rate_limit_requests_per_minute: int = 120
+    offline_task_backend: str = "local"
     redis_url: str = "redis://localhost:6379/0"
     object_storage_endpoint: str = ""
     object_storage_bucket: str = "shuihuo-killer"

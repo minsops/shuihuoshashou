@@ -5,6 +5,7 @@ from pathlib import Path
 from libs.common.config import get_settings
 from libs.common.database import init_db
 from libs.common.events import event_bus
+from libs.common.tasks import task_queue
 from libs.schemas import (
     CandidateCreate,
     InterviewCreate,
@@ -34,6 +35,7 @@ def test_offline_interview_chain(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("REPORT_DIR", str(tmp_path / "reports"))
     get_settings.cache_clear()
     event_bus.reset()
+    task_queue.reset()
     init_db()
     job = create_job(JobCreate(title="AI Engineer", jd_text="Python FastAPI LLM"))
     candidate = create_candidate(CandidateCreate(name="Ada"))
@@ -59,9 +61,14 @@ def test_offline_interview_chain(tmp_path: Path, monkeypatch) -> None:
     assert [topic for topic, _ in event_bus.history()] == [
         "qa_turn.created",
         "interview.finished",
+        "task.enqueued",
         "interview.scoring_started",
         "interview.reported",
+        "task.completed",
     ]
+    tasks = task_queue.history("interview.offline_scoring")
+    assert len(tasks) == 1
+    assert tasks[0].status == "completed"
 
 
 def test_offline_pipeline_exposes_scoring_state(tmp_path: Path, monkeypatch) -> None:
@@ -69,6 +76,7 @@ def test_offline_pipeline_exposes_scoring_state(tmp_path: Path, monkeypatch) -> 
     monkeypatch.setenv("REPORT_DIR", str(tmp_path / "reports"))
     get_settings.cache_clear()
     event_bus.reset()
+    task_queue.reset()
     init_db()
     job = create_job(JobCreate(title="Backend", jd_text="Python FastAPI"))
     candidate = create_candidate(CandidateCreate(name="Grace"))
@@ -105,6 +113,7 @@ def test_report_artifact_uris_use_object_storage_when_configured(
     monkeypatch.setenv("OBJECT_STORAGE_BUCKET", "reports-bucket")
     get_settings.cache_clear()
     event_bus.reset()
+    task_queue.reset()
     init_db()
     job = create_job(JobCreate(title="Backend", jd_text="Python FastAPI"))
     candidate = create_candidate(CandidateCreate(name="Lin"))

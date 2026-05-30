@@ -16,8 +16,9 @@ The local implementation is complete as a runnable MVP:
 - Probe generation, scoring, AIGC/template checks, consistency checks, HTML/PDF report generation.
 - Report artifact metadata includes local `file://` URIs or configured S3-style URIs.
 - Local offline scoring task flow with `FINISHED -> SCORING -> REPORTED` state transitions.
+- Local task queue boundary for offline scoring with enqueue/completion/failure events.
 - In-memory event bus topics for `qa_turn.created`, `interview.finished`,
-  `interview.scoring_started`, and `interview.reported`.
+  `task.enqueued`, `interview.scoring_started`, `interview.reported`, and `task.completed`.
 - Behavior signal module with explicit candidate consent gate.
 - Configurable LLM client with mock mode and OpenAI-compatible HTTP mode.
 - Safe runtime config and LLM smoke-test scripts.
@@ -85,6 +86,6 @@ LLM smoke test ok
 ## Remaining Production Gaps
 
 - Replace local SQLite with PostgreSQL/pgvector and Redis-backed state where deployment requires it.
-- Replace the in-memory event bus with Redis Streams, RabbitMQ, Kafka, or Celery workers.
+- Replace the local task queue/event bus with Redis Streams, RabbitMQ, Kafka, or Celery workers.
 - Plug a real streaming ASR/diarization engine behind the existing `ASREngine` interface.
 - Add concrete S3/MinIO upload client behind the report artifact store for multi-node deployments.

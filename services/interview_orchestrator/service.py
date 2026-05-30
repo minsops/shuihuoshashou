@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 
 from libs.common.database import connect, dumps, init_db, loads
 from libs.common.events import event_bus
+from libs.common.tasks import task_queue
 from libs.schemas import (
     CandidateCreate,
     CandidateRecord,
@@ -275,9 +276,18 @@ def run_offline_scoring_task(interview_id: str):
     return report
 
 
+def enqueue_offline_scoring_task(interview_id: str):
+    record = task_queue.enqueue(
+        "interview.offline_scoring",
+        {"interview_id": interview_id},
+        lambda payload: run_offline_scoring_task(str(payload["interview_id"])),
+    )
+    return record.result
+
+
 def end_interview(interview_id: str):
     finish_interview(interview_id)
-    return run_offline_scoring_task(interview_id)
+    return enqueue_offline_scoring_task(interview_id)
 
 
 def get_report(interview_id: str):
