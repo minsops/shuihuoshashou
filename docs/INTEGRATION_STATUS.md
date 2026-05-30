@@ -8,6 +8,7 @@ The local implementation is complete as a runnable MVP:
 - Local demo UI at `/`.
 - One-shot offline evaluation at `/api/offline/evaluate`.
 - WebSocket real-time text/audio-stub probe flow with speaker/finality/timestamp metadata.
+- Configurable HTTP cloud ASR adapter behind the `ASREngine` interface.
 - Separate `credibility` WebSocket event after probe generation.
 - Pydantic v2 shared schemas.
 - SQLite local persistence.
@@ -92,4 +93,4 @@ LLM smoke test ok
 
 - Replace the deterministic local embedding scorer with pgvector nearest-neighbor retrieval.
 - Add asynchronous Redis/Celery workers that consume the published offline task stream.
-- Plug a real streaming ASR/diarization engine behind the existing `ASREngine` interface.
+- Add production-grade streaming ASR session management and diarization beyond HTTP chunk forwarding.

@@ -17,6 +17,9 @@ class RuntimeStatus(BaseModel):
     llm_auth_scheme_configured: bool
     llm_response_content_path: str
     llm_extra_body_configured: bool
+    asr_provider: str
+    asr_base_url_configured: bool
+    asr_api_key_configured: bool
     signal_enabled: bool
     rate_limit_enabled: bool
     rate_limit_requests_per_minute: int
@@ -43,6 +46,9 @@ def get_runtime_status() -> RuntimeStatus:
         llm_auth_scheme_configured=bool(settings.llm_auth_scheme),
         llm_response_content_path=settings.llm_response_content_path,
         llm_extra_body_configured=bool(settings.llm_extra_body_json),
+        asr_provider=settings.asr_provider,
+        asr_base_url_configured=bool(settings.asr_base_url),
+        asr_api_key_configured=bool(settings.asr_api_key),
         signal_enabled=settings.signal_enabled,
         rate_limit_enabled=settings.rate_limit_enabled,
         rate_limit_requests_per_minute=settings.rate_limit_requests_per_minute,

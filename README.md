@@ -11,6 +11,7 @@ as a local-first Python MVP:
 - In-memory async events for local development, with explicit offline scoring events.
 - Local task queue boundary for offline scoring, with optional Redis Streams task publication.
 - Unified LLM client with mock mode and OpenAI-compatible HTTP mode for `mimo2.5pro`.
+- ASR interface supports local stub mode and configurable HTTP cloud ASR adapters.
 - End-to-end offline demo from JD + interview turns to probe, scoring, AIGC checks, and report.
 - Interview turns are stored in both the interview context and a `qa_turns` table for auditability.
 - WebSocket transcripts carry speaker/finality/timestamp metadata and emit separate credibility events.
@@ -122,6 +123,10 @@ WebSocket `audio_chunk` events may include `speaker`, `is_final`, `start_ms`, `e
 `confidence`. Only final candidate segments trigger a probe. Downstream events include
 `transcript`, `probe`, `credibility`, optional `signal`, and `report`.
 
+Set `ASR_PROVIDER=http`, `ASR_BASE_URL`, `ASR_API_PATH`, and `ASR_API_KEY` to forward audio chunks to
+a cloud ASR endpoint. Response mapping is configurable with `ASR_TEXT_PATH`, `ASR_SPEAKER_PATH`,
+`ASR_START_MS_PATH`, `ASR_END_MS_PATH`, `ASR_IS_FINAL_PATH`, and `ASR_CONFIDENCE_PATH`.
+
 ## One-Shot Offline Evaluation
 
 Use this endpoint for the first demo path: paste JD and interview Q&A, then receive the structured
@@ -158,8 +163,8 @@ curl -s http://127.0.0.1:8000/api/offline/evaluate \
 ## Scope Notes
 
 The real-time ASR and optional behavior signal modules are implemented behind interfaces with local
-stub engines. Production ASR, diarization, pgvector nearest-neighbor search, Redis Streams, and Celery
-can be plugged in without changing the shared schemas.
+stub engines. Production diarization, pgvector nearest-neighbor search, Redis Streams workers, and
+Celery can be plugged in without changing the shared schemas.
 
 Behavior signals are disabled by default. If an interview sets `signal_enabled=true`, the candidate
 must first grant `behavior_signal` consent through `POST /api/consents`; otherwise the API returns 403.

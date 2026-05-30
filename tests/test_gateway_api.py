@@ -83,6 +83,9 @@ def test_gateway_config_status_hides_secrets(tmp_path: Path, monkeypatch) -> Non
     assert response.status_code == 200
     payload = response.json()
     assert payload["llm_api_key_configured"] is True
+    assert payload["asr_provider"] == "stub"
+    assert payload["asr_base_url_configured"] is False
+    assert payload["asr_api_key_configured"] is False
     assert payload["rate_limit_enabled"] is False
     assert payload["rate_limit_requests_per_minute"] == 120
     assert payload["offline_task_backend"] == "local"
