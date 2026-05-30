@@ -1,0 +1,230 @@
+from __future__ import annotations
+
+import base64
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse, HTMLResponse
+
+from libs.common.database import init_db
+from libs.common.runtime import RuntimeStatus, get_runtime_status
+from libs.schemas import (
+    CandidateCreate,
+    ConsentCreate,
+    InterviewCreate,
+    JobCreate,
+    OfflineInterviewInput,
+    OfflineInterviewResult,
+    ProbeRequest,
+    QATurn,
+)
+from services.asr_service.service import get_asr_engine
+from services.interview_orchestrator.service import (
+    add_turn,
+    create_candidate,
+    create_consent,
+    create_interview,
+    end_interview,
+    get_interview,
+    get_report,
+    should_probe,
+    start_interview,
+)
+from services.jd_kb_service.service import create_job, get_job
+from services.probe_service.service import generate_probe
+from services.signal_service.service import extract_behavior_signal
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    init_db()
+    yield
+
+
+app = FastAPI(title="Shuihuo Killer", version="0.1.0", lifespan=lifespan)
+WEB_INDEX = Path(__file__).resolve().parents[2] / "web" / "index.html"
+
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+@app.get("/api/config/status", response_model=RuntimeStatus)
+def config_status() -> RuntimeStatus:
+    return get_runtime_status()
+
+
+@app.get("/", response_class=HTMLResponse)
+def index() -> str:
+    return WEB_INDEX.read_text(encoding="utf-8")
+
+
+async def _send_probe_for_segment(websocket: WebSocket, interview_id: str, record, segment):
+    turn = QATurn(
+        question="实时输入片段",
+        answer=segment.text,
+        answer_start_ms=segment.start_ms,
+        answer_end_ms=segment.end_ms,
+    )
+    record = add_turn(interview_id, turn)
+    probe = await generate_probe(
+        ProbeRequest(
+            job_id=record.job_id,
+            competency_model=record.context.competency_model,
+            recent_turns=record.context.turns[-5:],
+            latest_answer=segment.text,
+        )
+    )
+    await websocket.send_json({"type": "probe", "payload": probe.model_dump()})
+    signal = extract_behavior_signal(turn)
+    if signal is not None:
+        await websocket.send_json({"type": "signal", "payload": signal.model_dump()})
+    return record
+
+
+@app.post("/api/jobs")
+def api_create_job(payload: JobCreate):
+    return create_job(payload)
+
+
+@app.get("/api/jobs/{job_id}")
+def api_get_job(job_id: str):
+    try:
+        return get_job(job_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/api/candidates")
+def api_create_candidate(payload: CandidateCreate):
+    return create_candidate(payload)
+
+
+@app.post("/api/consents")
+def api_create_consent(payload: ConsentCreate):
+    return create_consent(payload)
+
+
+@app.post("/api/interviews")
+def api_create_interview(payload: InterviewCreate):
+    try:
+        return create_interview(payload)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+
+@app.post("/api/interviews/{interview_id}/start")
+def api_start_interview(interview_id: str):
+    try:
+        return start_interview(interview_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/api/interviews/{interview_id}/turns")
+def api_add_turn(interview_id: str, turn: QATurn):
+    try:
+        return add_turn(interview_id, turn)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/api/probe")
+async def api_probe(payload: ProbeRequest):
+    return await generate_probe(payload)
+
+
+@app.post("/api/offline/evaluate", response_model=OfflineInterviewResult)
+def api_offline_evaluate(payload: OfflineInterviewInput):
+    job = create_job(JobCreate(title=payload.job_title, jd_text=payload.jd_text))
+    candidate = create_candidate(
+        CandidateCreate(name=payload.candidate_name, resume_text=payload.resume_text)
+    )
+    interview = create_interview(InterviewCreate(job_id=job.id, candidate_id=candidate.id))
+    for turn in payload.turns:
+        add_turn(interview.id, turn)
+    start_interview(interview.id)
+    report = end_interview(interview.id)
+    interview = get_interview(interview.id)
+    return OfflineInterviewResult(
+        job=job,
+        candidate=candidate,
+        interview=interview,
+        report=report,
+    )
+
+
+@app.post("/api/interviews/{interview_id}/end")
+def api_end_interview(interview_id: str):
+    try:
+        return end_interview(interview_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/api/interviews/{interview_id}/report")
+def api_report(interview_id: str):
+    try:
+        report, _ = get_report(interview_id)
+        return report
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/api/interviews/{interview_id}/report.html")
+def api_report_html(interview_id: str):
+    try:
+        _, html = get_report(interview_id)
+        return HTMLResponse(html)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/api/interviews/{interview_id}/report.pdf")
+def api_report_pdf(interview_id: str):
+    try:
+        report, _ = get_report(interview_id)
+        pdf_path = report.get("pdf_path")
+        if not pdf_path:
+            raise KeyError(f"report pdf not found: {interview_id}")
+        return FileResponse(pdf_path, media_type="application/pdf", filename=f"{interview_id}.pdf")
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.websocket("/ws/interview/{interview_id}")
+async def ws_interview(websocket: WebSocket, interview_id: str):
+    await websocket.accept()
+    engine = get_asr_engine()
+    try:
+        record = start_interview(interview_id)
+        while True:
+            event = await websocket.receive_json()
+            if event.get("type") == "audio_chunk":
+                segment = await engine.transcribe_chunk(
+                    session_id=interview_id,
+                    seq=int(event.get("seq", 0)),
+                    audio_b64=event.get("audio", ""),
+                )
+                await websocket.send_json({"type": "transcript", "payload": segment.model_dump()})
+                if should_probe(segment, record):
+                    record = await _send_probe_for_segment(websocket, interview_id, record, segment)
+            elif event.get("type") == "text_turn":
+                text = str(event.get("answer", ""))
+                encoded = base64.b64encode(text.encode("utf-8")).decode("ascii")
+                segment = await engine.transcribe_chunk(interview_id, int(event.get("seq", 1)), encoded)
+                await websocket.send_json({"type": "transcript", "payload": segment.model_dump()})
+                if should_probe(segment, record):
+                    record = await _send_probe_for_segment(websocket, interview_id, record, segment)
+            elif event.get("type") == "end":
+                report = end_interview(interview_id)
+                await websocket.send_json({"type": "report", "payload": report.model_dump()})
+                break
+    except WebSocketDisconnect:
+        return
+    except KeyError as exc:
+        await websocket.send_json({"type": "error", "detail": str(exc)})

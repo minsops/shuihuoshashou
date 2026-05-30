@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>水货杀手</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7f9;
+        --panel: #ffffff;
+        --text: #18202f;
+        --muted: #667085;
+        --line: #d7dce5;
+        --accent: #0f766e;
+        --accent-strong: #115e59;
+        --risk: #b42318;
+        --ok: #157f3b;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei",
+          sans-serif;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        min-height: 64px;
+        padding: 12px 24px;
+        border-bottom: 1px solid var(--line);
+        background: var(--panel);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 20px;
+        letter-spacing: 0;
+      }
+
+      main {
+        display: grid;
+        grid-template-columns: minmax(360px, 0.9fr) minmax(420px, 1.1fr);
+        gap: 16px;
+        padding: 16px;
+      }
+
+      section {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+      }
+
+      .panel-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      h2 {
+        margin: 0;
+        font-size: 15px;
+        letter-spacing: 0;
+      }
+
+      form,
+      .results {
+        display: grid;
+        gap: 14px;
+        padding: 16px;
+      }
+
+      label {
+        display: grid;
+        gap: 6px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      input,
+      textarea {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 10px 12px;
+        color: var(--text);
+        background: #fff;
+        font: inherit;
+        font-size: 14px;
+      }
+
+      textarea {
+        min-height: 96px;
+        resize: vertical;
+        line-height: 1.5;
+      }
+
+      .turn {
+        display: grid;
+        gap: 8px;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fbfcfe;
+      }
+
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      button,
+      a.button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 38px;
+        border: 1px solid var(--accent);
+        border-radius: 6px;
+        padding: 8px 12px;
+        background: var(--accent);
+        color: #fff;
+        font: inherit;
+        font-size: 14px;
+        text-decoration: none;
+        cursor: pointer;
+      }
+
+      button.secondary,
+      a.secondary {
+        background: #fff;
+        color: var(--accent-strong);
+      }
+
+      button:disabled {
+        opacity: 0.55;
+        cursor: wait;
+      }
+
+      .score {
+        display: grid;
+        grid-template-columns: 160px 1fr;
+        gap: 12px;
+      }
+
+      .score-main {
+        display: grid;
+        place-items: center;
+        min-height: 160px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #f8fbfa;
+      }
+
+      .score-main strong {
+        font-size: 44px;
+        line-height: 1;
+        letter-spacing: 0;
+      }
+
+      .summary {
+        display: grid;
+        align-content: center;
+        gap: 8px;
+        min-height: 160px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 10px 8px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--muted);
+        font-weight: 600;
+      }
+
+      .risk {
+        color: var(--risk);
+      }
+
+      .empty {
+        display: grid;
+        place-items: center;
+        min-height: 360px;
+        color: var(--muted);
+        text-align: center;
+      }
+
+      @media (max-width: 900px) {
+        main,
+        .score {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>水货杀手</h1>
+      <span class="muted">AI 实时深挖面试官助手</span>
+    </header>
+    <main>
+      <section>
+        <div class="panel-head">
+          <h2>离线评估</h2>
+          <button class="secondary" type="button" id="addTurn">添加问答</button>
+        </div>
+        <form id="evaluateForm">
+          <label>
+            岗位名称
+            <input name="job_title" value="AI 后端工程师" required />
+          </label>
+          <label>
+            JD 文本
+            <textarea name="jd_text" required>负责 Python/FastAPI 微服务、LLM 应用、评估体系和可靠性工程。</textarea>
+          </label>
+          <label>
+            候选人
+            <input name="candidate_name" value="候选人A" required />
+          </label>
+          <label>
+            简历摘要
+            <textarea name="resume_text">做过 AI 应用和后端服务。</textarea>
+          </label>
+          <div id="turns"></div>
+          <div class="toolbar">
+            <button id="submit" type="submit">生成报告</button>
+            <button class="secondary" type="button" id="loadSample">填入样例</button>
+          </div>
+        </form>
+      </section>
+      <section>
+        <div class="panel-head">
+          <h2>评估报告</h2>
+          <div class="toolbar" id="links"></div>
+        </div>
+        <div class="results" id="results">
+          <div class="empty">提交一段问答后，这里会显示评分、风险点和报告链接。</div>
+        </div>
+      </section>
+    </main>
+    <script>
+      const turns = document.querySelector("#turns");
+      const results = document.querySelector("#results");
+      const links = document.querySelector("#links");
+      const submit = document.querySelector("#submit");
+
+      function addTurn(question = "", answer = "") {
+        const index = turns.children.length + 1;
+        const node = document.createElement("div");
+        node.className = "turn";
+        node.innerHTML = `
+          <label>问题 ${index}<textarea name="question" required>${question}</textarea></label>
+          <label>回答 ${index}<textarea name="answer" required>${answer}</textarea></label>
+        `;
+        turns.appendChild(node);
+      }
+
+      function loadSample() {
+        turns.innerHTML = "";
+        addTurn("介绍一个你最核心的 AI 项目。", "我主要负责整体架构设计并推动项目落地，优化后效果有显著提升。");
+        addTurn("具体你写了哪部分？", "我写了 FastAPI 的调用编排、重试和 JSON 解析，因为线上模型偶发返回格式错误。");
+      }
+
+      function formPayload(form) {
+        const turnNodes = [...turns.querySelectorAll(".turn")];
+        return {
+          job_title: form.job_title.value,
+          jd_text: form.jd_text.value,
+          candidate_name: form.candidate_name.value,
+          resume_text: form.resume_text.value,
+          turns: turnNodes.map((node, index) => ({
+            question: node.querySelector('[name="question"]').value,
+            answer: node.querySelector('[name="answer"]').value,
+            answer_start_ms: index * 30000,
+            answer_end_ms: index * 30000 + 20000,
+          })),
+        };
+      }
+
+      function renderReport(payload) {
+        const report = payload.report;
+        const score = report.score;
+        links.innerHTML = `
+          <a class="button secondary" href="/api/interviews/${report.interview_id}/report.html" target="_blank">HTML</a>
+          <a class="button secondary" href="/api/interviews/${report.interview_id}/report.pdf" target="_blank">PDF</a>
+        `;
+        const dimensions = score.dimensions
+          .map(
+            (d) => `
+              <tr>
+                <td>${d.dimension}</td>
+                <td>${d.score}</td>
+                <td>${d.weight}</td>
+                <td>${d.evidence.map((e) => e.excerpt).join("<br>")}</td>
+              </tr>`
+          )
+          .join("");
+        const risks =
+          score.risk_notes.length > 0
+            ? score.risk_notes.map((note) => `<p class="risk">${note}</p>`).join("")
+            : '<p class="muted">暂无高置信风险点。</p>';
+        results.innerHTML = `
+          <div class="score">
+            <div class="score-main"><strong>${score.total_score}</strong><span class="muted">${score.recommendation}</span></div>
+            <div class="summary"><strong>总评</strong><span>${report.summary}</span></div>
+          </div>
+          <div>${risks}</div>
+          <table>
+            <thead><tr><th>维度</th><th>分数</th><th>权重</th><th>证据</th></tr></thead>
+            <tbody>${dimensions}</tbody>
+          </table>
+        `;
+      }
+
+      document.querySelector("#addTurn").addEventListener("click", () => addTurn());
+      document.querySelector("#loadSample").addEventListener("click", loadSample);
+      document.querySelector("#evaluateForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        submit.disabled = true;
+        submit.textContent = "生成中";
+        try {
+          const response = await fetch("/api/offline/evaluate", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(formPayload(event.currentTarget)),
+          });
+          if (!response.ok) throw new Error(await response.text());
+          renderReport(await response.json());
+        } catch (error) {
+          results.innerHTML = `<div class="empty risk">${String(error)}</div>`;
+        } finally {
+          submit.disabled = false;
+          submit.textContent = "生成报告";
+        }
+      });
+
+      loadSample();
+    </script>
+  </body>
+</html>

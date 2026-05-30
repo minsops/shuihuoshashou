@@ -1,0 +1,30 @@
+[project]
+name = "shuihuo-killer"
+version = "0.1.0"
+description = "AI interview probe and anti-padding evaluation system"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.30.0",
+    "pydantic>=2.8.0",
+    "pydantic-settings>=2.4.0",
+    "httpx>=0.27.0",
+    "jinja2>=3.1.0",
+    "matplotlib>=3.8.0",
+    "weasyprint>=62.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0.0", "ruff>=0.6.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.setuptools.packages.find]
+include = ["libs*", "services*"]
+exclude = ["data*", "prompts*", "tests*", "scripts*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

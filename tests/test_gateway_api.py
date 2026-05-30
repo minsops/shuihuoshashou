@@ -1,0 +1,173 @@
+from __future__ import annotations
+
+import base64
+from pathlib import Path
+
+from fastapi.testclient import TestClient
+
+from libs.common.config import get_settings
+from services.gateway.app import app
+
+
+def _client(tmp_path: Path, monkeypatch) -> TestClient:
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'api.db'}")
+    monkeypatch.setenv("REPORT_DIR", str(tmp_path / "reports"))
+    monkeypatch.setenv("LLM_PROVIDER", "mock")
+    get_settings.cache_clear()
+    return TestClient(app)
+
+
+def test_gateway_offline_report_flow(tmp_path: Path, monkeypatch) -> None:
+    client = _client(tmp_path, monkeypatch)
+
+    job = client.post(
+        "/api/jobs",
+        json={"title": "AI 后端工程师", "jd_text": "Python FastAPI LLM 可靠性"},
+    ).json()
+    candidate = client.post(
+        "/api/candidates",
+        json={"name": "Candidate", "resume_text": "AI backend"},
+    ).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+    client.post(
+        f"/api/interviews/{interview['id']}/turns",
+        json={
+            "question": "讲一个项目",
+            "answer": "我主要负责整体架构设计并推动项目落地最终取得显著提升",
+            "answer_start_ms": 0,
+            "answer_end_ms": 1000,
+        },
+    )
+
+    report = client.post(f"/api/interviews/{interview['id']}/end").json()
+    assert report["score"]["total_score"] > 0
+    assert client.get(f"/api/interviews/{interview['id']}/report").status_code == 200
+    assert client.get(f"/api/interviews/{interview['id']}/report.html").status_code == 200
+    pdf = client.get(f"/api/interviews/{interview['id']}/report.pdf")
+    assert pdf.status_code == 200
+    assert pdf.headers["content-type"] == "application/pdf"
+
+
+def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
+    client = _client(tmp_path, monkeypatch)
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "水货杀手" in response.text
+    assert "/api/offline/evaluate" in response.text
+
+
+def test_gateway_config_status_hides_secrets(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("LLM_API_KEY", "super-secret")
+    client = _client(tmp_path, monkeypatch)
+    response = client.get("/api/config/status")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["llm_api_key_configured"] is True
+    assert "super-secret" not in response.text
+
+
+def test_signal_requires_candidate_consent(tmp_path: Path, monkeypatch) -> None:
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+
+    rejected = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"], "signal_enabled": True},
+    )
+    assert rejected.status_code == 403
+
+    consent = client.post(
+        "/api/consents",
+        json={"candidate_id": candidate["id"], "consent_type": "behavior_signal", "granted": True},
+    )
+    assert consent.status_code == 200
+    accepted = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"], "signal_enabled": True},
+    )
+    assert accepted.status_code == 200
+    assert accepted.json()["signal_enabled"] is True
+
+
+def test_gateway_websocket_probe_flow(tmp_path: Path, monkeypatch) -> None:
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+
+    text = "我主要负责优化，做了很多事情，效果比较好。"
+    audio = base64.b64encode(text.encode("utf-8")).decode("ascii")
+    with client.websocket_connect(f"/ws/interview/{interview['id']}") as websocket:
+        websocket.send_json(
+            {"type": "audio_chunk", "session_id": interview["id"], "seq": 1, "audio": audio}
+        )
+        transcript = websocket.receive_json()
+        probe = websocket.receive_json()
+        assert transcript["type"] == "transcript"
+        assert probe["type"] == "probe"
+        assert probe["payload"]["credibility"]["level"] in {"vague", "suspicious"}
+
+
+def test_gateway_websocket_text_turn_probe_flow(tmp_path: Path, monkeypatch) -> None:
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+
+    with client.websocket_connect(f"/ws/interview/{interview['id']}") as websocket:
+        websocket.send_json(
+            {
+                "type": "text_turn",
+                "seq": 1,
+                "answer": "我主要负责优化，做了很多事情，效果比较好。",
+            }
+        )
+        transcript = websocket.receive_json()
+        probe = websocket.receive_json()
+        assert transcript["type"] == "transcript"
+        assert transcript["payload"]["speaker"] == "candidate"
+        assert probe["type"] == "probe"
+        assert probe["payload"]["suggestions"]
+
+
+def test_gateway_one_shot_offline_evaluate(tmp_path: Path, monkeypatch) -> None:
+    client = _client(tmp_path, monkeypatch)
+    response = client.post(
+        "/api/offline/evaluate",
+        json={
+            "job_title": "AI 面试系统后端",
+            "jd_text": "Python FastAPI LLM 报告生成",
+            "candidate_name": "Candidate",
+            "resume_text": "做过 AI 应用",
+            "turns": [
+                {
+                    "question": "介绍最核心的项目",
+                    "answer": "我主要负责整体架构设计并推动项目落地最终取得显著提升",
+                    "answer_start_ms": 0,
+                    "answer_end_ms": 1000,
+                },
+                {
+                    "question": "具体你写了哪部分",
+                    "answer": "我写了 FastAPI 编排、模型重试和 JSON 校验，因为线上有格式漂移。",
+                    "answer_start_ms": 1200,
+                    "answer_end_ms": 3000,
+                },
+            ],
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["report"]["score"]["total_score"] > 0
+    assert payload["interview"]["status"] == "REPORTED"
+    report_id = payload["report"]["interview_id"]
+    assert client.get(f"/api/interviews/{report_id}/report").status_code == 200
