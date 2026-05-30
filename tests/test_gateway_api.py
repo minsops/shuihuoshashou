@@ -96,6 +96,8 @@ def test_gateway_config_status_hides_secrets(tmp_path: Path, monkeypatch) -> Non
     assert payload["asr_base_url_configured"] is False
     assert payload["asr_api_key_configured"] is False
     assert payload["asr_channel_diarization_configured"] is True
+    assert payload["probe_min_answer_chars"] == 20
+    assert payload["probe_min_interval_ms"] == 1000
     assert payload["speaker_diarization_provider"] == "local"
     assert payload["speaker_diarization_base_url_configured"] is False
     assert payload["speaker_diarization_api_key_configured"] is False

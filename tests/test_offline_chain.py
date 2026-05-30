@@ -14,11 +14,14 @@ from libs.schemas import (
     CompetencyItem,
     CompetencyModel,
     InterviewCreate,
+    InterviewContext,
+    InterviewRecord,
     InterviewStatus,
     JobCreate,
     JobRecord,
     ProbeRequest,
     QATurn,
+    TranscriptSegment,
 )
 from services.aigc_detect_service.service import detect_interview, load_templates
 from services.interview_orchestrator.consistency import detect_consistency, extract_fact_claim
@@ -31,6 +34,7 @@ from services.interview_orchestrator.service import (
     get_interview,
     list_turns,
     run_offline_scoring_task,
+    should_probe,
 )
 from services.jd_kb_service.service import (
     _index_probe_patterns,
@@ -408,3 +412,37 @@ def test_consistency_detects_contribution_conflict() -> None:
     flags = detect_consistency(turns)
     assert flags
     assert flags[0].severity == "high"
+
+
+def test_should_probe_uses_configurable_thresholds(monkeypatch) -> None:
+    monkeypatch.setenv("PROBE_MIN_ANSWER_CHARS", "5")
+    monkeypatch.setenv("PROBE_MIN_INTERVAL_MS", "2500")
+    get_settings.cache_clear()
+    model = generate_competency_model("job-local", "Backend", "Python 服务端岗位")
+    record = InterviewRecord(
+        job_id=model.job_id,
+        candidate_id="candidate-local",
+        context=InterviewContext(
+            session_id="session-local",
+            job_id=model.job_id,
+            candidate_id="candidate-local",
+            competency_model=model,
+        ),
+    )
+    record.context.turns.append(
+        QATurn(question="q", answer="上一段回答", answer_start_ms=0, answer_end_ms=1000)
+    )
+
+    early = TranscriptSegment(
+        session_id=record.id,
+        speaker="candidate",
+        text="足够长的回答",
+        start_ms=3000,
+        end_ms=3200,
+        is_final=True,
+        confidence=0.9,
+    )
+    late = early.model_copy(update={"start_ms": 3600})
+
+    assert should_probe(early, record) is False
+    assert should_probe(late, record) is True

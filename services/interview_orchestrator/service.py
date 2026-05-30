@@ -233,14 +233,15 @@ def list_turns(interview_id: str) -> list[QATurn]:
 
 
 def should_probe(segment: TranscriptSegment, record: InterviewRecord) -> bool:
+    settings = get_settings()
     if not segment.is_final or segment.speaker != "candidate":
         return False
-    if len(segment.text.strip()) < 20:
+    if len(segment.text.strip()) < settings.probe_min_answer_chars:
         return False
     if not record.context.turns:
         return True
     last_turn = record.context.turns[-1]
-    return segment.start_ms - last_turn.answer_end_ms >= 1000
+    return segment.start_ms - last_turn.answer_end_ms >= settings.probe_min_interval_ms
 
 
 def finish_interview(interview_id: str) -> InterviewRecord:

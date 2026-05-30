@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     asr_timeout_seconds: int = 30
     asr_interviewer_channels: str = "0,left,interviewer"
     asr_candidate_channels: str = "1,right,candidate"
+    probe_min_answer_chars: int = 20
+    probe_min_interval_ms: int = 1000
     speaker_diarization_provider: str = "local"
     speaker_diarization_base_url: str = ""
     speaker_diarization_api_path: str = "/diarize"

@@ -23,6 +23,8 @@ class RuntimeStatus(BaseModel):
     asr_base_url_configured: bool
     asr_api_key_configured: bool
     asr_channel_diarization_configured: bool
+    probe_min_answer_chars: int
+    probe_min_interval_ms: int
     speaker_diarization_provider: str
     speaker_diarization_base_url_configured: bool
     speaker_diarization_api_key_configured: bool
@@ -66,6 +68,8 @@ def get_runtime_status() -> RuntimeStatus:
         asr_channel_diarization_configured=bool(
             settings.asr_interviewer_channels and settings.asr_candidate_channels
         ),
+        probe_min_answer_chars=settings.probe_min_answer_chars,
+        probe_min_interval_ms=settings.probe_min_interval_ms,
         speaker_diarization_provider=settings.speaker_diarization_provider,
         speaker_diarization_base_url_configured=bool(settings.speaker_diarization_base_url),
         speaker_diarization_api_key_configured=bool(settings.speaker_diarization_api_key),

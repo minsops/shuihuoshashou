@@ -9,6 +9,7 @@ The local implementation is complete as a runnable MVP:
 - Local demo UI at `/`.
 - One-shot offline evaluation at `/api/offline/evaluate`.
 - WebSocket real-time text/audio-stub probe flow with speaker/finality/timestamp metadata and channel-based speaker mapping.
+- Configurable real-time probe trigger thresholds for candidate answer length and minimum interval.
 - Configurable HTTP cloud ASR adapter behind the `ASREngine` interface.
 - ASR session manager supports partial-to-final chunk updates, repeated-final deduplication,
   stale-final rejection, local audio-cluster speaker resolution, and conservative short-gap

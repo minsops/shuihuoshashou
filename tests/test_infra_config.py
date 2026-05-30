@@ -56,6 +56,8 @@ def test_env_example_lists_runtime_integration_knobs() -> None:
         "REPORT_DIR=",
         "RATE_LIMIT_BACKEND=",
         "REDIS_RATE_LIMIT_PREFIX=",
+        "PROBE_MIN_ANSWER_CHARS=",
+        "PROBE_MIN_INTERVAL_MS=",
     ]:
         assert key in env_example
 
