@@ -30,8 +30,20 @@ async def main() -> int:
     try:
         response = await get_llm_client().complete_json(
             [
-                LLMMessage(role="system", content="Return JSON matching ProbeResponse."),
-                LLMMessage(role="user", content="Generate one interview probe question."),
+                LLMMessage(
+                    role="system",
+                    content=(
+                        "Return only a JSON object with this exact shape: "
+                        '{"suggestions":[{"question":"...","target":"...","competency":"...",'
+                        '"priority":1}],"credibility":{"level":"solid","reason":"...",'
+                        '"drill_down_hint":"..."}}. The credibility.level must be one of '
+                        "solid, vague, suspicious."
+                    ),
+                ),
+                LLMMessage(
+                    role="user",
+                    content="Generate one interview probe question for a vague backend project answer.",
+                ),
             ],
             ProbeResponse,
             fallback,
