@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from libs.common.config import get_settings
-from libs.common.database import init_db
+from libs.common.database import connect, init_db, loads
 from libs.common.events import event_bus
 from libs.common.tasks import task_queue
 from libs.schemas import (
@@ -165,6 +165,26 @@ def test_jd_kb_retrieves_relevant_probe_patterns(tmp_path: Path, monkeypatch) ->
     assert hits
     assert hits[0].score > 0
     assert any("LLM" in hit.pattern or "FastAPI" in hit.pattern for hit in hits)
+
+
+def test_jd_kb_indexes_probe_pattern_embeddings(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'kb-vector.db'}")
+    get_settings.cache_clear()
+    init_db()
+    job = create_job(JobCreate(title="LLM Backend", jd_text="Python FastAPI LLM 可靠性"))
+
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT competency, pattern, embedding FROM probe_patterns WHERE job_id = ?",
+            (job.id,),
+        ).fetchall()
+
+    hits = retrieve_job_probe_patterns(job.id, "模型调用失败时怎么降级", limit=2)
+
+    assert rows
+    assert all(loads(row["embedding"]) for row in rows)
+    assert hits
+    assert hits[0].score > 0
 
 
 def test_probe_fallback_uses_retrieved_patterns() -> None:

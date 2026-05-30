@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from libs.llm_client import LLMMessage, get_llm_client
 from libs.schemas import CredibilitySignal, ProbeRequest, ProbeResponse, ProbeSuggestion
-from services.jd_kb_service.service import retrieve_probe_patterns
+from services.jd_kb_service.service import retrieve_job_probe_patterns, retrieve_probe_patterns
 
 
 VAGUE_MARKERS = ["负责", "参与", "优化", "提升", "很多", "比较", "主要", "一些"]
@@ -34,11 +34,10 @@ def assess_credibility(answer: str) -> CredibilitySignal:
 def fallback_probe(request: ProbeRequest) -> ProbeResponse:
     credibility = assess_credibility(request.latest_answer)
     suggestions: list[ProbeSuggestion] = []
-    pattern_hits = retrieve_probe_patterns(
-        request.competency_model,
-        f"{request.latest_answer} {credibility.drill_down_hint}",
-        limit=3,
-    )
+    query = f"{request.latest_answer} {credibility.drill_down_hint}"
+    pattern_hits = retrieve_job_probe_patterns(request.job_id, query, limit=3)
+    if not pattern_hits:
+        pattern_hits = retrieve_probe_patterns(request.competency_model, query, limit=3)
     for index, item in enumerate(request.competency_model.items[:3], start=1):
         hit = next((candidate for candidate in pattern_hits if candidate.competency == item.name), None)
         question = (

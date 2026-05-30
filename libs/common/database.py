@@ -55,6 +55,7 @@ _POSTGRES_JSON_COLUMNS = {
     ("scores", "risk_notes"),
     ("scores", "payload"),
     ("aigc_results", "payload"),
+    ("probe_patterns", "embedding"),
     ("reports", "payload"),
 }
 
@@ -230,6 +231,14 @@ def init_db() -> None:
                 probe_target TEXT,
                 payload TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS probe_patterns (
+                id TEXT PRIMARY KEY,
+                job_id TEXT NOT NULL,
+                competency TEXT NOT NULL,
+                pattern TEXT NOT NULL,
+                embedding TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS scores (
                 interview_id TEXT PRIMARY KEY,
                 dimensions TEXT,
@@ -288,6 +297,19 @@ def _ensure_sqlite_columns(conn: sqlite3.Connection) -> None:
     for column, column_type in aigc_columns.items():
         if column not in existing_aigc:
             conn.execute(f"ALTER TABLE aigc_results ADD COLUMN {column} {column_type}")
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS probe_patterns (
+            id TEXT PRIMARY KEY,
+            job_id TEXT NOT NULL,
+            competency TEXT NOT NULL,
+            pattern TEXT NOT NULL,
+            embedding TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
 
 
 def dumps(value: Any) -> str:

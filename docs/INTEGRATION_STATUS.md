@@ -14,7 +14,7 @@ The local implementation is complete as a runnable MVP:
 - PostgreSQL core schema SQL for compose initialization.
 - Database URL dialect detection and runtime connection support for SQLite and PostgreSQL targets.
 - Separate `qa_turns` persistence for auditable answer evidence.
-- JD knowledge base local retrieval for competency-specific probe patterns.
+- JD knowledge base indexes competency-specific probe patterns with deterministic embeddings.
 - Probe generation, scoring, AIGC/template checks, consistency checks, HTML/PDF report generation.
 - AIGC template checks use a local corpus and character n-gram cosine similarity.
 - Structured JSON and HTML reports include the full interview transcript.
@@ -90,6 +90,6 @@ LLM smoke test ok
 
 ## Remaining Production Gaps
 
-- Add pgvector-backed semantic retrieval for JD/probe-pattern search.
+- Replace the deterministic local embedding scorer with pgvector nearest-neighbor retrieval.
 - Replace the local task queue/event bus with Redis Streams, RabbitMQ, Kafka, or Celery workers.
 - Plug a real streaming ASR/diarization engine behind the existing `ASREngine` interface.

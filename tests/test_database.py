@@ -97,6 +97,10 @@ def test_sqlite_init_migrates_existing_score_columns(tmp_path, monkeypatch) -> N
         aigc_columns = {
             row["name"] for row in conn.execute("PRAGMA table_info(aigc_results)").fetchall()
         }
+        probe_pattern_columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(probe_patterns)").fetchall()
+        }
 
     assert {"dimensions", "total_score", "risk_notes", "recommendation"} <= score_columns
     assert {"ai_generated_prob", "template_similarity", "matched_template", "flagged"} <= aigc_columns
+    assert {"job_id", "competency", "pattern", "embedding"} <= probe_pattern_columns

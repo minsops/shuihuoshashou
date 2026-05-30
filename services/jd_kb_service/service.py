@@ -1,10 +1,19 @@
 from __future__ import annotations
 
+import hashlib
+import math
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 
 from libs.common.database import connect, dumps, init_db, loads
-from libs.schemas import CompetencyItem, CompetencyModel, JobCreate, JobRecord, ProbePatternHit
+from libs.schemas import (
+    CompetencyItem,
+    CompetencyModel,
+    JobCreate,
+    JobRecord,
+    ProbePatternHit,
+    new_id,
+)
 
 
 DEFAULT_DIMENSIONS = [
@@ -15,9 +24,17 @@ DEFAULT_DIMENSIONS = [
     ("注水风险", "AIGC、模板化、前后矛盾与追问露馅风险", -0.10),
 ]
 
+EMBEDDING_DIMENSIONS = 64
+
 
 def _tokens(text: str) -> set[str]:
-    return set(re.findall(r"[a-zA-Z0-9_+\-.#]+|[\u4e00-\u9fff]{2,}", text.lower()))
+    raw_tokens = re.findall(r"[a-zA-Z0-9_+\-.#]+|[\u4e00-\u9fff]{2,}", text.lower())
+    tokens: set[str] = set()
+    for token in raw_tokens:
+        tokens.add(token)
+        if re.fullmatch(r"[\u4e00-\u9fff]{3,}", token):
+            tokens.update(token[index : index + 2] for index in range(len(token) - 1))
+    return tokens
 
 
 def _score_pattern(query: str, competency: str, pattern: str) -> float:
@@ -34,6 +51,40 @@ def _score_pattern(query: str, competency: str, pattern: str) -> float:
     return round(overlap + phrase_bonus, 3)
 
 
+def _technical_token_boost(query: str, pattern: str) -> float:
+    query_tokens = {
+        token
+        for token in _tokens(query)
+        if re.fullmatch(r"[a-zA-Z0-9_+\-.#]{2,}", token)
+    }
+    pattern_tokens = {
+        token
+        for token in _tokens(pattern)
+        if re.fullmatch(r"[a-zA-Z0-9_+\-.#]{2,}", token)
+    }
+    return len(query_tokens & pattern_tokens) * 12.0
+
+
+def embed_text(text: str, dimensions: int = EMBEDDING_DIMENSIONS) -> list[float]:
+    vector = [0.0] * dimensions
+    tokens = _tokens(text)
+    for token in tokens:
+        digest = hashlib.sha256(token.encode("utf-8")).digest()
+        index = int.from_bytes(digest[:4], "big") % dimensions
+        sign = 1.0 if digest[4] % 2 == 0 else -1.0
+        vector[index] += sign
+    norm = math.sqrt(sum(value * value for value in vector))
+    if norm == 0:
+        return vector
+    return [round(value / norm, 6) for value in vector]
+
+
+def cosine_similarity(left: list[float], right: list[float]) -> float:
+    if not left or not right or len(left) != len(right):
+        return 0.0
+    return round(sum(a * b for a, b in zip(left, right, strict=True)), 6)
+
+
 def generate_competency_model(job_id: str, title: str, jd_text: str) -> CompetencyModel:
     text = jd_text.lower()
     items: list[CompetencyItem] = []
@@ -48,6 +99,10 @@ def generate_competency_model(job_id: str, title: str, jd_text: str) -> Competen
             patterns.append("请追问 LLM 调用、评估、成本、失败降级和安全边界。")
         items.append(CompetencyItem(name=name, description=description, probe_patterns=patterns, weight=weight))
     return CompetencyModel(job_id=job_id, job_title=title, items=items)
+
+
+def _pattern_text(competency: str, pattern: str) -> str:
+    return f"{competency} {pattern}"
 
 
 def retrieve_probe_patterns(
@@ -74,7 +129,61 @@ def retrieve_probe_patterns(
 
 
 def retrieve_job_probe_patterns(job_id: str, query: str, *, limit: int = 5) -> list[ProbePatternHit]:
+    indexed_hits = _retrieve_indexed_probe_patterns(job_id, query, limit=limit)
+    if indexed_hits:
+        return indexed_hits
     return retrieve_probe_patterns(get_job(job_id).competency_model, query, limit=limit)
+
+
+def _retrieve_indexed_probe_patterns(job_id: str, query: str, *, limit: int) -> list[ProbePatternHit]:
+    init_db()
+    query_embedding = embed_text(query)
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT competency, pattern, embedding FROM probe_patterns WHERE job_id = ?",
+            (job_id,),
+        ).fetchall()
+    hits: list[ProbePatternHit] = []
+    for row in rows:
+        competency = row["competency"]
+        pattern = row["pattern"]
+        embedding = loads(row["embedding"])
+        semantic = cosine_similarity(query_embedding, embedding)
+        lexical = _score_pattern(query, competency, pattern)
+        score = round(max(0.0, semantic) + lexical + _technical_token_boost(query, pattern), 6)
+        if score > 0:
+            hits.append(
+                ProbePatternHit(
+                    job_id=job_id,
+                    competency=competency,
+                    pattern=pattern,
+                    score=score,
+                )
+            )
+    hits.sort(key=lambda hit: (-hit.score, hit.competency, hit.pattern))
+    return hits[:limit]
+
+
+def _index_probe_patterns(record: JobRecord) -> None:
+    now = datetime.now(UTC).isoformat()
+    with connect() as conn:
+        for item in record.competency_model.items:
+            for pattern in item.probe_patterns:
+                conn.execute(
+                    """
+                    INSERT INTO probe_patterns
+                    (id, job_id, competency, pattern, embedding, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        new_id(),
+                        record.id,
+                        item.name,
+                        pattern,
+                        dumps(embed_text(_pattern_text(item.name, pattern))),
+                        now,
+                    ),
+                )
 
 
 def create_job(payload: JobCreate) -> JobRecord:
@@ -96,6 +205,7 @@ def create_job(payload: JobCreate) -> JobRecord:
                 record.created_at.isoformat(),
             ),
         )
+    _index_probe_patterns(record)
     return record
 
 

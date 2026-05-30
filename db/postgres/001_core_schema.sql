@@ -41,6 +41,15 @@ CREATE TABLE IF NOT EXISTS qa_turns (
     UNIQUE (interview_id, turn_index)
 );
 
+CREATE TABLE IF NOT EXISTS probe_patterns (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    job_id UUID NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    competency TEXT NOT NULL,
+    pattern TEXT NOT NULL,
+    embedding JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS scores (
     interview_id UUID PRIMARY KEY REFERENCES interviews(id) ON DELETE CASCADE,
     dimensions JSONB NOT NULL,
@@ -80,5 +89,6 @@ CREATE TABLE IF NOT EXISTS consents (
 CREATE INDEX IF NOT EXISTS idx_interviews_job_id ON interviews(job_id);
 CREATE INDEX IF NOT EXISTS idx_interviews_candidate_id ON interviews(candidate_id);
 CREATE INDEX IF NOT EXISTS idx_qa_turns_interview_id ON qa_turns(interview_id);
+CREATE INDEX IF NOT EXISTS idx_probe_patterns_job_id ON probe_patterns(job_id);
 CREATE INDEX IF NOT EXISTS idx_aigc_results_interview_id ON aigc_results(interview_id);
 CREATE INDEX IF NOT EXISTS idx_consents_candidate_type ON consents(candidate_id, consent_type);

@@ -17,7 +17,7 @@ as a local-first Python MVP:
 - Docker Compose declares the gateway plus PostgreSQL, Redis, and MinIO for local infrastructure.
 - PostgreSQL core schema SQL is provided under `db/postgres` for compose initialization.
 - Runtime database URL parsing supports SQLite and PostgreSQL targets.
-- JD knowledge base exposes local lexical retrieval for competency-specific probe patterns.
+- JD knowledge base indexes competency-specific probe patterns with deterministic embeddings.
 - Report artifacts write local files by default and upload to S3-compatible storage when credentials are configured.
 - Reports include structured scores, AIGC checks, consistency flags, and full interview transcripts.
 - AIGC/template checks use a local answer-template corpus with character n-gram cosine similarity.
@@ -70,7 +70,7 @@ The gateway uses SQLite in the default local profile. Set `DATABASE_URL` to a `p
 URL and install `.[postgres]` to run the same repository calls against PostgreSQL.
 
 PostgreSQL initializes from `db/postgres/001_core_schema.sql`, which declares the core jobs,
-candidates, interviews, turns, scores, AIGC results, reports, and consent tables from the spec.
+candidates, interviews, turns, probe-pattern embeddings, scores, AIGC results, reports, and consent tables from the spec.
 The runtime adapter translates the local repository parameter style and upserts for PostgreSQL.
 
 Set `OBJECT_STORAGE_ENDPOINT`, `OBJECT_STORAGE_BUCKET`, `OBJECT_STORAGE_ACCESS_KEY`, and
@@ -155,8 +155,8 @@ curl -s http://127.0.0.1:8000/api/offline/evaluate \
 ## Scope Notes
 
 The real-time ASR and optional behavior signal modules are implemented behind interfaces with local
-stub engines. Production ASR, diarization, object storage, vector DB, Redis Streams, and Celery can be
-plugged in without changing the shared schemas.
+stub engines. Production ASR, diarization, pgvector nearest-neighbor search, Redis Streams, and Celery
+can be plugged in without changing the shared schemas.
 
 Behavior signals are disabled by default. If an interview sets `signal_enabled=true`, the candidate
 must first grant `behavior_signal` consent through `POST /api/consents`; otherwise the API returns 403.
