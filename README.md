@@ -39,12 +39,15 @@ export LLM_AUTH_HEADER="api-key"
 export LLM_AUTH_SCHEME=""
 export LLM_RESPONSE_CONTENT_PATH="choices.0.message.content"
 export LLM_EXTRA_BODY_JSON=""
+export LLM_MAX_RETRIES=1
 ```
 
 If `LLM_PROVIDER=mock` or no API key is present, the system runs with deterministic local mock output.
 
 The default values follow the MiMo OpenAI-compatible chat completions protocol. If the provider changes
-the endpoint, auth header, or response JSON shape, change only the `LLM_*` environment variables above.
+the endpoint, auth header, response JSON shape, or retry policy, change only the `LLM_*` environment
+variables above. LLM JSON parsing is validated with pydantic; failed HTTP/JSON/schema attempts retry
+once by default before falling back to deterministic local behavior.
 
 Set `GATEWAY_API_KEY` in deployed environments to require `X-API-Key: ...` or
 `Authorization: Bearer ...` for `/api/*` and WebSocket traffic. It is empty by default for local demos.

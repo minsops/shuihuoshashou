@@ -91,6 +91,74 @@ def test_llm_client_falls_back_on_bad_response(monkeypatch) -> None:
     assert response.suggestions[0].question == "fallback"
 
 
+def test_llm_client_retries_once_after_bad_json(monkeypatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "openai_compatible")
+    monkeypatch.setenv("LLM_BASE_URL", "https://llm.example.test")
+    monkeypatch.setenv("LLM_API_KEY", "secret")
+    monkeypatch.setenv("LLM_MAX_RETRIES", "1")
+    get_settings.cache_clear()
+    calls = 0
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return httpx.Response(200, json={"choices": [{"message": {"content": "not-json"}}]})
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "suggestions": [
+                                        {
+                                            "question": "重试后成功",
+                                            "target": "验证项目真实性",
+                                            "competency": "项目真实性",
+                                            "priority": 1,
+                                        }
+                                    ],
+                                    "credibility": {
+                                        "level": "solid",
+                                        "reason": "重试解析成功",
+                                        "drill_down_hint": "继续追问",
+                                    },
+                                },
+                                ensure_ascii=False,
+                            )
+                        }
+                    }
+                ]
+            },
+        )
+
+    response = __import__("asyncio").run(_call_with_transport(httpx.MockTransport(handler)))
+
+    assert calls == 2
+    assert response.suggestions[0].question == "重试后成功"
+
+
+def test_llm_client_retry_count_can_be_disabled(monkeypatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "openai_compatible")
+    monkeypatch.setenv("LLM_BASE_URL", "https://llm.example.test")
+    monkeypatch.setenv("LLM_API_KEY", "secret")
+    monkeypatch.setenv("LLM_MAX_RETRIES", "0")
+    get_settings.cache_clear()
+    calls = 0
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(200, json={"choices": [{"message": {"content": "not-json"}}]})
+
+    response = __import__("asyncio").run(_call_with_transport(httpx.MockTransport(handler)))
+
+    assert calls == 1
+    assert response.suggestions[0].question == "fallback"
+
+
 def test_llm_client_can_raise_safe_error(monkeypatch) -> None:
     monkeypatch.setenv("LLM_PROVIDER", "openai_compatible")
     monkeypatch.setenv("LLM_BASE_URL", "https://llm.example.test")

@@ -51,7 +51,8 @@ class LLMClient:
         headers = {settings.llm_auth_header: auth_value}
         url = settings.llm_base_url.rstrip("/") + "/" + settings.llm_api_path.lstrip("/")
         last_error: Exception | None = None
-        for attempt in range(2):
+        max_attempts = max(1, settings.llm_max_retries + 1)
+        for attempt in range(max_attempts):
             try:
                 async with httpx.AsyncClient(
                     timeout=settings.llm_timeout_seconds,
@@ -66,7 +67,7 @@ class LLMClient:
                 return schema.model_validate(data)
             except Exception as exc:
                 last_error = exc
-                if attempt == 1:
+                if attempt == max_attempts - 1:
                     if raise_on_error:
                         raise RuntimeError(_safe_error_message(last_error)) from exc
                     return fallback

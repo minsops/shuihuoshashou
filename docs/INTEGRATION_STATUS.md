@@ -35,6 +35,7 @@ The local implementation is complete as a runnable MVP:
 - Behavior signal module with explicit candidate consent gate.
 - Candidate behavior-signal consent can be revoked and blocks future signal-enabled interviews.
 - Configurable LLM client with mock mode and OpenAI-compatible HTTP mode.
+- LLM JSON responses are pydantic-validated with configurable retry before deterministic fallback.
 - Safe runtime config and LLM smoke-test scripts.
 - Prometheus-style `/metrics` endpoint for local HTTP request counters and duration sums.
 - Structured JSON request logs with propagated `X-Request-ID` correlation IDs.

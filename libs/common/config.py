@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     llm_response_content_path: str = "choices.0.message.content"
     llm_extra_body_json: str = ""
     llm_timeout_seconds: int = 30
+    llm_max_retries: int = 1
     asr_provider: str = "stub"
     asr_base_url: str = ""
     asr_api_path: str = "/transcribe"

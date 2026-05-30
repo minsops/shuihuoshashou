@@ -18,6 +18,7 @@ class RuntimeStatus(BaseModel):
     llm_auth_scheme_configured: bool
     llm_response_content_path: str
     llm_extra_body_configured: bool
+    llm_max_retries: int
     asr_provider: str
     asr_base_url_configured: bool
     asr_api_key_configured: bool
@@ -54,6 +55,7 @@ def get_runtime_status() -> RuntimeStatus:
         llm_auth_scheme_configured=bool(settings.llm_auth_scheme),
         llm_response_content_path=settings.llm_response_content_path,
         llm_extra_body_configured=bool(settings.llm_extra_body_json),
+        llm_max_retries=settings.llm_max_retries,
         asr_provider=settings.asr_provider,
         asr_base_url_configured=bool(settings.asr_base_url),
         asr_api_key_configured=bool(settings.asr_api_key),
