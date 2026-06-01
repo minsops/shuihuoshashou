@@ -45,6 +45,7 @@ The local implementation is complete as a runnable MVP:
   recommendation, and the full interview transcript.
 - Report artifacts support local `file://` storage and SigV4 uploads to S3-compatible storage for
   HTML, PDF, and transcript JSON outputs.
+- Gateway exposes JSON, HTML, PDF, and transcript JSON report artifact endpoints.
 - Local offline scoring task flow with `FINISHED -> SCORING -> REPORTED` state transitions.
 - State guards prevent scoring before `FINISHED` and prevent turn edits or restarts after reporting.
 - Local task queue boundary for offline scoring with Redis Streams task publication and worker consumption.

@@ -436,6 +436,22 @@ def api_report_pdf(interview_id: str):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+@app.get("/api/interviews/{interview_id}/report.transcript.json")
+def api_report_transcript(interview_id: str):
+    try:
+        report, _ = get_report(interview_id)
+        transcript_path = report.get("transcript_path")
+        if not transcript_path or not Path(transcript_path).exists():
+            raise KeyError(f"report transcript not found: {interview_id}")
+        return FileResponse(
+            transcript_path,
+            media_type="application/json",
+            filename=f"{interview_id}.transcript.json",
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @app.websocket("/ws/interview/{interview_id}")
 async def ws_interview(websocket: WebSocket, interview_id: str):
     settings = get_settings()

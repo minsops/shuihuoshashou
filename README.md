@@ -166,6 +166,7 @@ returns 401, generate a fresh key and set it through `LLM_API_KEY` without commi
 - `GET /api/interviews/{id}/report`
 - `GET /api/interviews/{id}/report.html`
 - `GET /api/interviews/{id}/report.pdf`
+- `GET /api/interviews/{id}/report.transcript.json`
 - `WS /ws/interview/{id}`
 
 WebSocket `audio_chunk` events may include `speaker`, `channel`/`audio_channel`/`track`,
