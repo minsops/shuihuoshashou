@@ -314,9 +314,18 @@ def _validate_report_inputs(
                 )
             if evidence.excerpt not in turn.answer:
                 raise ValueError(f"score evidence excerpt is not in turn answer: {evidence.turn_id}")
-    for result in aigc:
-        if result.turn_id not in turns_by_id:
-            raise ValueError(f"AIGC result references unknown turn_id: {result.turn_id}")
+    aigc_turn_ids = [result.turn_id for result in aigc]
+    duplicate_aigc_turn_ids = {
+        turn_id for turn_id in aigc_turn_ids if aigc_turn_ids.count(turn_id) > 1
+    }
+    if duplicate_aigc_turn_ids:
+        raise ValueError("AIGC results must not contain duplicate turn_id values")
+    unknown_aigc_turn_ids = set(aigc_turn_ids) - set(turns_by_id)
+    if unknown_aigc_turn_ids:
+        raise ValueError(f"AIGC result references unknown turn_id: {sorted(unknown_aigc_turn_ids)[0]}")
+    missing_aigc_turn_ids = set(turns_by_id) - set(aigc_turn_ids)
+    if missing_aigc_turn_ids:
+        raise ValueError("AIGC results must cover every transcript turn")
 
 
 def _compute_total_score(score: InterviewScore) -> float:

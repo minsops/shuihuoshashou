@@ -36,7 +36,7 @@ as a local-first Python MVP:
   risk highlights, recommendations, and full interview transcripts.
 - Report building rejects mismatched score sessions, dimension names/weights, totals,
   recommendations, evidence turn ids, out-of-range evidence timestamps, non-transcript evidence
-  excerpts, or AIGC turn ids.
+  excerpts, incomplete/duplicate AIGC coverage, or unknown AIGC turn ids.
 - Report generation writes separate structured report JSON, HTML, PDF, and transcript JSON artifacts
   for audit and storage.
 - Interview context keeps an auditable fact-claim table for role, responsibility, technology, and

@@ -486,6 +486,29 @@ def test_gateway_report_build_rejects_mismatched_inputs(
     assert rejected_evidence_excerpt.status_code == 409
     assert "score evidence excerpt is not in turn answer" in rejected_evidence_excerpt.text
 
+    missing_aigc = client.post(
+        "/api/report/build",
+        json={
+            "context": interview["context"],
+            "score": score,
+            "aigc_results": [],
+        },
+    )
+    assert missing_aigc.status_code == 409
+    assert "AIGC results must cover every transcript turn" in missing_aigc.text
+
+    duplicate_aigc = [aigc_results[0], aigc_results[0]]
+    rejected_duplicate_aigc = client.post(
+        "/api/report/build",
+        json={
+            "context": interview["context"],
+            "score": score,
+            "aigc_results": duplicate_aigc,
+        },
+    )
+    assert rejected_duplicate_aigc.status_code == 409
+    assert "AIGC results must not contain duplicate turn_id values" in rejected_duplicate_aigc.text
+
     mismatched_aigc = [{**aigc_results[0], "turn_id": "missing-turn"}]
     rejected_aigc = client.post(
         "/api/report/build",
