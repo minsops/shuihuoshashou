@@ -102,7 +102,64 @@ def generate_competency_model(job_id: str, title: str, jd_text: str) -> Competen
         ),
     ]
     draft = get_llm_client().complete_json_sync(messages, CompetencyModel, fallback)
-    return draft.model_copy(update={"job_id": job_id, "job_title": title})
+    return _normalize_competency_model(draft, fallback, job_id=job_id, title=title)
+
+
+def _normalize_competency_model(
+    draft: CompetencyModel,
+    fallback: CompetencyModel,
+    *,
+    job_id: str,
+    title: str,
+) -> CompetencyModel:
+    draft_by_name = {item.name.strip(): item for item in draft.items if item.name.strip()}
+    default_names = {name for name, _, _ in DEFAULT_DIMENSIONS}
+    normalized: list[CompetencyItem] = []
+
+    for fallback_item in fallback.items:
+        draft_item = draft_by_name.get(fallback_item.name)
+        if draft_item is None:
+            normalized.append(fallback_item)
+            continue
+        normalized.append(
+            CompetencyItem(
+                name=fallback_item.name,
+                description=draft_item.description.strip() or fallback_item.description,
+                probe_patterns=_merge_patterns(
+                    draft_item.probe_patterns,
+                    fallback_item.probe_patterns,
+                ),
+                weight=fallback_item.weight,
+            )
+        )
+
+    for draft_item in draft.items:
+        name = draft_item.name.strip()
+        if not name or name in default_names:
+            continue
+        weight = draft_item.weight if math.isfinite(draft_item.weight) else 0.10
+        normalized.append(
+            CompetencyItem(
+                name=name,
+                description=draft_item.description.strip() or f"{name}相关岗位能力",
+                probe_patterns=_merge_patterns(
+                    draft_item.probe_patterns,
+                    [f"请围绕{name}追问一个可验证的具体案例。"],
+                ),
+                weight=max(0.0, min(1.0, weight)),
+            )
+        )
+
+    return CompetencyModel(job_id=job_id, job_title=title, items=normalized)
+
+
+def _merge_patterns(primary: list[str], fallback: list[str]) -> list[str]:
+    merged: list[str] = []
+    for pattern in [*primary, *fallback]:
+        cleaned = pattern.strip()
+        if cleaned and cleaned not in merged:
+            merged.append(cleaned)
+    return merged
 
 
 def fallback_competency_model(job_id: str, title: str, jd_text: str) -> CompetencyModel:

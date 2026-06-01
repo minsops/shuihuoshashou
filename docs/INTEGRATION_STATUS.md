@@ -29,7 +29,8 @@ The local implementation is complete as a runnable MVP:
 - Separate `qa_turns` persistence for auditable answer evidence.
 - JD knowledge base indexes competency-specific probe patterns with deterministic embeddings and optional pgvector nearest-neighbor search.
 - JD competency generation uses the shared LLM JSON client with `prompts/competency_gen.md` and
-  deterministic fallback.
+  deterministic fallback, then normalizes outputs to preserve required scoring dimensions and
+  weights.
 - Probe generation, scoring, AIGC/template checks, consistency checks, HTML/PDF report generation.
 - Internal HTTP-style contracts for standalone probe, AIGC detection, scoring, and report calls.
 - Scoring uses the shared LLM JSON client for structured dimension drafts, then normalizes evidence

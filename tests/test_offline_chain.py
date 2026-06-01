@@ -457,6 +457,12 @@ def test_competency_generation_uses_prompt_and_overrides_ids(monkeypatch) -> Non
                 description="验证设计和排障能力",
                 probe_patterns=["请讲一次线上故障的定位过程。"],
                 weight=1.0,
+            ),
+            CompetencyItem(
+                name="注水风险",
+                description="验证模板化回答和前后矛盾",
+                probe_patterns=["请追问回答中最像模板的细节。"],
+                weight=99.0,
             )
         ],
     )
@@ -475,7 +481,14 @@ def test_competency_generation_uses_prompt_and_overrides_ids(monkeypatch) -> Non
     assert "Python FastAPI" in sent_messages[1].content
     assert model.job_id == "job-local"
     assert model.job_title == "Backend"
-    assert model.items[0].name == "工程深度"
+    names = [item.name for item in model.items]
+    assert names[:5] == ["专业能力深度", "项目真实性", "岗位匹配度", "沟通与逻辑", "注水风险"]
+    assert names[-1] == "工程深度"
+    risk = next(item for item in model.items if item.name == "注水风险")
+    custom = next(item for item in model.items if item.name == "工程深度")
+    assert risk.weight == -0.10
+    assert "请追问回答中最像模板的细节。" in risk.probe_patterns
+    assert "请讲一次线上故障的定位过程。" in custom.probe_patterns
 
 
 def test_jd_kb_retrieves_relevant_probe_patterns(tmp_path: Path, monkeypatch) -> None:
