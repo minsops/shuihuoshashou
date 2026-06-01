@@ -28,6 +28,8 @@ The local implementation is complete as a runnable MVP:
 - Pydantic v2 shared schemas.
 - SQLite local persistence.
 - PostgreSQL core schema SQL for compose initialization.
+- PostgreSQL schema-level CHECK constraints enforce core state, timestamp, score, AIGC, report, and
+  consent invariants at the storage boundary.
 - Database URL dialect detection and runtime connection support for SQLite and PostgreSQL targets.
 - SQLite startup migrations backfill later realtime/report columns so older local demo databases stay usable.
 - Local SQLite service code validates interview/consent candidate references to match PostgreSQL

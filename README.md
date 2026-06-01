@@ -113,7 +113,10 @@ The compose gateway uses PostgreSQL by default through
 profile still defaults to SQLite for quick demos.
 
 PostgreSQL initializes from `db/postgres/001_core_schema.sql`, which declares the core jobs,
-candidates, interviews, turns, probe-pattern embeddings, scores, AIGC results, reports, and consent tables from the spec.
+candidates, interviews, turns, probe-pattern embeddings, scores, AIGC results, reports, and consent
+tables from the spec. The schema also applies CHECK constraints for interview states, turn
+timestamps, question sources, score ranges, AIGC probability/similarity ranges, recommendations, and
+behavior-signal consent type.
 The runtime adapter translates the local repository parameter style and upserts for PostgreSQL.
 Set `JD_VECTOR_BACKEND=pgvector` on PostgreSQL deployments with pgvector installed to apply
 `db/postgres/002_pgvector_probe_patterns.sql` and use `embedding_vector <=> query` nearest-neighbor

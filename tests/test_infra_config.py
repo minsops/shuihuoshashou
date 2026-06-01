@@ -102,3 +102,25 @@ def test_postgres_schema_matches_core_spec_tables() -> None:
     assert "REFERENCES jobs(id)" in schema
     assert "REFERENCES candidates(id)" in schema
     assert "REFERENCES interviews(id)" in schema
+
+
+def test_postgres_schema_enforces_core_contract_invariants() -> None:
+    schema = (ROOT / "db" / "postgres" / "001_core_schema.sql").read_text(encoding="utf-8")
+
+    for constraint in [
+        "status IN ('CREATED', 'IN_PROGRESS', 'FINISHED', 'SCORING', 'REPORTED')",
+        "ended_at IS NULL OR started_at IS NULL OR ended_at >= started_at",
+        "turn_index >= 0",
+        "question_source IN ('interviewer', 'ai_probe')",
+        "answer_start_ms >= 0",
+        "answer_end_ms >= answer_start_ms",
+        "jsonb_typeof(dimensions) = 'array' AND jsonb_array_length(dimensions) > 0",
+        "total_score >= 0 AND total_score <= 100",
+        "jsonb_typeof(risk_notes) = 'array'",
+        "recommendation IN ('strong_yes', 'yes', 'hold', 'no')",
+        "ai_generated_prob >= 0 AND ai_generated_prob <= 1",
+        "template_similarity >= 0 AND template_similarity <= 1",
+        "consent_type IN ('behavior_signal')",
+        "revoked_at IS NULL OR revoked_at >= granted_at",
+    ]:
+        assert constraint in schema
