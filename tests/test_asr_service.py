@@ -13,6 +13,8 @@ from services.asr_service.service import (
     HTTPASREngine,
     LocalSpeakerDiarizer,
     StubASREngine,
+    asr_session_manager,
+    configure_asr_runtime,
     get_asr_engine,
     get_speaker_diarizer,
 )
@@ -318,6 +320,22 @@ def test_get_speaker_diarizer_uses_http_provider(monkeypatch) -> None:
     get_settings.cache_clear()
 
     assert isinstance(get_speaker_diarizer(), HTTPSpeakerDiarizer)
+
+
+def test_configure_asr_runtime_reloads_speaker_diarizer_from_settings(monkeypatch) -> None:
+    monkeypatch.setenv("SPEAKER_DIARIZATION_PROVIDER", "http")
+    monkeypatch.setenv("SPEAKER_DIARIZATION_BASE_URL", "https://diarize.example.com")
+    get_settings.cache_clear()
+
+    configure_asr_runtime()
+
+    assert isinstance(asr_session_manager.speaker_diarizer, HTTPSpeakerDiarizer)
+
+    monkeypatch.setenv("SPEAKER_DIARIZATION_PROVIDER", "local")
+    get_settings.cache_clear()
+    configure_asr_runtime()
+
+    assert isinstance(asr_session_manager.speaker_diarizer, LocalSpeakerDiarizer)
 
 
 def test_get_speaker_diarizer_defaults_to_local(monkeypatch) -> None:

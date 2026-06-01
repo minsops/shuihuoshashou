@@ -24,6 +24,8 @@ The local implementation is complete as a runnable MVP:
   speaker continuity smoothing.
 - Speaker diarization is pluggable: local deterministic audio clusters for development, or an
   HTTP provider for production voice embedding / cloud diarization services.
+- Docker Compose forwards `SPEAKER_DIARIZATION_*` settings to the gateway, and gateway startup
+  reloads the ASR session diarizer from runtime configuration.
 - Separate `credibility` WebSocket event after probe generation.
 - Pydantic v2 shared schemas.
 - SQLite local persistence.

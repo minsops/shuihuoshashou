@@ -35,7 +35,7 @@ from libs.schemas import (
     TranscriptSegment,
 )
 from services.aigc_detect_service.service import detect_interview
-from services.asr_service.service import asr_session_manager, get_asr_engine
+from services.asr_service.service import asr_session_manager, configure_asr_runtime, get_asr_engine
 from services.interview_orchestrator.service import (
     add_turn,
     create_candidate,
@@ -87,6 +87,7 @@ TRUE_FINALITY_VALUES = {"1", "true", "yes", "on", "final", "finalized", "complet
 @asynccontextmanager
 async def lifespan(fastapi_app: FastAPI):
     configure_opentelemetry(fastapi_app, get_settings())
+    configure_asr_runtime()
     init_db()
     yield
 

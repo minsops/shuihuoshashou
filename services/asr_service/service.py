@@ -202,6 +202,12 @@ class ASRSessionManager:
             self._sessions.clear()
             self.speaker_diarizer.reset()
 
+    def configure_speaker_diarizer(self, speaker_diarizer: SpeakerDiarizer) -> None:
+        with self._lock:
+            self._sessions.clear()
+            self.speaker_diarizer.reset()
+            self.speaker_diarizer = speaker_diarizer
+
     def _smooth_speaker(
         self,
         state: ASRSessionState,
@@ -440,3 +446,7 @@ def get_speaker_diarizer() -> SpeakerDiarizer:
 
 
 asr_session_manager = ASRSessionManager(speaker_diarizer=get_speaker_diarizer())
+
+
+def configure_asr_runtime() -> None:
+    asr_session_manager.configure_speaker_diarizer(get_speaker_diarizer())

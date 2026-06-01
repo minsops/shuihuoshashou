@@ -19,6 +19,11 @@ def test_docker_compose_declares_required_infrastructure() -> None:
     assert "OBJECT_STORAGE_ENDPOINT: http://minio:9000" in compose
     assert "OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}" in compose
     assert "OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-shuihuo-killer-gateway}" in compose
+    assert "SPEAKER_DIARIZATION_PROVIDER: ${SPEAKER_DIARIZATION_PROVIDER:-local}" in compose
+    assert "SPEAKER_DIARIZATION_BASE_URL: ${SPEAKER_DIARIZATION_BASE_URL:-}" in compose
+    assert "SPEAKER_DIARIZATION_API_PATH: ${SPEAKER_DIARIZATION_API_PATH:-/diarize}" in compose
+    assert "SPEAKER_DIARIZATION_API_KEY: ${SPEAKER_DIARIZATION_API_KEY:-}" in compose
+    assert "SPEAKER_DIARIZATION_SPEAKER_PATH: ${SPEAKER_DIARIZATION_SPEAKER_PATH:-speaker}" in compose
     assert 'profiles: ["worker"]' in compose
     assert "services.offline_worker.celery_tasks:celery_app" in compose
     assert "CELERY_BROKER_URL: redis://redis:6379/1" in compose

@@ -223,7 +223,9 @@ timestamp ranges at API boundaries as well.
 Set `SPEAKER_DIARIZATION_PROVIDER=http`, `SPEAKER_DIARIZATION_BASE_URL`,
 `SPEAKER_DIARIZATION_API_PATH`, and `SPEAKER_DIARIZATION_API_KEY` to resolve unknown speakers through
 a production voice-clustering service. The expected response speaker path defaults to
-`SPEAKER_DIARIZATION_SPEAKER_PATH=speaker`.
+`SPEAKER_DIARIZATION_SPEAKER_PATH=speaker`. Docker Compose forwards the same
+`SPEAKER_DIARIZATION_*` variables to the gateway, and the gateway refreshes the ASR session
+diarizer from runtime settings during startup.
 
 Set `AIGC_DETECTOR_PROVIDER=http`, `AIGC_DETECTOR_BASE_URL`, `AIGC_DETECTOR_API_PATH`, and
 `AIGC_DETECTOR_API_KEY` to send each answer to an external AI-text detector. The local template
