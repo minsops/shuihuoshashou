@@ -31,6 +31,8 @@ The local implementation is complete as a runnable MVP:
 - Internal HTTP-style contracts for standalone probe, AIGC detection, scoring, and report calls.
 - Scoring uses the shared LLM JSON client for structured dimension drafts, then normalizes evidence
   and recomputes final totals in Python.
+- Scoring evidence is re-anchored to persisted turns so fabricated excerpts or out-of-range
+  timestamps from LLM drafts do not enter reports.
 - Runtime probe prompts are kept under `prompts/` and loaded by services instead of being embedded in code.
 - AIGC checks use a local corpus with character n-gram cosine similarity plus optional HTTP detector
   integration with deterministic local fallback.

@@ -385,6 +385,60 @@ def test_score_interview_uses_prompt_and_recomputes_total(monkeypatch) -> None:
     assert score.risk_notes == ["LLM draft risk"]
 
 
+def test_score_interview_normalizes_evidence_to_real_turns(monkeypatch) -> None:
+    model = generate_competency_model("job-local", "Backend", "Python FastAPI")
+    turn = QATurn(
+        question="讲项目",
+        answer="我负责 FastAPI 接口优化，延迟降低 30%。",
+        answer_start_ms=100,
+        answer_end_ms=1200,
+    )
+    ctx = InterviewContext(
+        session_id="session-local",
+        job_id=model.job_id,
+        candidate_id="candidate-local",
+        competency_model=model,
+        turns=[turn],
+    )
+    draft = InterviewScore(
+        session_id=ctx.session_id,
+        dimensions=[
+            DimensionScore(
+                dimension=item.name,
+                score=80.0,
+                weight=item.weight,
+                evidence=[
+                    EvidenceRef(
+                        turn_id=turn.turn_id,
+                        quote_start_ms=-500,
+                        quote_end_ms=999999,
+                        excerpt="LLM 编造的不存在原文",
+                    )
+                ],
+            )
+            for item in model.items
+        ],
+        total_score=80.0,
+        risk_notes=[],
+        recommendation="yes",
+    )
+
+    class FakeClient:
+        def complete_json_sync(self, messages, schema, fallback):
+            return draft
+
+    monkeypatch.setattr("services.scoring_service.service.get_llm_client", lambda: FakeClient())
+
+    score = score_interview(ctx, [])
+
+    for dimension in score.dimensions:
+        assert dimension.evidence
+        ref = dimension.evidence[0]
+        assert ref.excerpt == turn.answer
+        assert ref.quote_start_ms == turn.answer_start_ms
+        assert ref.quote_end_ms == turn.answer_end_ms
+
+
 def test_competency_generation_uses_prompt_and_overrides_ids(monkeypatch) -> None:
     sent_messages = []
     draft = CompetencyModel(

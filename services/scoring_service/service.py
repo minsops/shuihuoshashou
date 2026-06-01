@@ -5,7 +5,7 @@ from typing import Literal
 
 from libs.common.prompts import load_prompt
 from libs.llm_client import LLMMessage, get_llm_client
-from libs.schemas import AIGCResult, DimensionScore, EvidenceRef, InterviewContext, InterviewScore
+from libs.schemas import AIGCResult, DimensionScore, EvidenceRef, InterviewContext, InterviewScore, QATurn
 
 
 def _evidence_for_dimension(ctx: InterviewContext, dimension: str) -> list[EvidenceRef]:
@@ -123,11 +123,7 @@ def _normalize_score(
         if draft_dimension is None:
             normalized_dimensions.append(fallback_by_dimension[item.name])
             continue
-        evidence = [
-            ref
-            for ref in draft_dimension.evidence
-            if ref.turn_id in turns_by_id and ref.excerpt.strip()
-        ]
+        evidence = _normalize_evidence_refs(draft_dimension.evidence, turns_by_id)
         if not evidence:
             evidence = fallback_by_dimension[item.name].evidence
         normalized_dimensions.append(
@@ -147,6 +143,34 @@ def _normalize_score(
         risk_notes=draft.risk_notes or fallback.risk_notes,
         recommendation=_recommendation(total),
     )
+
+
+def _normalize_evidence_refs(
+    refs: list[EvidenceRef],
+    turns_by_id: dict[str, QATurn],
+) -> list[EvidenceRef]:
+    normalized: list[EvidenceRef] = []
+    for ref in refs:
+        turn = turns_by_id.get(ref.turn_id)
+        if turn is None or not ref.excerpt.strip():
+            continue
+        answer = turn.answer
+        excerpt = ref.excerpt.strip()
+        if excerpt not in answer:
+            excerpt = answer[:120]
+        answer_start_ms = turn.answer_start_ms
+        answer_end_ms = turn.answer_end_ms
+        quote_start_ms = max(answer_start_ms, min(ref.quote_start_ms, answer_end_ms))
+        quote_end_ms = max(quote_start_ms, min(ref.quote_end_ms, answer_end_ms))
+        normalized.append(
+            EvidenceRef(
+                turn_id=ref.turn_id,
+                quote_start_ms=quote_start_ms,
+                quote_end_ms=quote_end_ms,
+                excerpt=excerpt,
+            )
+        )
+    return normalized
 
 
 def _compute_total_score(dimensions: list[DimensionScore]) -> float:
