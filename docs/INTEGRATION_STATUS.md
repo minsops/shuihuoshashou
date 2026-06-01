@@ -48,6 +48,7 @@ The local implementation is complete as a runnable MVP:
 - State guards prevent scoring before `FINISHED` and prevent turn edits or restarts after reporting.
 - Local task queue boundary for offline scoring with Redis Streams task publication and worker consumption.
 - Optional Celery task publication and worker registration for `interview.offline_scoring`.
+- Docker Compose includes an optional `worker` profile for running the Celery offline-scoring worker.
 - Configurable async end-interview mode returns queued task metadata while workers generate reports.
 - Async end-interview advances queued interviews to `SCORING` and rejects duplicate queueing.
 - In-memory event bus topics for `qa_turn.created`, `interview.finished`,

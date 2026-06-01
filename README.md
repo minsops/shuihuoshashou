@@ -88,6 +88,12 @@ PostgreSQL, Redis, and S3-compatible MinIO.
 docker compose up --build
 ```
 
+To run the optional Celery offline-scoring worker in the same compose stack:
+
+```bash
+OFFLINE_TASK_BACKEND=celery OFFLINE_TASK_EXECUTION=async docker compose --profile worker up --build
+```
+
 The compose gateway uses PostgreSQL by default through
 `postgresql://shuihuo:shuihuo_local@postgres:5432/shuihuo_killer`, while the non-Docker local
 profile still defaults to SQLite for quick demos.

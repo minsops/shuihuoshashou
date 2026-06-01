@@ -52,6 +52,44 @@ services:
       timeout: 3s
       retries: 6
 
+  offline-worker:
+    build: .
+    profiles: ["worker"]
+    command: ["celery", "-A", "services.offline_worker.celery_tasks:celery_app", "worker", "--loglevel=info"]
+    environment:
+      APP_ENV: docker
+      DATABASE_URL: postgresql://shuihuo:shuihuo_local@postgres:5432/shuihuo_killer
+      REDIS_URL: redis://redis:6379/0
+      OFFLINE_TASK_BACKEND: celery
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      OBJECT_STORAGE_ENDPOINT: http://minio:9000
+      OBJECT_STORAGE_BUCKET: shuihuo-killer
+      OBJECT_STORAGE_ACCESS_KEY: minioadmin
+      OBJECT_STORAGE_SECRET_KEY: minioadmin
+      OBJECT_STORAGE_REGION: us-east-1
+      REPORT_DIR: /app/data/reports
+      LLM_PROVIDER: ${LLM_PROVIDER:-mock}
+      LLM_MODEL: ${LLM_MODEL:-mimo-v2.5-pro}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://token-plan-cn.xiaomimimo.com/v1}
+      LLM_API_PATH: ${LLM_API_PATH:-/chat/completions}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_AUTH_HEADER: ${LLM_AUTH_HEADER:-api-key}
+      LLM_AUTH_SCHEME: ${LLM_AUTH_SCHEME:-}
+      LLM_RESPONSE_CONTENT_PATH: ${LLM_RESPONSE_CONTENT_PATH:-choices.0.message.content}
+      LLM_EXTRA_BODY_JSON: ${LLM_EXTRA_BODY_JSON:-}
+      REDIS_STREAM_PREFIX: ${REDIS_STREAM_PREFIX:-shuihuo}
+      JD_VECTOR_BACKEND: ${JD_VECTOR_BACKEND:-local}
+    volumes:
+      - app-data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+
   postgres:
     image: postgres:16-alpine
     environment:
