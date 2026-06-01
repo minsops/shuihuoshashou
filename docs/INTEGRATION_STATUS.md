@@ -53,6 +53,7 @@ The local implementation is complete as a runnable MVP:
 - In-memory event bus topics for `qa_turn.created`, `interview.finished`,
   `task.enqueued`, `interview.scoring_started`, `interview.reported`, and `task.completed`.
 - Behavior signal module with explicit administrator enablement and candidate consent gates.
+- BehaviorSignal schema forbids extra personality, emotion, reliability, or similar derived fields.
 - Candidate behavior-signal consent can be revoked and blocks future signal-enabled interviews.
 - Realtime signal emission re-checks active consent, so revoked consent suppresses later WS hints.
 - Configurable LLM client with mock mode and OpenAI-compatible HTTP mode.

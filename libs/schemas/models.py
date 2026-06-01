@@ -5,7 +5,7 @@ from enum import Enum
 from typing import Literal
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 def new_id() -> str:
@@ -150,6 +150,8 @@ class AIGCResult(BaseModel):
 
 
 class BehaviorSignal(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     turn_id: str
     fluency: float = Field(ge=0.0, le=1.0)
     hesitation: float = Field(ge=0.0, le=1.0)
