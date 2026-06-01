@@ -410,6 +410,32 @@ def test_gateway_report_build_rejects_mismatched_inputs(
     assert rejected_evidence.status_code == 409
     assert "score evidence references unknown turn_id" in rejected_evidence.text
 
+    out_of_range_evidence = json.loads(json.dumps(score))
+    out_of_range_evidence["dimensions"][0]["evidence"][0]["quote_end_ms"] = 999999
+    rejected_evidence_range = client.post(
+        "/api/report/build",
+        json={
+            "context": interview["context"],
+            "score": out_of_range_evidence,
+            "aigc_results": aigc_results,
+        },
+    )
+    assert rejected_evidence_range.status_code == 409
+    assert "score evidence timestamp is outside turn range" in rejected_evidence_range.text
+
+    wrong_excerpt_evidence = json.loads(json.dumps(score))
+    wrong_excerpt_evidence["dimensions"][0]["evidence"][0]["excerpt"] = "不存在于回答里的片段"
+    rejected_evidence_excerpt = client.post(
+        "/api/report/build",
+        json={
+            "context": interview["context"],
+            "score": wrong_excerpt_evidence,
+            "aigc_results": aigc_results,
+        },
+    )
+    assert rejected_evidence_excerpt.status_code == 409
+    assert "score evidence excerpt is not in turn answer" in rejected_evidence_excerpt.text
+
     mismatched_aigc = [{**aigc_results[0], "turn_id": "missing-turn"}]
     rejected_aigc = client.post(
         "/api/report/build",

@@ -284,13 +284,23 @@ def _validate_report_inputs(
 ) -> None:
     if score.session_id != ctx.session_id:
         raise ValueError("score session_id must match interview context session_id")
-    turn_ids = {turn.turn_id for turn in ctx.turns}
-    if not turn_ids:
+    turns_by_id = {turn.turn_id: turn for turn in ctx.turns}
+    if not turns_by_id:
         raise ValueError("report requires at least one transcript turn")
     for dimension in score.dimensions:
         for evidence in dimension.evidence:
-            if evidence.turn_id not in turn_ids:
+            turn = turns_by_id.get(evidence.turn_id)
+            if turn is None:
                 raise ValueError(f"score evidence references unknown turn_id: {evidence.turn_id}")
+            if (
+                evidence.quote_start_ms < turn.answer_start_ms
+                or evidence.quote_end_ms > turn.answer_end_ms
+            ):
+                raise ValueError(
+                    f"score evidence timestamp is outside turn range: {evidence.turn_id}"
+                )
+            if evidence.excerpt not in turn.answer:
+                raise ValueError(f"score evidence excerpt is not in turn answer: {evidence.turn_id}")
     for result in aigc:
-        if result.turn_id not in turn_ids:
+        if result.turn_id not in turns_by_id:
             raise ValueError(f"AIGC result references unknown turn_id: {result.turn_id}")

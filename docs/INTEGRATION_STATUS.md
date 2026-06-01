@@ -55,7 +55,8 @@ The local implementation is complete as a runnable MVP:
   statements, and consistency checks run against that fact table.
 - Structured JSON and HTML/PDF reports include highlights, radar charts, AIGC risk highlights,
   recommendation, and the full interview transcript.
-- Report input validation rejects score/session mismatches and unknown EvidenceRef or AIGC turn ids.
+- Report input validation rejects score/session mismatches, unknown EvidenceRef/AIGC turn ids,
+  out-of-range evidence timestamps, and evidence excerpts not present in the transcript answer.
 - Report artifacts support local `file://` storage and SigV4 uploads to S3-compatible storage for
   structured report JSON, HTML, PDF, and transcript JSON outputs.
 - Gateway exposes report JSON, HTML, PDF, and transcript JSON artifact endpoints.
