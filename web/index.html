@@ -124,6 +124,17 @@
         gap: 8px;
       }
 
+      .full-width {
+        grid-column: 1 / -1;
+      }
+
+      .live-grid {
+        display: grid;
+        grid-template-columns: minmax(320px, 0.8fr) minmax(420px, 1.2fr);
+        gap: 16px;
+        padding: 16px;
+      }
+
       button,
       a.button {
         display: inline-flex;
@@ -218,9 +229,32 @@
         text-align: center;
       }
 
+      .feed {
+        display: grid;
+        align-content: start;
+        gap: 10px;
+        min-height: 360px;
+        max-height: 560px;
+        overflow: auto;
+      }
+
+      .event {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px 12px;
+        background: #fbfcfe;
+      }
+
+      .event strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 13px;
+      }
+
       @media (max-width: 900px) {
         main,
-        .score {
+        .score,
+        .live-grid {
           grid-template-columns: 1fr;
         }
       }
@@ -270,12 +304,66 @@
           <div class="empty">提交一段问答后，这里会显示评分、风险点和报告链接。</div>
         </div>
       </section>
+      <section class="full-width">
+        <div class="panel-head">
+          <h2>实时追问</h2>
+          <span class="muted" id="liveStatus">未连接</span>
+        </div>
+        <div class="live-grid">
+          <form id="liveForm">
+            <label>
+              岗位名称
+              <input name="live_job_title" value="AI 后端工程师" required />
+            </label>
+            <label>
+              JD 文本
+              <textarea name="live_jd_text" required>Python FastAPI LLM 可靠性 项目决策 指标复盘</textarea>
+            </label>
+            <label>
+              候选人
+              <input name="live_candidate_name" value="候选人B" required />
+            </label>
+            <label>
+              候选人回答
+              <textarea name="live_answer" required>我主要负责优化项目架构，做了很多可靠性提升，最终效果比较明显。</textarea>
+            </label>
+            <div class="toolbar">
+              <button type="submit" id="liveConnect">开始</button>
+              <button class="secondary" type="button" id="sendTurn" disabled>发送回答</button>
+              <button class="secondary" type="button" id="manualProbe" disabled>手动追问</button>
+              <button class="secondary" type="button" id="endLive" disabled>结束</button>
+            </div>
+          </form>
+          <div class="feed" id="liveFeed">
+            <div class="empty">开始后，转写、追问卡、可信度和报告会显示在这里。</div>
+          </div>
+        </div>
+      </section>
     </main>
     <script>
       const turns = document.querySelector("#turns");
       const results = document.querySelector("#results");
       const links = document.querySelector("#links");
       const submit = document.querySelector("#submit");
+      const liveForm = document.querySelector("#liveForm");
+      const liveFeed = document.querySelector("#liveFeed");
+      const liveStatus = document.querySelector("#liveStatus");
+      const liveConnectButton = document.querySelector("#liveConnect");
+      const sendTurnButton = document.querySelector("#sendTurn");
+      const manualProbeButton = document.querySelector("#manualProbe");
+      const endLiveButton = document.querySelector("#endLive");
+      let liveSocket = null;
+      let liveInterviewId = "";
+      let liveSeq = 1;
+
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+      }
 
       function addTurn(question = "", answer = "") {
         const index = turns.children.length + 1;
@@ -321,21 +409,21 @@
           .map(
             (d) => `
               <tr>
-                <td>${d.dimension}</td>
-                <td>${d.score}</td>
-                <td>${d.weight}</td>
-                <td>${d.evidence.map((e) => e.excerpt).join("<br>")}</td>
+                <td>${escapeHtml(d.dimension)}</td>
+                <td>${escapeHtml(d.score)}</td>
+                <td>${escapeHtml(d.weight)}</td>
+                <td>${d.evidence.map((e) => escapeHtml(e.excerpt)).join("<br>")}</td>
               </tr>`
           )
           .join("");
         const risks =
           score.risk_notes.length > 0
-            ? score.risk_notes.map((note) => `<p class="risk">${note}</p>`).join("")
+            ? score.risk_notes.map((note) => `<p class="risk">${escapeHtml(note)}</p>`).join("")
             : '<p class="muted">暂无高置信风险点。</p>';
         results.innerHTML = `
           <div class="score">
-            <div class="score-main"><strong>${score.total_score}</strong><span class="muted">${score.recommendation}</span></div>
-            <div class="summary"><strong>总评</strong><span>${report.summary}</span></div>
+            <div class="score-main"><strong>${escapeHtml(score.total_score)}</strong><span class="muted">${escapeHtml(score.recommendation)}</span></div>
+            <div class="summary"><strong>总评</strong><span>${escapeHtml(report.summary)}</span></div>
           </div>
           <div>${risks}</div>
           <table>
@@ -345,8 +433,130 @@
         `;
       }
 
+      function appendLiveEvent(title, body, tone = "") {
+        if (liveFeed.querySelector(".empty")) liveFeed.innerHTML = "";
+        const node = document.createElement("div");
+        node.className = `event ${tone}`;
+        node.innerHTML = `<strong>${escapeHtml(title)}</strong><div>${body}</div>`;
+        liveFeed.prepend(node);
+      }
+
+      async function createLiveInterview(form) {
+        const job = await postJson("/api/jobs", {
+          title: form.live_job_title.value,
+          jd_text: form.live_jd_text.value,
+        });
+        const candidate = await postJson("/api/candidates", {
+          name: form.live_candidate_name.value,
+          resume_text: "",
+        });
+        return postJson("/api/interviews", {
+          job_id: job.id,
+          candidate_id: candidate.id,
+        });
+      }
+
+      async function postJson(url, payload) {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) throw new Error(await response.text());
+        return response.json();
+      }
+
+      function setLiveConnected(connected) {
+        liveStatus.textContent = connected ? `已连接 ${liveInterviewId}` : "未连接";
+        liveConnectButton.disabled = connected;
+        sendTurnButton.disabled = !connected;
+        manualProbeButton.disabled = !connected;
+        endLiveButton.disabled = !connected;
+      }
+
+      function openLiveSocket(interviewId) {
+        const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+        liveSocket = new WebSocket(`${protocol}://${window.location.host}/ws/interview/${interviewId}`);
+        liveSocket.addEventListener("open", () => {
+          setLiveConnected(true);
+          appendLiveEvent("连接", "实时通道已打开。");
+        });
+        liveSocket.addEventListener("close", () => {
+          setLiveConnected(false);
+          appendLiveEvent("连接", "实时通道已关闭。");
+        });
+        liveSocket.addEventListener("message", (event) => renderLiveMessage(JSON.parse(event.data)));
+      }
+
+      function renderLiveMessage(message) {
+        if (message.type === "transcript") {
+          appendLiveEvent(
+            "转写",
+            `${escapeHtml(message.payload.speaker)} · ${escapeHtml(message.payload.text)}`
+          );
+        } else if (message.type === "probe") {
+          const cards = message.payload.suggestions
+            .map((item) => `<p>${escapeHtml(item.priority)}. ${escapeHtml(item.question)}<br><span class="muted">${escapeHtml(item.target)} · ${escapeHtml(item.competency)}</span></p>`)
+            .join("");
+          appendLiveEvent("追问卡", cards);
+        } else if (message.type === "credibility") {
+          appendLiveEvent(
+            "可信度",
+            `${escapeHtml(message.payload.level)} · ${escapeHtml(message.payload.reason)}<br><span class="muted">${escapeHtml(message.payload.drill_down_hint)}</span>`
+          );
+        } else if (message.type === "signal") {
+          appendLiveEvent(
+            "行为信号",
+            `fluency ${escapeHtml(message.payload.fluency)} · hesitation ${escapeHtml(message.payload.hesitation)}`
+          );
+        } else if (message.type === "asr_warning") {
+          appendLiveEvent("ASR", escapeHtml(message.payload.reason), "risk");
+        } else if (message.type === "report") {
+          const id = message.payload.interview_id;
+          appendLiveEvent(
+            "报告",
+            `<a class="button secondary" href="/api/interviews/${id}/report.html" target="_blank">HTML</a> <a class="button secondary" href="/api/interviews/${id}/report.pdf" target="_blank">PDF</a>`
+          );
+        } else if (message.type === "error") {
+          appendLiveEvent("错误", escapeHtml(message.detail || "unknown error"), "risk");
+        }
+      }
+
+      function sendLiveTurn(manual = false) {
+        if (!liveSocket || liveSocket.readyState !== WebSocket.OPEN) return;
+        const answer = liveForm.live_answer.value;
+        liveSocket.send(
+          JSON.stringify(
+            manual
+              ? { type: "manual_probe", answer }
+              : { type: "text_turn", seq: liveSeq++, answer, speaker: "candidate" }
+          )
+        );
+      }
+
       document.querySelector("#addTurn").addEventListener("click", () => addTurn());
       document.querySelector("#loadSample").addEventListener("click", loadSample);
+      liveForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        liveConnectButton.disabled = true;
+        try {
+          const interview = await createLiveInterview(event.currentTarget);
+          liveInterviewId = interview.id;
+          liveSeq = 1;
+          liveFeed.innerHTML = "";
+          openLiveSocket(liveInterviewId);
+        } catch (error) {
+          appendLiveEvent("错误", escapeHtml(error), "risk");
+          liveConnectButton.disabled = false;
+        }
+      });
+      sendTurnButton.addEventListener("click", () => sendLiveTurn(false));
+      manualProbeButton.addEventListener("click", () => sendLiveTurn(true));
+      endLiveButton.addEventListener("click", () => {
+        if (liveSocket && liveSocket.readyState === WebSocket.OPEN) {
+          liveSocket.send(JSON.stringify({ type: "end" }));
+        }
+      });
       document.querySelector("#evaluateForm").addEventListener("submit", async (event) => {
         event.preventDefault();
         submit.disabled = true;

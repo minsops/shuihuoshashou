@@ -106,6 +106,9 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert response.status_code == 200
     assert "水货杀手" in response.text
     assert "/api/offline/evaluate" in response.text
+    assert "实时追问" in response.text
+    assert "/ws/interview/" in response.text
+    assert "asr_warning" in response.text
 
 
 def test_gateway_config_status_hides_secrets(tmp_path: Path, monkeypatch) -> None:
