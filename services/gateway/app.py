@@ -267,6 +267,11 @@ def _event_channel(event: dict) -> str | None:
     return None
 
 
+def _event_session_mismatch(interview_id: str, event: dict) -> bool:
+    session_id = str(event.get("session_id", "")).strip()
+    return bool(session_id and session_id != interview_id)
+
+
 def _channel_aliases(raw: str) -> set[str]:
     return {item.strip().lower() for item in raw.split(",") if item.strip()}
 
@@ -449,6 +454,11 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
             event = await websocket.receive_json()
             if event.get("type") == "audio_chunk":
                 seq = int(event.get("seq", 0))
+                if _event_session_mismatch(interview_id, event):
+                    await websocket.send_json(
+                        {"type": "asr_warning", "payload": {"reason": "session_id_mismatch", "seq": seq}}
+                    )
+                    continue
                 audio_b64 = event.get("audio", "")
                 if not _valid_audio_b64(audio_b64):
                     await websocket.send_json(

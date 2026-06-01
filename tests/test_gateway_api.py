@@ -732,6 +732,37 @@ def test_gateway_websocket_rejects_invalid_audio_base64(
     assert report["payload"]["transcript"] == []
 
 
+def test_gateway_websocket_rejects_mismatched_audio_session(
+    tmp_path: Path, monkeypatch
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+    audio = base64.b64encode("我负责 FastAPI 编排和重试。".encode("utf-8")).decode("ascii")
+
+    with client.websocket_connect(f"/ws/interview/{interview['id']}") as websocket:
+        websocket.send_json(
+            {
+                "type": "audio_chunk",
+                "session_id": "other-session",
+                "seq": 7,
+                "audio": audio,
+                "speaker": "candidate",
+            }
+        )
+        warning = websocket.receive_json()
+        websocket.send_json({"type": "end"})
+        report = websocket.receive_json()
+
+    assert warning["type"] == "asr_warning"
+    assert warning["payload"] == {"reason": "session_id_mismatch", "seq": 7}
+    assert report["payload"]["transcript"] == []
+
+
 def test_gateway_websocket_maps_audio_channel_to_speaker(tmp_path: Path, monkeypatch) -> None:
     client = _client(tmp_path, monkeypatch)
     job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()

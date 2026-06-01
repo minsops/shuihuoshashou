@@ -170,6 +170,8 @@ to `candidate`. Only final candidate segments trigger a probe. Downstream events
 with the same sequence are deduplicated and returned as `asr_warning` events instead of triggering
 duplicate probe generation. When ASR returns `unknown` speaker, the session manager first tries to
 resolve it from a previously observed local audio cluster, then falls back to short-gap continuity.
+If an `audio_chunk` includes a `session_id`, it must match the WebSocket interview id; mismatches are
+returned as `asr_warning` events and skipped.
 Invalid or empty `audio_chunk.audio` payloads are rejected with `asr_warning` instead of being
 converted into placeholder transcripts.
 Tune `PROBE_MIN_ANSWER_CHARS` and `PROBE_MIN_INTERVAL_MS` to control when candidate final segments
