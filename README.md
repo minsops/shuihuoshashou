@@ -140,10 +140,11 @@ processes through Redis. Local development uses the in-memory backend by default
 
 HTTP responses include `X-Request-ID` and W3C `traceparent`; clients may send the same headers to
 correlate API calls, structured JSON logs, and Prometheus request metrics. Set
-`OTEL_EXPORTER_OTLP_ENDPOINT` when deploying behind an OpenTelemetry collector; the current local
-runtime emits trace-compatible IDs without requiring the SDK. The metrics endpoint also exposes
-domain/task event counters such as `task.enqueued`, `task.completed`, `task.failed`,
-`task.worker_failed`, `interview.finished`, and `interview.reported` for the offline scoring path.
+`OTEL_EXPORTER_OTLP_ENDPOINT` and install the `.[otel]` extra when deploying behind an
+OpenTelemetry collector; Docker images include that extra and instrument the FastAPI gateway when
+the endpoint is configured. The metrics endpoint also exposes domain/task event counters such as
+`task.enqueued`, `task.completed`, `task.failed`, `task.worker_failed`, `interview.finished`, and
+`interview.reported` for the offline scoring path.
 
 Check runtime configuration without exposing secrets:
 
@@ -154,9 +155,9 @@ LLM_API_KEY=your-key python scripts/diagnose_llm_auth.py
 curl -s http://127.0.0.1:8000/api/config/status
 ```
 
-`/api/config/status` reports non-secret provider paths, response mapping paths, timeout values, and
-whether secrets are configured, but never returns API keys. Database URLs are returned with passwords
-redacted.
+`/api/config/status` reports non-secret provider paths, response mapping paths, timeout values,
+OTLP exporter presence, and whether secrets are configured, but never returns API keys. Database
+URLs are returned with passwords redacted.
 
 When `GATEWAY_API_KEY` is set, include `X-API-Key` or a bearer token on API requests. WebSocket
 clients can pass the same key in headers or as `?api_key=...`.

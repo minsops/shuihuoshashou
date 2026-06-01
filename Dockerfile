@@ -22,7 +22,7 @@ COPY prompts ./prompts
 COPY scripts ./scripts
 COPY web ./web
 
-RUN pip install --no-cache-dir -e ".[postgres,redis,celery]"
+RUN pip install --no-cache-dir -e ".[postgres,redis,celery,otel]"
 
 EXPOSE 8000
 

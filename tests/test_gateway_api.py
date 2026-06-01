@@ -150,6 +150,8 @@ def test_gateway_config_status_hides_secrets(tmp_path: Path, monkeypatch) -> Non
     assert response.status_code == 200
     payload = response.json()
     assert payload["database_url"].startswith("sqlite:///")
+    assert payload["otel_exporter_otlp_configured"] is False
+    assert payload["otel_service_name"] == "shuihuo-killer-gateway"
     assert payload["llm_api_key_configured"] is True
     assert payload["llm_max_retries"] == 1
     assert payload["llm_rate_limit_enabled"] is False

@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     app_env: str = "local"
     gateway_api_key: str = ""
     database_url: str = "sqlite:///data/shuihuo_killer.db"
+    otel_exporter_otlp_endpoint: str = ""
+    otel_service_name: str = "shuihuo-killer-gateway"
     llm_provider: str = "mock"
     llm_model: str = "mimo-v2.5-pro"
     llm_base_url: str = "https://token-plan-cn.xiaomimimo.com/v1"

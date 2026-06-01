@@ -94,6 +94,8 @@ The local implementation is complete as a runnable MVP:
   failure events.
 - Structured JSON request logs with propagated `X-Request-ID` correlation IDs.
 - W3C `traceparent` propagation with trace/span IDs included in request logs.
+- Optional OpenTelemetry OTLP HTTP tracing is wired into the FastAPI gateway when
+  `OTEL_EXPORTER_OTLP_ENDPOINT` is configured and the `otel` extra is installed.
 - Optional per-client gateway rate limit gate with local and Redis-backed counter modes.
 - Docker Compose entrypoint for gateway, PostgreSQL-backed persistence, Redis, and MinIO.
 

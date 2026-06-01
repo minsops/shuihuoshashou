@@ -20,6 +20,8 @@ TRACEPARENT_RE = re.compile(
     r"(?P<span_id>[0-9a-f]{16})-"
     r"(?P<flags>[0-9a-f]{2})$"
 )
+_otel_lock = Lock()
+_otel_configured = False
 
 
 def _label_value(value: str) -> str:
@@ -57,6 +59,61 @@ def trace_context_from_header(value: str | None) -> TraceContext:
 def log_event(event: str, **fields: object) -> None:
     payload = {"event": event, **fields}
     logger.info(json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str))
+
+
+@dataclass(frozen=True)
+class OpenTelemetryConfigResult:
+    enabled: bool
+    reason: str
+
+
+def configure_opentelemetry(app: object, settings: Settings) -> OpenTelemetryConfigResult:
+    global _otel_configured
+
+    if not settings.otel_exporter_otlp_endpoint:
+        return OpenTelemetryConfigResult(enabled=False, reason="endpoint_not_configured")
+
+    with _otel_lock:
+        if _otel_configured:
+            return OpenTelemetryConfigResult(enabled=True, reason="already_configured")
+
+        try:
+            from opentelemetry import trace
+            from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+            from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+            from opentelemetry.sdk.resources import Resource
+            from opentelemetry.sdk.trace import TracerProvider
+            from opentelemetry.sdk.trace.export import BatchSpanProcessor
+        except ImportError as exc:
+            log_event(
+                "otel.configure.skipped",
+                reason="missing_optional_dependencies",
+                error=str(exc),
+                endpoint_configured=True,
+            )
+            return OpenTelemetryConfigResult(
+                enabled=False,
+                reason="missing_optional_dependencies",
+            )
+
+        resource = Resource.create(
+            {
+                "service.name": settings.otel_service_name,
+                "deployment.environment": settings.app_env,
+            }
+        )
+        provider = TracerProvider(resource=resource)
+        exporter = OTLPSpanExporter(endpoint=settings.otel_exporter_otlp_endpoint)
+        provider.add_span_processor(BatchSpanProcessor(exporter))
+        trace.set_tracer_provider(provider)
+        FastAPIInstrumentor.instrument_app(app, tracer_provider=provider)
+        _otel_configured = True
+        log_event(
+            "otel.configure.enabled",
+            service_name=settings.otel_service_name,
+            endpoint_configured=True,
+        )
+        return OpenTelemetryConfigResult(enabled=True, reason="configured")
 
 
 @dataclass

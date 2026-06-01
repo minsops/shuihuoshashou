@@ -6,6 +6,8 @@ services:
     environment:
       APP_ENV: docker
       DATABASE_URL: postgresql://shuihuo:shuihuo_local@postgres:5432/shuihuo_killer
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-shuihuo-killer-gateway}
       REDIS_URL: redis://redis:6379/0
       OBJECT_STORAGE_ENDPOINT: http://minio:9000
       OBJECT_STORAGE_BUCKET: shuihuo-killer

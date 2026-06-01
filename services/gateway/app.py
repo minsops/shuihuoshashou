@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Res
 from libs.common.config import get_settings
 from libs.common.database import init_db
 from libs.common.observability import (
+    configure_opentelemetry,
     get_rate_limiter,
     log_event,
     metrics_registry,
@@ -84,7 +85,8 @@ TRUE_FINALITY_VALUES = {"1", "true", "yes", "on", "final", "finalized", "complet
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI):
+async def lifespan(fastapi_app: FastAPI):
+    configure_opentelemetry(fastapi_app, get_settings())
     init_db()
     yield
 

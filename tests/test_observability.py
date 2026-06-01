@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from libs.common.observability import RedisFixedWindowRateLimiter
+import builtins
+
+from libs.common.config import Settings
+from libs.common.observability import RedisFixedWindowRateLimiter, configure_opentelemetry
 
 
 class FakeRedis:
@@ -53,3 +56,29 @@ def test_redis_rate_limiter_starts_new_window() -> None:
     assert limiter.check("client-1", now=61).allowed is True
 
     assert set(client.values) == {"test:limit:client-1:0", "test:limit:client-1:1"}
+
+
+def test_configure_opentelemetry_skips_without_endpoint() -> None:
+    settings = Settings(otel_exporter_otlp_endpoint="")
+
+    result = configure_opentelemetry(object(), settings)
+
+    assert result.enabled is False
+    assert result.reason == "endpoint_not_configured"
+
+
+def test_configure_opentelemetry_skips_when_optional_dependencies_missing(monkeypatch) -> None:
+    settings = Settings(otel_exporter_otlp_endpoint="http://collector:4318/v1/traces")
+    real_import = builtins.__import__
+
+    def fake_import(name, globals_=None, locals_=None, fromlist=(), level=0):
+        if name == "opentelemetry" or name.startswith("opentelemetry."):
+            raise ImportError("blocked in test")
+        return real_import(name, globals_, locals_, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+
+    result = configure_opentelemetry(object(), settings)
+
+    assert result.enabled is False
+    assert result.reason == "missing_optional_dependencies"

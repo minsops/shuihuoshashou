@@ -11,6 +11,8 @@ class RuntimeStatus(BaseModel):
     app_env: str
     gateway_auth_enabled: bool
     database_url: str
+    otel_exporter_otlp_configured: bool
+    otel_service_name: str
     llm_provider: str
     llm_model: str
     llm_base_url_configured: bool
@@ -75,6 +77,8 @@ def get_runtime_status() -> RuntimeStatus:
         app_env=settings.app_env,
         gateway_auth_enabled=bool(settings.gateway_api_key),
         database_url=_redact_database_url(settings.database_url),
+        otel_exporter_otlp_configured=bool(settings.otel_exporter_otlp_endpoint),
+        otel_service_name=settings.otel_service_name,
         llm_provider=settings.llm_provider,
         llm_model=settings.llm_model,
         llm_base_url_configured=bool(settings.llm_base_url),

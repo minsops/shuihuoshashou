@@ -17,6 +17,8 @@ def test_docker_compose_declares_required_infrastructure() -> None:
     assert "DATABASE_URL: postgresql://shuihuo:shuihuo_local@postgres:5432/shuihuo_killer" in compose
     assert "REDIS_URL: redis://redis:6379/0" in compose
     assert "OBJECT_STORAGE_ENDPOINT: http://minio:9000" in compose
+    assert "OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}" in compose
+    assert "OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-shuihuo-killer-gateway}" in compose
     assert 'profiles: ["worker"]' in compose
     assert "services.offline_worker.celery_tasks:celery_app" in compose
     assert "CELERY_BROKER_URL: redis://redis:6379/1" in compose
@@ -29,7 +31,7 @@ def test_dockerfile_packages_gateway_app() -> None:
     dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
 
     assert "FROM python:3.11-slim" in dockerfile
-    assert 'pip install --no-cache-dir -e ".[postgres,redis,celery]"' in dockerfile
+    assert 'pip install --no-cache-dir -e ".[postgres,redis,celery,otel]"' in dockerfile
     assert "uvicorn" in dockerfile
     assert "services.gateway.app:app" in dockerfile
 
@@ -39,6 +41,9 @@ def test_pyproject_declares_optional_worker_dependencies() -> None:
 
     assert 'redis = ["redis>=5.0.0"]' in pyproject
     assert 'celery = ["celery[redis]>=5.3.0"]' in pyproject
+    assert "opentelemetry-sdk>=1.26.0" in pyproject
+    assert "opentelemetry-exporter-otlp-proto-http>=1.26.0" in pyproject
+    assert "opentelemetry-instrumentation-fastapi>=0.47b0" in pyproject
 
 
 def test_env_example_lists_runtime_integration_knobs() -> None:
@@ -52,6 +57,7 @@ def test_env_example_lists_runtime_integration_knobs() -> None:
         "LLM_RATE_LIMIT_ENABLED=",
         "LLM_RATE_LIMIT_REQUESTS_PER_MINUTE=",
         "OTEL_EXPORTER_OTLP_ENDPOINT=",
+        "OTEL_SERVICE_NAME=",
         "SPEAKER_DIARIZATION_PROVIDER=",
         "SPEAKER_DIARIZATION_BASE_URL=",
         "OFFLINE_TASK_EXECUTION=",
