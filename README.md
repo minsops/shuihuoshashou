@@ -145,7 +145,7 @@ Set `RATE_LIMIT_BACKEND=redis` and install `.[redis]` to share gateway rate-limi
 processes through Redis. Local development uses the in-memory backend by default.
 
 HTTP responses include `X-Request-ID` and W3C `traceparent`; clients may send the same headers to
-correlate API calls, structured JSON logs, and Prometheus request metrics. Set
+correlate API calls, structlog-rendered JSON logs, and Prometheus request metrics. Set
 `OTEL_EXPORTER_OTLP_ENDPOINT` and install the `.[otel]` extra when deploying behind an
 OpenTelemetry collector; Docker images include that extra and instrument the FastAPI gateway when
 the endpoint is configured. The metrics endpoint also exposes domain/task event counters such as

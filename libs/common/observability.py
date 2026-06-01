@@ -12,6 +12,11 @@ from uuid import uuid4
 
 from libs.common.config import Settings
 
+try:
+    import structlog
+except ImportError:  # pragma: no cover - dependency fallback for partially synced envs
+    structlog = None  # type: ignore[assignment]
+
 LOGGER_NAME = "shuihuo"
 logger = logging.getLogger(LOGGER_NAME)
 TRACEPARENT_RE = re.compile(
@@ -22,6 +27,35 @@ TRACEPARENT_RE = re.compile(
 )
 _otel_lock = Lock()
 _otel_configured = False
+_structlog_configured = False
+
+
+def _json_dumps(payload: object, **kwargs: object) -> str:
+    kwargs.setdefault("ensure_ascii", False)
+    kwargs.setdefault("sort_keys", True)
+    kwargs.setdefault("default", str)
+    return json.dumps(payload, **kwargs)
+
+
+def configure_structlog() -> None:
+    global _structlog_configured
+
+    if structlog is None or _structlog_configured:
+        return
+
+    structlog.configure(
+        processors=[
+            structlog.stdlib.add_log_level,
+            structlog.processors.JSONRenderer(serializer=_json_dumps),
+        ],
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
+        cache_logger_on_first_use=True,
+    )
+    _structlog_configured = True
+
+
+configure_structlog()
 
 
 def _label_value(value: str) -> str:
@@ -57,8 +91,12 @@ def trace_context_from_header(value: str | None) -> TraceContext:
 
 
 def log_event(event: str, **fields: object) -> None:
+    if structlog is not None:
+        structlog.get_logger(LOGGER_NAME).info(event, **fields)
+        return
+
     payload = {"event": event, **fields}
-    logger.info(json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str))
+    logger.info(_json_dumps(payload))
 
 
 @dataclass(frozen=True)

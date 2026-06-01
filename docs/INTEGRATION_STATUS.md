@@ -98,7 +98,8 @@ The local implementation is complete as a runnable MVP:
 - Prometheus-style `/metrics` endpoint for local HTTP request counters and duration sums.
 - `/metrics` also exposes domain/task event counters, including offline scoring success and
   failure events.
-- Structured JSON request logs with propagated `X-Request-ID` correlation IDs.
+- Structured JSON request logs rendered through structlog with propagated `X-Request-ID`
+  correlation IDs.
 - W3C `traceparent` propagation with trace/span IDs included in request logs.
 - Optional OpenTelemetry OTLP HTTP tracing is wired into the FastAPI gateway when
   `OTEL_EXPORTER_OTLP_ENDPOINT` is configured and the `otel` extra is installed.
