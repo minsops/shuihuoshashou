@@ -113,3 +113,57 @@ def test_sqlite_init_migrates_existing_score_columns(tmp_path, monkeypatch) -> N
     assert {"dimensions", "total_score", "risk_notes", "recommendation"} <= score_columns
     assert {"ai_generated_prob", "template_similarity", "matched_template", "flagged"} <= aigc_columns
     assert {"job_id", "competency", "pattern", "embedding"} <= probe_pattern_columns
+
+
+def test_sqlite_init_migrates_realtime_columns_and_legacy_turns(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'old-realtime.db'}")
+    get_settings.cache_clear()
+    with connect() as conn:
+        conn.executescript(
+            """
+            CREATE TABLE interviews (
+                id TEXT PRIMARY KEY,
+                job_id TEXT NOT NULL,
+                candidate_id TEXT NOT NULL,
+                status TEXT NOT NULL,
+                context TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                started_at TEXT,
+                ended_at TEXT
+            );
+            CREATE TABLE qa_turns (
+                id TEXT PRIMARY KEY,
+                interview_id TEXT NOT NULL,
+                turn_index INTEGER NOT NULL,
+                question TEXT NOT NULL,
+                question_source TEXT NOT NULL,
+                answer TEXT NOT NULL,
+                answer_start_ms INTEGER NOT NULL,
+                answer_end_ms INTEGER NOT NULL,
+                probe_target TEXT
+            );
+            INSERT INTO qa_turns
+            (id, interview_id, turn_index, question, question_source, answer,
+             answer_start_ms, answer_end_ms, probe_target)
+            VALUES
+            ('turn-1', 'interview-1', 0, 'q', 'interviewer', 'a', 10, 20, NULL);
+            """
+        )
+
+    init_db()
+
+    from services.interview_orchestrator.service import list_turns
+
+    with connect() as conn:
+        interview_columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(interviews)").fetchall()
+        }
+        turn_columns = {row["name"] for row in conn.execute("PRAGMA table_info(qa_turns)").fetchall()}
+    turns = list_turns("interview-1")
+
+    assert "signal_enabled" in interview_columns
+    assert "payload" in turn_columns
+    assert turns[0].turn_id == "turn-1"
+    assert turns[0].answer_start_ms == 10

@@ -238,10 +238,32 @@ def list_turns(interview_id: str) -> list[QATurn]:
     init_db()
     with connect() as conn:
         rows = conn.execute(
-            "SELECT payload FROM qa_turns WHERE interview_id = ? ORDER BY turn_index",
+            """
+            SELECT id, question, question_source, answer, answer_start_ms, answer_end_ms,
+                   probe_target, payload
+            FROM qa_turns
+            WHERE interview_id = ?
+            ORDER BY turn_index
+            """,
             (interview_id,),
         ).fetchall()
-    return [QATurn.model_validate(loads(row["payload"])) for row in rows]
+    turns: list[QATurn] = []
+    for row in rows:
+        if row["payload"]:
+            turns.append(QATurn.model_validate(loads(row["payload"])))
+            continue
+        turns.append(
+            QATurn(
+                turn_id=row["id"],
+                question=row["question"],
+                question_source=row["question_source"],
+                answer=row["answer"],
+                answer_start_ms=row["answer_start_ms"],
+                answer_end_ms=row["answer_end_ms"],
+                probe_target=row["probe_target"],
+            )
+        )
+    return turns
 
 
 def should_probe(segment: TranscriptSegment, record: InterviewRecord) -> bool:

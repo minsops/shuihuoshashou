@@ -281,6 +281,24 @@ def init_db() -> None:
 
 
 def _ensure_sqlite_columns(conn: sqlite3.Connection) -> None:
+    existing_interviews = {
+        row["name"] for row in conn.execute("PRAGMA table_info(interviews)").fetchall()
+    }
+    interview_columns = {
+        "signal_enabled": "INTEGER DEFAULT 0",
+    }
+    for column, column_type in interview_columns.items():
+        if column not in existing_interviews:
+            conn.execute(f"ALTER TABLE interviews ADD COLUMN {column} {column_type}")
+
+    existing_turns = {row["name"] for row in conn.execute("PRAGMA table_info(qa_turns)").fetchall()}
+    turn_columns = {
+        "payload": "TEXT",
+    }
+    for column, column_type in turn_columns.items():
+        if column not in existing_turns:
+            conn.execute(f"ALTER TABLE qa_turns ADD COLUMN {column} {column_type}")
+
     existing_scores = {row["name"] for row in conn.execute("PRAGMA table_info(scores)").fetchall()}
     score_columns = {
         "dimensions": "TEXT",

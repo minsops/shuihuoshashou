@@ -24,6 +24,7 @@ The local implementation is complete as a runnable MVP:
 - SQLite local persistence.
 - PostgreSQL core schema SQL for compose initialization.
 - Database URL dialect detection and runtime connection support for SQLite and PostgreSQL targets.
+- SQLite startup migrations backfill later realtime/report columns so older local demo databases stay usable.
 - Separate `qa_turns` persistence for auditable answer evidence.
 - JD knowledge base indexes competency-specific probe patterns with deterministic embeddings and optional pgvector nearest-neighbor search.
 - JD competency generation uses the shared LLM JSON client with `prompts/competency_gen.md` and
