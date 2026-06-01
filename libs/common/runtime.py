@@ -23,7 +23,13 @@ class RuntimeStatus(BaseModel):
     llm_rate_limit_requests_per_minute: int
     asr_provider: str
     asr_base_url_configured: bool
+    asr_api_path: str
     asr_api_key_configured: bool
+    asr_text_path: str
+    asr_speaker_path: str
+    asr_is_final_path: str
+    asr_confidence_path: str
+    asr_timeout_seconds: int
     asr_channel_diarization_configured: bool
     probe_min_answer_chars: int
     probe_min_interval_ms: int
@@ -32,9 +38,15 @@ class RuntimeStatus(BaseModel):
     speaker_diarization_provider: str
     speaker_diarization_base_url_configured: bool
     speaker_diarization_api_key_configured: bool
+    speaker_diarization_speaker_path: str
+    speaker_diarization_timeout_seconds: int
     aigc_detector_provider: str
     aigc_detector_base_url_configured: bool
+    aigc_detector_api_path: str
     aigc_detector_api_key_configured: bool
+    aigc_detector_probability_path: str
+    aigc_detector_flagged_path: str
+    aigc_detector_timeout_seconds: int
     aigc_ai_prob_threshold: float
     aigc_template_similarity_threshold: float
     signal_enabled: bool
@@ -75,7 +87,13 @@ def get_runtime_status() -> RuntimeStatus:
         llm_rate_limit_requests_per_minute=settings.llm_rate_limit_requests_per_minute,
         asr_provider=settings.asr_provider,
         asr_base_url_configured=bool(settings.asr_base_url),
+        asr_api_path=settings.asr_api_path,
         asr_api_key_configured=bool(settings.asr_api_key),
+        asr_text_path=settings.asr_text_path,
+        asr_speaker_path=settings.asr_speaker_path,
+        asr_is_final_path=settings.asr_is_final_path,
+        asr_confidence_path=settings.asr_confidence_path,
+        asr_timeout_seconds=settings.asr_timeout_seconds,
         asr_channel_diarization_configured=bool(
             settings.asr_interviewer_channels and settings.asr_candidate_channels
         ),
@@ -86,9 +104,15 @@ def get_runtime_status() -> RuntimeStatus:
         speaker_diarization_provider=settings.speaker_diarization_provider,
         speaker_diarization_base_url_configured=bool(settings.speaker_diarization_base_url),
         speaker_diarization_api_key_configured=bool(settings.speaker_diarization_api_key),
+        speaker_diarization_speaker_path=settings.speaker_diarization_speaker_path,
+        speaker_diarization_timeout_seconds=settings.speaker_diarization_timeout_seconds,
         aigc_detector_provider=settings.aigc_detector_provider,
         aigc_detector_base_url_configured=bool(settings.aigc_detector_base_url),
+        aigc_detector_api_path=settings.aigc_detector_api_path,
         aigc_detector_api_key_configured=bool(settings.aigc_detector_api_key),
+        aigc_detector_probability_path=settings.aigc_detector_probability_path,
+        aigc_detector_flagged_path=settings.aigc_detector_flagged_path,
+        aigc_detector_timeout_seconds=settings.aigc_detector_timeout_seconds,
         aigc_ai_prob_threshold=settings.aigc_ai_prob_threshold,
         aigc_template_similarity_threshold=settings.aigc_template_similarity_threshold,
         signal_enabled=settings.signal_enabled,

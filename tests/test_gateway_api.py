@@ -151,7 +151,13 @@ def test_gateway_config_status_hides_secrets(tmp_path: Path, monkeypatch) -> Non
     assert payload["gateway_auth_enabled"] is False
     assert payload["asr_provider"] == "stub"
     assert payload["asr_base_url_configured"] is False
+    assert payload["asr_api_path"] == "/transcribe"
     assert payload["asr_api_key_configured"] is False
+    assert payload["asr_text_path"] == "text"
+    assert payload["asr_speaker_path"] == "speaker"
+    assert payload["asr_is_final_path"] == "is_final"
+    assert payload["asr_confidence_path"] == "confidence"
+    assert payload["asr_timeout_seconds"] == 30
     assert payload["asr_channel_diarization_configured"] is True
     assert payload["probe_min_answer_chars"] == 20
     assert payload["probe_min_interval_ms"] == 1000
@@ -160,9 +166,15 @@ def test_gateway_config_status_hides_secrets(tmp_path: Path, monkeypatch) -> Non
     assert payload["speaker_diarization_provider"] == "local"
     assert payload["speaker_diarization_base_url_configured"] is False
     assert payload["speaker_diarization_api_key_configured"] is False
+    assert payload["speaker_diarization_speaker_path"] == "speaker"
+    assert payload["speaker_diarization_timeout_seconds"] == 10
     assert payload["aigc_detector_provider"] == "local"
     assert payload["aigc_detector_base_url_configured"] is False
+    assert payload["aigc_detector_api_path"] == "/detect"
     assert payload["aigc_detector_api_key_configured"] is False
+    assert payload["aigc_detector_probability_path"] == "ai_generated_prob"
+    assert payload["aigc_detector_flagged_path"] == "flagged"
+    assert payload["aigc_detector_timeout_seconds"] == 10
     assert payload["aigc_ai_prob_threshold"] == 0.65
     assert payload["aigc_template_similarity_threshold"] == 0.45
     assert payload["rate_limit_enabled"] is False
