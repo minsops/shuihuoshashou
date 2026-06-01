@@ -100,6 +100,8 @@ The local implementation is complete as a runnable MVP:
   `OTEL_EXPORTER_OTLP_ENDPOINT` is configured and the `otel` extra is installed.
 - Optional per-client gateway rate limit gate with local and Redis-backed counter modes.
 - Docker Compose entrypoint for gateway, PostgreSQL-backed persistence, Redis, and MinIO.
+- Docker Compose forwards gateway auth, LLM retry/rate-limit, ASR mapping, probe trigger, AIGC
+  detector, Redis rate-limit, and worker AIGC/LLM runtime settings into the services that use them.
 
 ## MiMo Configuration
 

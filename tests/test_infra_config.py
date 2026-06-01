@@ -14,6 +14,7 @@ def test_docker_compose_declares_required_infrastructure() -> None:
     assert "postgres:16-alpine" in compose
     assert "redis:7-alpine" in compose
     assert "minio/minio" in compose
+    assert "GATEWAY_API_KEY: ${GATEWAY_API_KEY:-}" in compose
     assert "DATABASE_URL: postgresql://shuihuo:shuihuo_local@postgres:5432/shuihuo_killer" in compose
     assert "REDIS_URL: redis://redis:6379/0" in compose
     assert "OBJECT_STORAGE_ENDPOINT: http://minio:9000" in compose
@@ -24,6 +25,29 @@ def test_docker_compose_declares_required_infrastructure() -> None:
     assert "SPEAKER_DIARIZATION_API_PATH: ${SPEAKER_DIARIZATION_API_PATH:-/diarize}" in compose
     assert "SPEAKER_DIARIZATION_API_KEY: ${SPEAKER_DIARIZATION_API_KEY:-}" in compose
     assert "SPEAKER_DIARIZATION_SPEAKER_PATH: ${SPEAKER_DIARIZATION_SPEAKER_PATH:-speaker}" in compose
+    for key in [
+        "LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-30}",
+        "LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-1}",
+        "LLM_RATE_LIMIT_ENABLED: ${LLM_RATE_LIMIT_ENABLED:-false}",
+        "LLM_RATE_LIMIT_REQUESTS_PER_MINUTE: ${LLM_RATE_LIMIT_REQUESTS_PER_MINUTE:-60}",
+        "AIGC_DETECTOR_PROVIDER: ${AIGC_DETECTOR_PROVIDER:-local}",
+        "AIGC_DETECTOR_BASE_URL: ${AIGC_DETECTOR_BASE_URL:-}",
+        "AIGC_DETECTOR_API_PATH: ${AIGC_DETECTOR_API_PATH:-/detect}",
+        "AIGC_DETECTOR_API_KEY: ${AIGC_DETECTOR_API_KEY:-}",
+        "AIGC_AI_PROB_THRESHOLD: ${AIGC_AI_PROB_THRESHOLD:-0.65}",
+        "AIGC_TEMPLATE_SIMILARITY_THRESHOLD: ${AIGC_TEMPLATE_SIMILARITY_THRESHOLD:-0.45}",
+    ]:
+        assert compose.count(key) == 2
+    for key in [
+        "ASR_TEXT_PATH: ${ASR_TEXT_PATH:-text}",
+        "ASR_START_MS_PATH: ${ASR_START_MS_PATH:-start_ms}",
+        "ASR_CONFIDENCE_PATH: ${ASR_CONFIDENCE_PATH:-confidence}",
+        "PROBE_MIN_ANSWER_CHARS: ${PROBE_MIN_ANSWER_CHARS:-20}",
+        "PROBE_REQUIRE_TOPIC_MATCH: ${PROBE_REQUIRE_TOPIC_MATCH:-true}",
+        "RATE_LIMIT_BACKEND: ${RATE_LIMIT_BACKEND:-local}",
+        "REDIS_RATE_LIMIT_PREFIX: ${REDIS_RATE_LIMIT_PREFIX:-shuihuo:rate_limit}",
+    ]:
+        assert key in compose
     assert 'profiles: ["worker"]' in compose
     assert "services.offline_worker.celery_tasks:celery_app" in compose
     assert "CELERY_BROKER_URL: redis://redis:6379/1" in compose

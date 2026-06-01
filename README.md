@@ -111,6 +111,10 @@ OFFLINE_TASK_BACKEND=celery OFFLINE_TASK_EXECUTION=async docker compose --profil
 The compose gateway uses PostgreSQL by default through
 `postgresql://shuihuo:shuihuo_local@postgres:5432/shuihuo_killer`, while the non-Docker local
 profile still defaults to SQLite for quick demos.
+The compose stack forwards the runtime integration knobs from `.env.example` into the relevant
+services, including gateway auth, LLM retry/rate-limit settings, ASR response mappings, probe
+trigger thresholds, external AIGC detector settings, Redis rate-limit settings, and Celery worker
+AIGC/LLM settings.
 
 PostgreSQL initializes from `db/postgres/001_core_schema.sql`, which declares the core jobs,
 candidates, interviews, turns, probe-pattern embeddings, scores, AIGC results, reports, and consent
