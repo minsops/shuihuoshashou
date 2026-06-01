@@ -879,7 +879,15 @@ def test_gateway_websocket_probe_flow(tmp_path: Path, monkeypatch) -> None:
     audio = base64.b64encode(text.encode("utf-8")).decode("ascii")
     with client.websocket_connect(f"/ws/interview/{interview['id']}") as websocket:
         websocket.send_json(
-            {"type": "audio_chunk", "session_id": interview["id"], "seq": 1, "audio": audio}
+            {
+                "type": "audio_chunk",
+                "session_id": interview["id"],
+                "seq": 1,
+                "audio": audio,
+                "audio_format": "pcm",
+                "sample_rate_hz": 16000,
+                "channels": 1,
+            }
         )
         transcript = websocket.receive_json()
         probe = websocket.receive_json()
@@ -1020,6 +1028,62 @@ def test_gateway_websocket_rejects_invalid_audio_base64(
 
     assert warning["type"] == "asr_warning"
     assert warning["payload"] == {"reason": "invalid_audio_base64", "seq": 1}
+    assert error["type"] == "error"
+    assert "cannot finish interview without candidate turns" in error["detail"]
+
+
+def test_gateway_websocket_rejects_unsupported_audio_metadata(
+    tmp_path: Path, monkeypatch
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+    audio = base64.b64encode("我负责 FastAPI 编排和重试。".encode("utf-8")).decode("ascii")
+
+    with client.websocket_connect(f"/ws/interview/{interview['id']}") as websocket:
+        websocket.send_json(
+            {
+                "type": "audio_chunk",
+                "session_id": interview["id"],
+                "seq": 1,
+                "audio": audio,
+                "audio_format": "mp3",
+            }
+        )
+        bad_format = websocket.receive_json()
+        websocket.send_json(
+            {
+                "type": "audio_chunk",
+                "session_id": interview["id"],
+                "seq": 2,
+                "audio": audio,
+                "sample_rate_hz": 48000,
+            }
+        )
+        bad_rate = websocket.receive_json()
+        websocket.send_json(
+            {
+                "type": "audio_chunk",
+                "session_id": interview["id"],
+                "seq": 3,
+                "audio": audio,
+                "channels": 2,
+            }
+        )
+        bad_channels = websocket.receive_json()
+        websocket.send_json({"type": "end"})
+        error = websocket.receive_json()
+
+    assert bad_format["type"] == "asr_warning"
+    assert bad_format["payload"] == {"reason": "unsupported_audio_format", "seq": 1}
+    assert bad_rate["type"] == "asr_warning"
+    assert bad_rate["payload"] == {"reason": "unsupported_sample_rate", "seq": 2}
+    assert bad_channels["type"] == "asr_warning"
+    assert bad_channels["payload"] == {"reason": "unsupported_channel_count", "seq": 3}
     assert error["type"] == "error"
     assert "cannot finish interview without candidate turns" in error["detail"]
 

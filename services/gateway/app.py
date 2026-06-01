@@ -54,6 +54,17 @@ from services.scoring_service.service import score_interview
 from services.signal_service.service import extract_behavior_signal
 
 VALID_SPEAKERS = {"interviewer", "candidate", "unknown"}
+SUPPORTED_AUDIO_FORMATS = {
+    "pcm",
+    "pcm16",
+    "pcm-16",
+    "linear16",
+    "linear-16",
+    "s16le",
+    "opus",
+}
+EXPECTED_AUDIO_SAMPLE_RATE_HZ = 16000
+EXPECTED_AUDIO_CHANNELS = 1
 FALSE_FINALITY_VALUES = {
     "",
     "0",
@@ -314,6 +325,42 @@ def _valid_audio_b64(value: object) -> bool:
         return False
 
 
+def _audio_contract_warning(event: dict) -> str | None:
+    audio_format = _event_string(event, "format", "audio_format", "codec")
+    if audio_format is not None and audio_format not in SUPPORTED_AUDIO_FORMATS:
+        return "unsupported_audio_format"
+    sample_rate_hz = _event_int(event, "sample_rate_hz", "sample_rate", "rate")
+    if sample_rate_hz is not None and sample_rate_hz != EXPECTED_AUDIO_SAMPLE_RATE_HZ:
+        return "unsupported_sample_rate"
+    channels = _event_int(event, "channels", "channel_count")
+    if channels is not None and channels != EXPECTED_AUDIO_CHANNELS:
+        return "unsupported_channel_count"
+    return None
+
+
+def _event_string(event: dict, *keys: str) -> str | None:
+    for key in keys:
+        value = event.get(key)
+        if value is None:
+            continue
+        text = str(value).strip().lower().replace("_", "-")
+        if text:
+            return text
+    return None
+
+
+def _event_int(event: dict, *keys: str) -> int | None:
+    for key in keys:
+        value = event.get(key)
+        if value is None or value == "":
+            continue
+        try:
+            return int(float(value))
+        except (TypeError, ValueError):
+            return -1
+    return None
+
+
 @app.post("/api/jobs")
 def api_create_job(payload: JobCreate):
     return create_job(payload)
@@ -524,6 +571,12 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                 if not _valid_audio_b64(audio_b64):
                     await websocket.send_json(
                         {"type": "asr_warning", "payload": {"reason": "invalid_audio_base64", "seq": seq}}
+                    )
+                    continue
+                contract_warning = _audio_contract_warning(event)
+                if contract_warning is not None:
+                    await websocket.send_json(
+                        {"type": "asr_warning", "payload": {"reason": contract_warning, "seq": seq}}
                     )
                     continue
                 segment = await engine.transcribe_chunk(

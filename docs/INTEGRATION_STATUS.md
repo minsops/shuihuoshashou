@@ -11,6 +11,8 @@ The local implementation is complete as a runnable MVP:
 - WebSocket real-time text/audio-stub probe flow with speaker/finality/timestamp metadata and channel-based speaker mapping.
 - Invalid or empty WebSocket audio chunks are rejected with `asr_warning` before transcription.
 - WebSocket audio chunks with mismatched `session_id` values are rejected before ASR processing.
+- Optional WebSocket audio metadata is validated against the startup contract: PCM/Opus-style
+  payloads, 16 kHz sample rate, and one channel.
 - Configurable real-time probe trigger rules for candidate answer length, drill-down topic matching,
   minimum interval, and interviewer-initiated manual probes.
 - Configurable HTTP cloud ASR adapter behind the `ASREngine` interface.
