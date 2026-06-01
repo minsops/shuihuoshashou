@@ -194,6 +194,13 @@ def _write_pdf(html: str, pdf_path: Path) -> None:
         pdf_path.write_bytes(content.encode("latin-1"))
 
 
+def _write_report_json(report: Report, json_path: Path) -> None:
+    json_path.write_text(
+        json.dumps(report.model_dump(mode="json"), ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
 def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCResult]) -> tuple[Report, str]:
     summary = (
         f"候选人在本场面试中获得 {score.total_score} 分，系统建议为 {score.recommendation}。"
@@ -210,6 +217,7 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
     )
     settings = get_settings()
     settings.report_dir.mkdir(parents=True, exist_ok=True)
+    json_path = Path(settings.report_dir / f"{ctx.session_id}.report.json")
     html_path = Path(settings.report_dir / f"{ctx.session_id}.html")
     pdf_path = Path(settings.report_dir / f"{ctx.session_id}.pdf")
     transcript_path = Path(settings.report_dir / f"{ctx.session_id}.transcript.json")
@@ -240,6 +248,7 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
         transcript_path,
         "application/json; charset=utf-8",
     )
+    json_artifact_name = f"reports/{ctx.session_id}.report.json"
     report = Report(
         interview_id=ctx.session_id,
         score=score,
@@ -247,6 +256,7 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
         consistency_flags=ctx.flags,
         transcript=ctx.turns,
         summary=summary,
+        json_path=str(json_path),
         html_path=str(html_path),
         pdf_path=str(pdf_path),
         transcript_path=str(transcript_path),
@@ -254,6 +264,13 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
             "html": html_artifact.uri,
             "pdf": pdf_artifact.uri,
             "transcript": transcript_artifact.uri,
+            "json": artifact_store.artifact_uri(json_artifact_name, json_path),
         },
+    )
+    _write_report_json(report, json_path)
+    artifact_store.put_file(
+        json_artifact_name,
+        json_path,
+        "application/json; charset=utf-8",
     )
     return report, html

@@ -71,6 +71,11 @@ def test_gateway_offline_report_flow(tmp_path: Path, monkeypatch) -> None:
     assert report["score"]["total_score"] > 0
     assert client.get(f"/api/interviews/{interview['id']}/report").status_code == 200
     assert client.get(f"/api/interviews/{interview['id']}/report.html").status_code == 200
+    report_json = client.get(f"/api/interviews/{interview['id']}/report.json")
+    assert report_json.status_code == 200
+    assert report_json.headers["content-type"].startswith("application/json")
+    assert report_json.json()["interview_id"] == interview["id"]
+    assert report_json.json()["artifact_uris"]["json"].startswith("file://")
     transcript = client.get(f"/api/interviews/{interview['id']}/report.transcript.json")
     assert transcript.status_code == 200
     assert transcript.headers["content-type"].startswith("application/json")
@@ -334,8 +339,10 @@ def test_gateway_exposes_internal_aigc_scoring_and_report_contracts(
     assert report_payload["interview_id"] == interview["id"]
     assert report_payload["score"]["total_score"] == payload["total_score"]
     assert report_payload["aigc_results"][0]["turn_id"] == turns[0]["turn_id"]
+    assert report_payload["artifact_uris"]["json"].startswith("file://")
     assert report_payload["artifact_uris"]["html"].startswith("file://")
     assert report_payload["artifact_uris"]["pdf"].startswith("file://")
+    assert Path(report_payload["json_path"]).read_text(encoding="utf-8")
     assert Path(report_payload["pdf_path"]).read_bytes().startswith(b"%PDF")
 
 

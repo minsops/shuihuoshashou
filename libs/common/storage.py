@@ -21,16 +21,22 @@ class StoredArtifact:
 
 
 class ArtifactStore:
+    def artifact_uri(self, name: str, path: Path) -> str:
+        raise NotImplementedError
+
     def put_file(self, name: str, path: Path, content_type: str) -> StoredArtifact:
         raise NotImplementedError
 
 
 class LocalArtifactStore(ArtifactStore):
+    def artifact_uri(self, name: str, path: Path) -> str:
+        return path.resolve().as_uri()
+
     def put_file(self, name: str, path: Path, content_type: str) -> StoredArtifact:
         return StoredArtifact(
             name=name,
             path=str(path),
-            uri=path.resolve().as_uri(),
+            uri=self.artifact_uri(name, path),
             content_type=content_type,
         )
 
@@ -53,10 +59,17 @@ class S3CompatibleArtifactStore(ArtifactStore):
         self.client = client or httpx.Client(timeout=30)
 
     def put_file(self, name: str, path: Path, content_type: str) -> StoredArtifact:
-        uri = f"s3://{self.bucket}/{name}"
         if self.access_key and self.secret_key:
             self._upload_file(name, path, content_type)
-        return StoredArtifact(name=name, path=str(path), uri=uri, content_type=content_type)
+        return StoredArtifact(
+            name=name,
+            path=str(path),
+            uri=self.artifact_uri(name, path),
+            content_type=content_type,
+        )
+
+    def artifact_uri(self, name: str, path: Path) -> str:
+        return f"s3://{self.bucket}/{name}"
 
     def _upload_file(self, name: str, path: Path, content_type: str) -> None:
         body = path.read_bytes()

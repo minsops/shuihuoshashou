@@ -84,9 +84,11 @@ def test_offline_interview_chain(tmp_path: Path, monkeypatch) -> None:
     assert report.aigc_results
     assert report.transcript
     assert report.transcript[0].answer == "我主要负责整体架构设计并推动项目落地最终取得显著提升"
+    assert (tmp_path / "reports" / f"{interview.id}.report.json").exists()
     assert (tmp_path / "reports" / f"{interview.id}.html").exists()
     assert (tmp_path / "reports" / f"{interview.id}.pdf").exists()
     assert (tmp_path / "reports" / f"{interview.id}.transcript.json").exists()
+    report_json = loads(Path(report.json_path or "").read_text(encoding="utf-8"))
     html = Path(report.html_path or "").read_text(encoding="utf-8")
     pdf_bytes = Path(report.pdf_path or "").read_bytes()
     transcript_json = loads(Path(report.transcript_path or "").read_text(encoding="utf-8"))
@@ -96,6 +98,9 @@ def test_offline_interview_chain(tmp_path: Path, monkeypatch) -> None:
     assert "疑似注水/模板化" in html
     assert "转写全文" in html
     assert report.transcript[0].answer in html
+    assert report_json["interview_id"] == interview.id
+    assert report_json["artifact_uris"]["json"].startswith("file://")
+    assert report.artifact_uris["json"].startswith("file://")
     assert report.artifact_uris["html"].startswith("file://")
     assert report.artifact_uris["pdf"].startswith("file://")
     assert report.artifact_uris["transcript"].startswith("file://")
@@ -277,7 +282,9 @@ def test_report_artifact_uris_use_object_storage_when_configured(
         "html": f"s3://reports-bucket/reports/{interview.id}.html",
         "pdf": f"s3://reports-bucket/reports/{interview.id}.pdf",
         "transcript": f"s3://reports-bucket/reports/{interview.id}.transcript.json",
+        "json": f"s3://reports-bucket/reports/{interview.id}.report.json",
     }
+    assert Path(report.json_path or "").exists()
     assert Path(report.html_path or "").exists()
     assert Path(report.pdf_path or "").exists()
     assert Path(report.transcript_path or "").exists()

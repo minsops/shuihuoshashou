@@ -27,7 +27,8 @@ as a local-first Python MVP:
 - Report artifacts write local files by default and upload to S3-compatible storage when credentials are configured.
 - Reports include structured scores, radar charts, highlights, AIGC checks, consistency flags,
   risk highlights, recommendations, and full interview transcripts.
-- Report generation writes separate HTML, PDF, and transcript JSON artifacts for audit and storage.
+- Report generation writes separate structured report JSON, HTML, PDF, and transcript JSON artifacts
+  for audit and storage.
 - Interview context keeps an auditable fact-claim table for role, responsibility, technology, and
   metric statements used by consistency checks.
 - Scoring uses the shared LLM JSON client for structured dimension drafts and recomputes final
@@ -169,6 +170,7 @@ returns 401, generate a fresh key and set it through `LLM_API_KEY` without commi
 - `POST /api/interviews/{id}/end`
 - `GET /api/interviews/{id}/report`
 - `GET /api/interviews/{id}/report.html`
+- `GET /api/interviews/{id}/report.json`
 - `GET /api/interviews/{id}/report.pdf`
 - `GET /api/interviews/{id}/report.transcript.json`
 - `WS /ws/interview/{id}`

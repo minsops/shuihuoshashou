@@ -424,6 +424,22 @@ def api_report_html(interview_id: str):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+@app.get("/api/interviews/{interview_id}/report.json")
+def api_report_json(interview_id: str):
+    try:
+        report, _ = get_report(interview_id)
+        json_path = report.get("json_path")
+        if not json_path or not Path(json_path).exists():
+            raise KeyError(f"report json not found: {interview_id}")
+        return FileResponse(
+            json_path,
+            media_type="application/json",
+            filename=f"{interview_id}.report.json",
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @app.get("/api/interviews/{interview_id}/report.pdf")
 def api_report_pdf(interview_id: str):
     try:

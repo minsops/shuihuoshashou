@@ -261,6 +261,7 @@ class Report(BaseModel):
     consistency_flags: list[ConsistencyFlag]
     transcript: list[QATurn] = Field(default_factory=list)
     summary: str
+    json_path: str | None = None
     html_path: str | None = None
     pdf_path: str | None = None
     transcript_path: str | None = None
