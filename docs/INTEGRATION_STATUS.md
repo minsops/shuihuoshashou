@@ -14,7 +14,8 @@ The local implementation is complete as a runnable MVP:
 - Configurable real-time probe trigger rules for candidate answer length, drill-down topic matching,
   minimum interval, and interviewer-initiated manual probes.
 - Configurable HTTP cloud ASR adapter behind the `ASREngine` interface.
-- HTTP ASR responses normalize string finality flags and clamp confidence values into the schema range.
+- HTTP ASR responses normalize string finality flags, treat provisional labels as non-final, and
+  clamp confidence values into the schema range.
 - ASR session manager supports partial-to-final chunk updates, repeated-final deduplication,
   stale-final rejection, local audio-cluster speaker resolution, and conservative short-gap
   speaker continuity smoothing.

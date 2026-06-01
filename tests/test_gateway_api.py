@@ -729,7 +729,7 @@ def test_gateway_websocket_ignores_non_final_and_interviewer_segments(
                 "seq": 1,
                 "audio": audio,
                 "speaker": "candidate",
-                "is_final": False,
+                "is_final": "partial",
                 "start_ms": 100,
                 "end_ms": 600,
                 "confidence": 0.6,

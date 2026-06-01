@@ -54,6 +54,22 @@ from services.scoring_service.service import score_interview
 from services.signal_service.service import extract_behavior_signal
 
 VALID_SPEAKERS = {"interviewer", "candidate", "unknown"}
+FALSE_FINALITY_VALUES = {
+    "",
+    "0",
+    "false",
+    "no",
+    "off",
+    "partial",
+    "interim",
+    "intermediate",
+    "non_final",
+    "non-final",
+    "not_final",
+    "not-final",
+    "provisional",
+}
+TRUE_FINALITY_VALUES = {"1", "true", "yes", "on", "final", "finalized", "complete", "completed"}
 
 
 @asynccontextmanager
@@ -281,7 +297,11 @@ def _event_bool(event: dict, key: str, default: bool) -> bool:
     if isinstance(value, bool):
         return value
     if isinstance(value, str):
-        return value.lower() not in {"0", "false", "no"}
+        lowered = value.strip().lower()
+        if lowered in FALSE_FINALITY_VALUES:
+            return False
+        if lowered in TRUE_FINALITY_VALUES:
+            return True
     return bool(value)
 
 

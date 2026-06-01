@@ -132,6 +132,28 @@ def test_http_asr_engine_coerces_string_final_and_clamps_confidence(monkeypatch)
     assert segment.confidence == 1.0
 
 
+def test_http_asr_engine_treats_partial_strings_as_non_final(monkeypatch) -> None:
+    def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "text": "临时识别片段",
+                "speaker": "candidate",
+                "is_final": "partial",
+                "confidence": 0.8,
+            },
+        )
+
+    monkeypatch.setenv("ASR_PROVIDER", "http")
+    monkeypatch.setenv("ASR_BASE_URL", "https://asr.example.com")
+    get_settings.cache_clear()
+    engine = HTTPASREngine(transport=httpx.MockTransport(handler))
+
+    segment = asyncio.run(engine.transcribe_chunk("session-1", 3, "YXVkaW8="))
+
+    assert segment.is_final is False
+
+
 def test_get_asr_engine_uses_http_provider(monkeypatch) -> None:
     monkeypatch.setenv("ASR_PROVIDER", "http")
     monkeypatch.setenv("ASR_BASE_URL", "https://asr.example.com")

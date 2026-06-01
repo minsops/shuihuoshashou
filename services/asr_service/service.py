@@ -13,6 +13,22 @@ from libs.common.config import get_settings
 from libs.schemas import TranscriptSegment
 
 Speaker = Literal["interviewer", "candidate", "unknown"]
+FALSE_FINALITY_VALUES = {
+    "",
+    "0",
+    "false",
+    "no",
+    "off",
+    "partial",
+    "interim",
+    "intermediate",
+    "non_final",
+    "non-final",
+    "not_final",
+    "not-final",
+    "provisional",
+}
+TRUE_FINALITY_VALUES = {"1", "true", "yes", "on", "final", "finalized", "complete", "completed"}
 
 
 @dataclass
@@ -359,7 +375,11 @@ def _coerce_bool(value: Any) -> bool:
     if isinstance(value, bool):
         return value
     if isinstance(value, str):
-        return value.strip().lower() not in {"", "0", "false", "no", "off"}
+        lowered = value.strip().lower()
+        if lowered in FALSE_FINALITY_VALUES:
+            return False
+        if lowered in TRUE_FINALITY_VALUES:
+            return True
     return bool(value)
 
 
