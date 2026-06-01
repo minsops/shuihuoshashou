@@ -480,3 +480,6 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
     except KeyError as exc:
         asr_session_manager.close(interview_id)
         await websocket.send_json({"type": "error", "detail": str(exc)})
+    except ValueError as exc:
+        asr_session_manager.close(interview_id)
+        await websocket.send_json({"type": "error", "detail": str(exc)})
