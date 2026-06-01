@@ -301,8 +301,8 @@ class HTTPASREngine(ASREngine):
             text=str(_extract_path(data, settings.asr_text_path)),
             start_ms=int(resolved_start_ms),
             end_ms=int(resolved_end_ms),
-            is_final=bool(resolved_final),
-            confidence=float(resolved_confidence),
+            is_final=_coerce_bool(resolved_final),
+            confidence=_clamp_float(resolved_confidence, minimum=0.0, maximum=1.0),
         )
 
 
@@ -353,6 +353,19 @@ def _coerce_speaker(value: Any) -> Speaker:
     if value in {"interviewer", "candidate", "unknown"}:
         return value
     return "unknown"
+
+
+def _coerce_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() not in {"", "0", "false", "no", "off"}
+    return bool(value)
+
+
+def _clamp_float(value: Any, *, minimum: float, maximum: float) -> float:
+    resolved = float(value)
+    return max(minimum, min(maximum, resolved))
 
 
 def _audio_fingerprint(audio_b64: str | None) -> str | None:
