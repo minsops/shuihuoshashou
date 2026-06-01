@@ -45,6 +45,8 @@ def test_env_example_lists_runtime_integration_knobs() -> None:
         "ASR_BASE_URL=",
         "GATEWAY_API_KEY=",
         "LLM_MAX_RETRIES=",
+        "LLM_RATE_LIMIT_ENABLED=",
+        "LLM_RATE_LIMIT_REQUESTS_PER_MINUTE=",
         "OTEL_EXPORTER_OTLP_ENDPOINT=",
         "SPEAKER_DIARIZATION_PROVIDER=",
         "SPEAKER_DIARIZATION_BASE_URL=",

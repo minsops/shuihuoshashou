@@ -54,6 +54,7 @@ The local implementation is complete as a runnable MVP:
 - Configurable LLM client with mock mode and OpenAI-compatible HTTP mode.
 - LLM JSON responses are pydantic-validated with configurable retry before deterministic fallback.
 - Async and sync LLM paths support injectable transports for network-free unit tests.
+- Optional LLM provider-call rate limiting is enforced before outbound model requests.
 - Safe runtime config and LLM smoke-test scripts.
 - Prometheus-style `/metrics` endpoint for local HTTP request counters and duration sums.
 - `/metrics` also exposes domain/task event counters for the offline scoring path.

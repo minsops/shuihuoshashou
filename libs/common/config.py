@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     llm_extra_body_json: str = ""
     llm_timeout_seconds: int = 30
     llm_max_retries: int = 1
+    llm_rate_limit_enabled: bool = False
+    llm_rate_limit_requests_per_minute: int = 60
     asr_provider: str = "stub"
     asr_base_url: str = ""
     asr_api_path: str = "/transcribe"

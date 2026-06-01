@@ -49,6 +49,8 @@ export LLM_AUTH_SCHEME=""
 export LLM_RESPONSE_CONTENT_PATH="choices.0.message.content"
 export LLM_EXTRA_BODY_JSON=""
 export LLM_MAX_RETRIES=1
+export LLM_RATE_LIMIT_ENABLED=false
+export LLM_RATE_LIMIT_REQUESTS_PER_MINUTE=60
 ```
 
 If `LLM_PROVIDER=mock` or no API key is present, the system runs with deterministic local mock output.
@@ -57,6 +59,8 @@ The default values follow the MiMo OpenAI-compatible chat completions protocol. 
 the endpoint, auth header, response JSON shape, or retry policy, change only the `LLM_*` environment
 variables above. LLM JSON parsing is validated with pydantic; failed HTTP/JSON/schema attempts retry
 once by default before falling back to deterministic local behavior.
+Set `LLM_RATE_LIMIT_ENABLED=true` to cap provider calls per model before they leave the process;
+limited calls fall back locally unless diagnostic code asks for `raise_on_error`.
 
 Set `GATEWAY_API_KEY` in deployed environments to require `X-API-Key: ...` or
 `Authorization: Bearer ...` for `/api/*` and WebSocket traffic. It is empty by default for local demos.

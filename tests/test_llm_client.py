@@ -5,7 +5,7 @@ import json
 import httpx
 
 from libs.common.config import get_settings
-from libs.llm_client import LLMClient, LLMMessage
+from libs.llm_client import LLMClient, LLMMessage, reset_llm_rate_limiter
 from libs.schemas import CredibilitySignal, ProbeResponse, ProbeSuggestion
 
 
@@ -288,3 +288,102 @@ def test_llm_client_sync_path_retries_after_bad_json(monkeypatch) -> None:
 
     assert calls == 2
     assert response.suggestions[0].question == "同步重试后成功"
+
+
+def test_llm_client_rate_limit_returns_fallback_without_http(monkeypatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "openai_compatible")
+    monkeypatch.setenv("LLM_BASE_URL", "https://llm.example.test")
+    monkeypatch.setenv("LLM_API_KEY", "secret")
+    monkeypatch.setenv("LLM_RATE_LIMIT_ENABLED", "true")
+    monkeypatch.setenv("LLM_RATE_LIMIT_REQUESTS_PER_MINUTE", "1")
+    get_settings.cache_clear()
+    reset_llm_rate_limiter()
+    calls = 0
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "suggestions": [
+                                        {
+                                            "question": "第一次真实调用",
+                                            "target": "验证限流",
+                                            "competency": "可靠性",
+                                            "priority": 1,
+                                        }
+                                    ],
+                                    "credibility": {
+                                        "level": "solid",
+                                        "reason": "首次调用通过",
+                                        "drill_down_hint": "继续追问",
+                                    },
+                                },
+                                ensure_ascii=False,
+                            )
+                        }
+                    }
+                ]
+            },
+        )
+
+    transport = httpx.MockTransport(handler)
+    first = __import__("asyncio").run(_call_with_transport(transport))
+    second = __import__("asyncio").run(_call_with_transport(transport))
+
+    assert calls == 1
+    assert first.suggestions[0].question == "第一次真实调用"
+    assert second.suggestions[0].question == "fallback"
+    reset_llm_rate_limiter()
+
+
+def test_llm_client_rate_limit_can_raise_without_secret(monkeypatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "openai_compatible")
+    monkeypatch.setenv("LLM_BASE_URL", "https://llm.example.test")
+    monkeypatch.setenv("LLM_API_KEY", "secret")
+    monkeypatch.setenv("LLM_RATE_LIMIT_ENABLED", "true")
+    monkeypatch.setenv("LLM_RATE_LIMIT_REQUESTS_PER_MINUTE", "1")
+    get_settings.cache_clear()
+    reset_llm_rate_limiter()
+    client = LLMClient(
+        transport=httpx.MockTransport(
+            lambda _: httpx.Response(
+                200,
+                json={
+                    "choices": [
+                        {"message": {"content": json.dumps(_fallback().model_dump())}}
+                    ]
+                },
+            )
+        )
+    )
+
+    try:
+        __import__("asyncio").run(
+            client.complete_json(
+                [LLMMessage(role="user", content="hello")],
+                ProbeResponse,
+                _fallback(),
+            )
+        )
+        __import__("asyncio").run(
+            client.complete_json(
+                [LLMMessage(role="user", content="hello")],
+                ProbeResponse,
+                _fallback(),
+                raise_on_error=True,
+            )
+        )
+    except RuntimeError as exc:
+        assert "LLM rate limit exceeded" in str(exc)
+        assert "secret" not in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError")
+    finally:
+        reset_llm_rate_limiter()

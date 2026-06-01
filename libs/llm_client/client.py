@@ -8,8 +8,10 @@ import httpx
 from pydantic import BaseModel
 
 from libs.common.config import get_settings
+from libs.common.observability import SlidingWindowRateLimiter
 
 T = TypeVar("T", bound=BaseModel)
+_llm_rate_limiter = SlidingWindowRateLimiter(requests_per_minute=60)
 
 
 @dataclass(frozen=True)
@@ -39,6 +41,12 @@ class LLMClient:
         settings = get_settings()
         if settings.llm_provider == "mock" or not settings.llm_api_key or not settings.llm_base_url:
             return fallback
+        if settings.llm_rate_limit_enabled:
+            limited = _llm_rate_limited(settings.llm_provider, settings.llm_model)
+            if limited:
+                if raise_on_error:
+                    raise RuntimeError(limited)
+                return fallback
         payload = _request_payload(messages)
         headers = _auth_headers()
         url = settings.llm_base_url.rstrip("/") + "/" + settings.llm_api_path.lstrip("/")
@@ -71,6 +79,12 @@ class LLMClient:
         settings = get_settings()
         if settings.llm_provider == "mock" or not settings.llm_api_key or not settings.llm_base_url:
             return fallback
+        if settings.llm_rate_limit_enabled:
+            limited = _llm_rate_limited(settings.llm_provider, settings.llm_model)
+            if limited:
+                if raise_on_error:
+                    raise RuntimeError(limited)
+                return fallback
         payload = _request_payload(messages)
         headers = _auth_headers()
         url = settings.llm_base_url.rstrip("/") + "/" + settings.llm_api_path.lstrip("/")
@@ -96,6 +110,19 @@ class LLMClient:
 
 def get_llm_client() -> LLMClient:
     return LLMClient()
+
+
+def reset_llm_rate_limiter() -> None:
+    _llm_rate_limiter.reset()
+
+
+def _llm_rate_limited(provider: str, model: str) -> str:
+    settings = get_settings()
+    _llm_rate_limiter.requests_per_minute = settings.llm_rate_limit_requests_per_minute
+    decision = _llm_rate_limiter.check(f"{provider}:{model}")
+    if decision.allowed:
+        return ""
+    return f"LLM rate limit exceeded; retry after {decision.retry_after_seconds}s"
 
 
 def _request_payload(messages: list[LLMMessage]) -> dict[str, Any]:

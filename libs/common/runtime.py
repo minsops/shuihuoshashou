@@ -19,6 +19,8 @@ class RuntimeStatus(BaseModel):
     llm_response_content_path: str
     llm_extra_body_configured: bool
     llm_max_retries: int
+    llm_rate_limit_enabled: bool
+    llm_rate_limit_requests_per_minute: int
     asr_provider: str
     asr_base_url_configured: bool
     asr_api_key_configured: bool
@@ -69,6 +71,8 @@ def get_runtime_status() -> RuntimeStatus:
         llm_response_content_path=settings.llm_response_content_path,
         llm_extra_body_configured=bool(settings.llm_extra_body_json),
         llm_max_retries=settings.llm_max_retries,
+        llm_rate_limit_enabled=settings.llm_rate_limit_enabled,
+        llm_rate_limit_requests_per_minute=settings.llm_rate_limit_requests_per_minute,
         asr_provider=settings.asr_provider,
         asr_base_url_configured=bool(settings.asr_base_url),
         asr_api_key_configured=bool(settings.asr_api_key),
