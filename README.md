@@ -163,6 +163,8 @@ to `candidate`. Only final candidate segments trigger a probe. Downstream events
 with the same sequence are deduplicated and returned as `asr_warning` events instead of triggering
 duplicate probe generation. When ASR returns `unknown` speaker, the session manager first tries to
 resolve it from a previously observed local audio cluster, then falls back to short-gap continuity.
+Invalid or empty `audio_chunk.audio` payloads are rejected with `asr_warning` instead of being
+converted into placeholder transcripts.
 Tune `PROBE_MIN_ANSWER_CHARS` and `PROBE_MIN_INTERVAL_MS` to control when candidate final segments
 are eligible for probe generation. `PROBE_REQUIRE_TOPIC_MATCH` and `PROBE_TOPIC_KEYWORDS` keep
 automatic probes focused on drill-down topics such as projects, technical decisions, metrics, and

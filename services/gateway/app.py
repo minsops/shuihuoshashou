@@ -278,6 +278,15 @@ def _event_bool(event: dict, key: str, default: bool) -> bool:
     return bool(value)
 
 
+def _valid_audio_b64(value: object) -> bool:
+    if not isinstance(value, str) or not value.strip():
+        return False
+    try:
+        return bool(base64.b64decode(value, validate=True))
+    except Exception:
+        return False
+
+
 @app.post("/api/jobs")
 def api_create_job(payload: JobCreate):
     return create_job(payload)
@@ -432,10 +441,16 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
             event = await websocket.receive_json()
             if event.get("type") == "audio_chunk":
                 seq = int(event.get("seq", 0))
+                audio_b64 = event.get("audio", "")
+                if not _valid_audio_b64(audio_b64):
+                    await websocket.send_json(
+                        {"type": "asr_warning", "payload": {"reason": "invalid_audio_base64", "seq": seq}}
+                    )
+                    continue
                 segment = await engine.transcribe_chunk(
                     session_id=interview_id,
                     seq=seq,
-                    audio_b64=event.get("audio", ""),
+                    audio_b64=audio_b64,
                     speaker=_event_speaker(event),
                     start_ms=event.get("start_ms"),
                     end_ms=event.get("end_ms"),
@@ -445,7 +460,7 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                 decision = asr_session_manager.accept_segment(
                     seq,
                     segment,
-                    audio_b64=event.get("audio", ""),
+                    audio_b64=audio_b64,
                 )
                 if not decision.accepted or decision.segment is None:
                     await websocket.send_json(

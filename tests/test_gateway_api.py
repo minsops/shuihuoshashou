@@ -683,6 +683,37 @@ def test_gateway_websocket_ignores_non_final_and_interviewer_segments(
         assert report["type"] == "report"
 
 
+def test_gateway_websocket_rejects_invalid_audio_base64(
+    tmp_path: Path, monkeypatch
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+
+    with client.websocket_connect(f"/ws/interview/{interview['id']}") as websocket:
+        websocket.send_json(
+            {
+                "type": "audio_chunk",
+                "session_id": interview["id"],
+                "seq": 1,
+                "audio": "not-base64!",
+                "speaker": "candidate",
+            }
+        )
+        warning = websocket.receive_json()
+        websocket.send_json({"type": "end"})
+        report = websocket.receive_json()
+
+    assert warning["type"] == "asr_warning"
+    assert warning["payload"] == {"reason": "invalid_audio_base64", "seq": 1}
+    assert report["type"] == "report"
+    assert report["payload"]["transcript"] == []
+
+
 def test_gateway_websocket_maps_audio_channel_to_speaker(tmp_path: Path, monkeypatch) -> None:
     client = _client(tmp_path, monkeypatch)
     job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
