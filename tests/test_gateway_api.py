@@ -509,6 +509,27 @@ def test_gateway_report_build_rejects_mismatched_inputs(
     assert rejected_duplicate_aigc.status_code == 409
     assert "AIGC results must not contain duplicate turn_id values" in rejected_duplicate_aigc.text
 
+    threshold_bypass_aigc = [
+        {
+            **aigc_results[0],
+            "ai_generated_prob": 0.99,
+            "template_similarity": 0.0,
+            "flagged": False,
+        }
+    ]
+    rejected_threshold_bypass = client.post(
+        "/api/report/build",
+        json={
+            "context": interview["context"],
+            "score": score,
+            "aigc_results": threshold_bypass_aigc,
+        },
+    )
+    assert rejected_threshold_bypass.status_code == 409
+    assert "AIGC result flagged must be true when thresholds are exceeded" in (
+        rejected_threshold_bypass.text
+    )
+
     mismatched_aigc = [{**aigc_results[0], "turn_id": "missing-turn"}]
     rejected_aigc = client.post(
         "/api/report/build",

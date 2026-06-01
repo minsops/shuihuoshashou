@@ -326,6 +326,13 @@ def _validate_report_inputs(
     missing_aigc_turn_ids = set(turns_by_id) - set(aigc_turn_ids)
     if missing_aigc_turn_ids:
         raise ValueError("AIGC results must cover every transcript turn")
+    settings = get_settings()
+    for result in aigc:
+        if not result.flagged and (
+            result.ai_generated_prob >= settings.aigc_ai_prob_threshold
+            or result.template_similarity >= settings.aigc_template_similarity_threshold
+        ):
+            raise ValueError("AIGC result flagged must be true when thresholds are exceeded")
 
 
 def _compute_total_score(score: InterviewScore) -> float:
