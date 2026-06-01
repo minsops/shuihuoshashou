@@ -93,6 +93,13 @@ class QATurn(BaseModel):
             raise ValueError("answer_end_ms must be greater than or equal to answer_start_ms")
         return self
 
+    @field_validator("question", "answer")
+    @classmethod
+    def text_fields_are_not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("question and answer must not be blank")
+        return value
+
 
 class InterviewContext(BaseModel):
     session_id: str
@@ -142,6 +149,13 @@ class EvidenceRef(BaseModel):
         if self.quote_end_ms < self.quote_start_ms:
             raise ValueError("quote_end_ms must be greater than or equal to quote_start_ms")
         return self
+
+    @field_validator("excerpt")
+    @classmethod
+    def excerpt_is_not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("excerpt must not be blank")
+        return value
 
 
 class DimensionScore(BaseModel):

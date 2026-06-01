@@ -31,6 +31,7 @@ The local implementation is complete as a runnable MVP:
 - Local SQLite service code validates interview/consent candidate references to match PostgreSQL
   foreign-key behavior.
 - Separate `qa_turns` persistence for auditable answer evidence.
+- Shared QATurn and EvidenceRef schemas reject blank question, answer, and excerpt text.
 - JD knowledge base indexes competency-specific probe patterns with deterministic embeddings and optional pgvector nearest-neighbor search.
 - JD competency generation uses the shared LLM JSON client with `prompts/competency_gen.md` and
   deterministic fallback, then normalizes outputs to preserve required scoring dimensions and
