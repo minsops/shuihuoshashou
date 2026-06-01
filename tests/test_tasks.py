@@ -92,6 +92,7 @@ def test_local_task_queue_records_success() -> None:
 
 def test_local_task_queue_records_failure() -> None:
     event_bus.reset()
+    metrics_registry.reset()
     queue = LocalTaskQueue()
 
     def fail(_: dict) -> None:
@@ -104,6 +105,9 @@ def test_local_task_queue_records_failure() -> None:
     assert records[0].status == "failed"
     assert records[0].error == "boom"
     assert [topic for topic, _ in event_bus.history()] == ["task.enqueued", "task.failed"]
+    metrics = metrics_registry.render_prometheus()
+    assert 'shuihuo_events_total{topic="task.enqueued"} 1' in metrics
+    assert 'shuihuo_events_total{topic="task.failed"} 1' in metrics
 
 
 def test_local_task_queue_can_defer_without_handler() -> None:
@@ -209,6 +213,7 @@ def test_redis_stream_worker_consumes_and_acks_task() -> None:
 
 def test_redis_stream_worker_publishes_failure_without_ack() -> None:
     event_bus.reset()
+    metrics_registry.reset()
     client = FakeRedis()
     publisher = RedisStreamPublisher(
         redis_url="redis://localhost:6379/0",
@@ -235,6 +240,8 @@ def test_redis_stream_worker_publishes_failure_without_ack() -> None:
     history = event_bus.history()
     assert [topic for topic, _ in history] == ["task.worker_failed"]
     assert history[0][1]["error"] == "boom"
+    metrics = metrics_registry.render_prometheus()
+    assert 'shuihuo_events_total{topic="task.worker_failed"} 1' in metrics
 
 
 def test_celery_task_publisher_sends_named_task() -> None:

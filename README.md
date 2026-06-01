@@ -125,8 +125,8 @@ HTTP responses include `X-Request-ID` and W3C `traceparent`; clients may send th
 correlate API calls, structured JSON logs, and Prometheus request metrics. Set
 `OTEL_EXPORTER_OTLP_ENDPOINT` when deploying behind an OpenTelemetry collector; the current local
 runtime emits trace-compatible IDs without requiring the SDK. The metrics endpoint also exposes
-domain/task event counters such as `task.enqueued`, `task.completed`, `interview.finished`, and
-`interview.reported` for the offline scoring path.
+domain/task event counters such as `task.enqueued`, `task.completed`, `task.failed`,
+`task.worker_failed`, `interview.finished`, and `interview.reported` for the offline scoring path.
 
 Check runtime configuration without exposing secrets:
 

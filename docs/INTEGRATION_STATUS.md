@@ -54,7 +54,8 @@ The local implementation is complete as a runnable MVP:
 - Configurable async end-interview mode returns queued task metadata while workers generate reports.
 - Async end-interview advances queued interviews to `SCORING` and rejects duplicate queueing.
 - In-memory event bus topics for `qa_turn.created`, `interview.finished`,
-  `task.enqueued`, `interview.scoring_started`, `interview.reported`, and `task.completed`.
+  `task.enqueued`, `task.completed`, `task.failed`, `task.worker_completed`,
+  `task.worker_failed`, `interview.scoring_started`, and `interview.reported`.
 - Behavior signal module with explicit administrator enablement and candidate consent gates.
 - BehaviorSignal schema forbids extra personality, emotion, reliability, or similar derived fields.
 - Candidate behavior-signal consent can be revoked and blocks future signal-enabled interviews.
@@ -67,7 +68,8 @@ The local implementation is complete as a runnable MVP:
 - Runtime config status exposes non-secret provider paths, response mapping paths, and timeouts for deployment diagnostics.
 - Runtime config status redacts database URL passwords.
 - Prometheus-style `/metrics` endpoint for local HTTP request counters and duration sums.
-- `/metrics` also exposes domain/task event counters for the offline scoring path.
+- `/metrics` also exposes domain/task event counters, including offline scoring success and
+  failure events.
 - Structured JSON request logs with propagated `X-Request-ID` correlation IDs.
 - W3C `traceparent` propagation with trace/span IDs included in request logs.
 - Optional per-client gateway rate limit gate with local and Redis-backed counter modes.
