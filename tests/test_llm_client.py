@@ -80,6 +80,43 @@ def test_llm_client_uses_configurable_protocol(monkeypatch) -> None:
     assert response.credibility.level == "solid"
 
 
+def test_llm_client_accepts_decoded_json_response_content(monkeypatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "openai_compatible")
+    monkeypatch.setenv("LLM_BASE_URL", "https://llm.example.test")
+    monkeypatch.setenv("LLM_API_KEY", "secret")
+    monkeypatch.setenv("LLM_RESPONSE_CONTENT_PATH", "data.output")
+    get_settings.cache_clear()
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "data": {
+                    "output": {
+                        "suggestions": [
+                            {
+                                "question": "对象响应追问",
+                                "target": "验证结构化响应",
+                                "competency": "项目真实性",
+                                "priority": 1,
+                            }
+                        ],
+                        "credibility": {
+                            "level": "solid",
+                            "reason": "供应商直接返回 JSON 对象",
+                            "drill_down_hint": "继续追问边界条件",
+                        },
+                    }
+                }
+            },
+        )
+
+    response = __import__("asyncio").run(_call_with_transport(httpx.MockTransport(handler)))
+
+    assert response.suggestions[0].question == "对象响应追问"
+    assert response.credibility.reason == "供应商直接返回 JSON 对象"
+
+
 def test_llm_client_falls_back_on_bad_response(monkeypatch) -> None:
     monkeypatch.setenv("LLM_PROVIDER", "openai_compatible")
     monkeypatch.setenv("LLM_BASE_URL", "https://llm.example.test")

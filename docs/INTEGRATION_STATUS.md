@@ -63,7 +63,8 @@ The local implementation is complete as a runnable MVP:
 - Candidate behavior-signal consent can be revoked and blocks future signal-enabled interviews.
 - Realtime signal emission re-checks active consent, so revoked consent suppresses later WS hints.
 - Configurable LLM client with mock mode and OpenAI-compatible HTTP mode.
-- LLM JSON responses are pydantic-validated with configurable retry before deterministic fallback.
+- LLM JSON responses are pydantic-validated from string or object payloads with configurable retry
+  before deterministic fallback.
 - Async and sync LLM paths support injectable transports for network-free unit tests.
 - Optional LLM provider-call rate limiting is enforced before outbound model requests.
 - Safe runtime config and LLM smoke-test scripts.

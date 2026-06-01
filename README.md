@@ -60,7 +60,8 @@ If `LLM_PROVIDER=mock` or no API key is present, the system runs with determinis
 The default values follow the MiMo OpenAI-compatible chat completions protocol. If the provider changes
 the endpoint, auth header, response JSON shape, or retry policy, change only the `LLM_*` environment
 variables above. LLM JSON parsing is validated with pydantic; failed HTTP/JSON/schema attempts retry
-once by default before falling back to deterministic local behavior.
+once by default before falling back to deterministic local behavior. The configured response path can
+resolve to either a JSON string or an already-decoded JSON object.
 Set `LLM_RATE_LIMIT_ENABLED=true` to cap provider calls per model before they leave the process;
 limited calls fall back locally unless diagnostic code asks for `raise_on_error`.
 

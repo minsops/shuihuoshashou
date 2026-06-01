@@ -153,9 +153,12 @@ def _auth_headers() -> dict[str, str]:
 
 def _parse_json_response(payload: Any, schema: type[T]) -> T:
     content = _extract_path(payload, get_settings().llm_response_content_path)
-    if not isinstance(content, str):
-        raise ValueError("LLM response content path did not resolve to a string")
-    data: Any = json.loads(content)
+    if isinstance(content, str):
+        data: Any = json.loads(content)
+    elif isinstance(content, (dict, list)):
+        data = content
+    else:
+        raise ValueError("LLM response content path did not resolve to JSON data")
     return schema.model_validate(data)
 
 
