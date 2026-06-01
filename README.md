@@ -196,8 +196,10 @@ Set `OFFLINE_TASK_BACKEND=celery` and install `.[celery]` to publish the same
 `CELERY_RESULT_BACKEND`.
 
 Set `OFFLINE_TASK_EXECUTION=async` to make `POST /api/interviews/{id}/end` return a queued task
-instead of blocking for the report. The worker then consumes the Redis Stream and creates the report.
-`POST /api/offline/evaluate` remains synchronous for demos and smoke tests.
+instead of blocking for the report. Once queued, the interview advances to `SCORING` so repeated
+end requests cannot enqueue duplicate offline scoring tasks. The worker then consumes the Redis
+Stream and creates the report. `POST /api/offline/evaluate` remains synchronous for demos and smoke
+tests.
 
 Run a Redis Streams consumer for offline scoring tasks with:
 

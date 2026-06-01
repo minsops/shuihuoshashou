@@ -43,6 +43,7 @@ The local implementation is complete as a runnable MVP:
 - Local task queue boundary for offline scoring with Redis Streams task publication and worker consumption.
 - Optional Celery task publication and worker registration for `interview.offline_scoring`.
 - Configurable async end-interview mode returns queued task metadata while workers generate reports.
+- Async end-interview advances queued interviews to `SCORING` and rejects duplicate queueing.
 - In-memory event bus topics for `qa_turn.created`, `interview.finished`,
   `task.enqueued`, `interview.scoring_started`, `interview.reported`, and `task.completed`.
 - Behavior signal module with explicit administrator enablement and candidate consent gates.

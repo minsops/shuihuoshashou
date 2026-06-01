@@ -287,8 +287,10 @@ def finish_interview(interview_id: str) -> InterviewRecord:
 
 def run_offline_scoring_task(interview_id: str):
     record = get_interview(interview_id)
-    if record.status != InterviewStatus.finished:
-        raise ValueError(f"offline scoring requires FINISHED status, got {record.status.value}")
+    if record.status not in {InterviewStatus.finished, InterviewStatus.scoring}:
+        raise ValueError(
+            f"offline scoring requires FINISHED or SCORING status, got {record.status.value}"
+        )
     record.status = InterviewStatus.scoring
     save_interview(record)
     event_bus.publish_nowait(
@@ -354,10 +356,15 @@ def enqueue_offline_scoring_task(interview_id: str, *, execute_inline: bool | No
     if execute_inline is None:
         execute_inline = get_settings().offline_task_execution != "async"
     if not execute_inline:
+        interview = get_interview(interview_id)
+        if interview.status != InterviewStatus.finished:
+            raise ValueError(f"cannot queue offline scoring from status {interview.status.value}")
         record = task_queue.enqueue_deferred(
             "interview.offline_scoring",
             {"interview_id": interview_id},
         )
+        interview.status = InterviewStatus.scoring
+        save_interview(interview)
         return OfflineTaskAccepted(
             interview_id=interview_id,
             task_id=record.task_id,

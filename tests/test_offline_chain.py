@@ -157,7 +157,7 @@ def test_offline_scoring_requires_finished_state(tmp_path: Path, monkeypatch) ->
     candidate = create_candidate(CandidateCreate(name="Grace"))
     interview = create_interview(InterviewCreate(job_id=job.id, candidate_id=candidate.id))
 
-    with pytest.raises(ValueError, match="offline scoring requires FINISHED"):
+    with pytest.raises(ValueError, match="offline scoring requires FINISHED or SCORING"):
         run_offline_scoring_task(interview.id)
 
 
@@ -210,12 +210,40 @@ def test_end_interview_can_queue_offline_scoring_without_running_it(
     assert accepted.status == "queued"
     assert accepted.interview_id == interview.id
     assert accepted.task_name == "interview.offline_scoring"
-    assert get_interview(interview.id).status == InterviewStatus.finished
+    assert get_interview(interview.id).status == InterviewStatus.scoring
     assert task_queue.history("interview.offline_scoring")[0].status == "queued"
     assert [topic for topic, _ in event_bus.history()][-2:] == [
         "interview.finished",
         "task.enqueued",
     ]
+
+    report = run_offline_scoring_task(interview.id)
+
+    assert report.interview_id == interview.id
+    assert get_interview(interview.id).status == InterviewStatus.reported
+
+
+def test_async_end_interview_rejects_duplicate_queueing(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'async-duplicate.db'}")
+    monkeypatch.setenv("REPORT_DIR", str(tmp_path / "reports"))
+    get_settings.cache_clear()
+    event_bus.reset()
+    task_queue.reset()
+    init_db()
+    job = create_job(JobCreate(title="Backend", jd_text="Python FastAPI"))
+    candidate = create_candidate(CandidateCreate(name="Grace"))
+    interview = create_interview(InterviewCreate(job_id=job.id, candidate_id=candidate.id))
+    add_turn(interview.id, QATurn(question="讲项目", answer="我写了 FastAPI 编排。"))
+
+    first = end_interview(interview.id, execute_inline=False)
+
+    assert first.status == "queued"
+    assert get_interview(interview.id).status == InterviewStatus.scoring
+    with pytest.raises(ValueError, match="cannot finish interview from status SCORING"):
+        end_interview(interview.id, execute_inline=False)
+    assert len(task_queue.history("interview.offline_scoring")) == 1
 
 
 def test_report_artifact_uris_use_object_storage_when_configured(
