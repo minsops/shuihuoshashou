@@ -284,6 +284,19 @@ def _validate_report_inputs(
 ) -> None:
     if score.session_id != ctx.session_id:
         raise ValueError("score session_id must match interview context session_id")
+    expected_dimension_names = [item.name for item in ctx.competency_model.items]
+    actual_dimension_names = [dimension.dimension for dimension in score.dimensions]
+    if actual_dimension_names != expected_dimension_names:
+        raise ValueError("score dimensions must match competency model items")
+    for dimension, item in zip(score.dimensions, ctx.competency_model.items, strict=True):
+        if abs(dimension.weight - item.weight) > 1e-9:
+            raise ValueError(f"score dimension weight must match competency model: {dimension.dimension}")
+    expected_total = _compute_total_score(score)
+    if abs(score.total_score - expected_total) > 0.01:
+        raise ValueError("score total_score must match dimension scores and weights")
+    expected_recommendation = _recommendation(expected_total)
+    if score.recommendation != expected_recommendation:
+        raise ValueError("score recommendation must match total_score")
     turns_by_id = {turn.turn_id: turn for turn in ctx.turns}
     if not turns_by_id:
         raise ValueError("report requires at least one transcript turn")
@@ -304,3 +317,23 @@ def _validate_report_inputs(
     for result in aigc:
         if result.turn_id not in turns_by_id:
             raise ValueError(f"AIGC result references unknown turn_id: {result.turn_id}")
+
+
+def _compute_total_score(score: InterviewScore) -> float:
+    positive = [dimension for dimension in score.dimensions if dimension.weight > 0]
+    weight_sum = sum(dimension.weight for dimension in positive) or 1.0
+    total = sum(dimension.score * dimension.weight for dimension in positive) / weight_sum
+    for dimension in score.dimensions:
+        if dimension.weight < 0:
+            total -= (100.0 - dimension.score) * abs(dimension.weight)
+    return round(max(0.0, min(100.0, total)), 2)
+
+
+def _recommendation(total_score: float) -> str:
+    if total_score >= 88:
+        return "strong_yes"
+    if total_score >= 75:
+        return "yes"
+    if total_score >= 60:
+        return "hold"
+    return "no"

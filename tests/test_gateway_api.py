@@ -397,6 +397,56 @@ def test_gateway_report_build_rejects_mismatched_inputs(
     assert rejected_score.status_code == 409
     assert "score session_id" in rejected_score.text
 
+    mismatched_dimension = json.loads(json.dumps(score))
+    mismatched_dimension["dimensions"][0]["dimension"] = "不存在的维度"
+    rejected_dimension = client.post(
+        "/api/report/build",
+        json={
+            "context": interview["context"],
+            "score": mismatched_dimension,
+            "aigc_results": aigc_results,
+        },
+    )
+    assert rejected_dimension.status_code == 409
+    assert "score dimensions must match competency model items" in rejected_dimension.text
+
+    mismatched_weight = json.loads(json.dumps(score))
+    mismatched_weight["dimensions"][0]["weight"] = 99
+    rejected_weight = client.post(
+        "/api/report/build",
+        json={
+            "context": interview["context"],
+            "score": mismatched_weight,
+            "aigc_results": aigc_results,
+        },
+    )
+    assert rejected_weight.status_code == 409
+    assert "score dimension weight must match competency model" in rejected_weight.text
+
+    mismatched_total = {**score, "total_score": 1}
+    rejected_total = client.post(
+        "/api/report/build",
+        json={
+            "context": interview["context"],
+            "score": mismatched_total,
+            "aigc_results": aigc_results,
+        },
+    )
+    assert rejected_total.status_code == 409
+    assert "score total_score must match dimension scores and weights" in rejected_total.text
+
+    mismatched_recommendation = {**score, "recommendation": "no"}
+    rejected_recommendation = client.post(
+        "/api/report/build",
+        json={
+            "context": interview["context"],
+            "score": mismatched_recommendation,
+            "aigc_results": aigc_results,
+        },
+    )
+    assert rejected_recommendation.status_code == 409
+    assert "score recommendation must match total_score" in rejected_recommendation.text
+
     mismatched_evidence = json.loads(json.dumps(score))
     mismatched_evidence["dimensions"][0]["evidence"][0]["turn_id"] = "missing-turn"
     rejected_evidence = client.post(
