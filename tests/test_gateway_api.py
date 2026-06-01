@@ -228,7 +228,7 @@ def test_gateway_job_probe_pattern_search(tmp_path: Path, monkeypatch) -> None:
     assert any("LLM" in item["pattern"] or "FastAPI" in item["pattern"] for item in payload)
 
 
-def test_gateway_exposes_internal_aigc_and_scoring_contracts(
+def test_gateway_exposes_internal_aigc_scoring_and_report_contracts(
     tmp_path: Path, monkeypatch
 ) -> None:
     client = _client(tmp_path, monkeypatch)
@@ -268,6 +268,19 @@ def test_gateway_exposes_internal_aigc_and_scoring_contracts(
     assert payload["dimensions"]
     assert payload["total_score"] > 0
     assert payload["risk_notes"]
+
+    report = client.post(
+        "/api/report/build",
+        json={"context": interview["context"], "score": payload, "aigc_results": aigc_results},
+    )
+    assert report.status_code == 200
+    report_payload = report.json()
+    assert report_payload["interview_id"] == interview["id"]
+    assert report_payload["score"]["total_score"] == payload["total_score"]
+    assert report_payload["aigc_results"][0]["turn_id"] == turns[0]["turn_id"]
+    assert report_payload["artifact_uris"]["html"].startswith("file://")
+    assert report_payload["artifact_uris"]["pdf"].startswith("file://")
+    assert Path(report_payload["pdf_path"]).read_bytes().startswith(b"%PDF")
 
 
 def test_gateway_end_interview_can_return_queued_task(tmp_path: Path, monkeypatch) -> None:

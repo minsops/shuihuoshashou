@@ -231,6 +231,12 @@ class ScoringRequest(BaseModel):
     aigc_results: list[AIGCResult] = Field(default_factory=list)
 
 
+class ReportBuildRequest(BaseModel):
+    context: InterviewContext
+    score: InterviewScore
+    aigc_results: list[AIGCResult] = Field(default_factory=list)
+
+
 class OfflineInterviewResult(BaseModel):
     job: JobRecord
     candidate: CandidateRecord

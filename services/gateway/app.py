@@ -29,6 +29,7 @@ from libs.schemas import (
     OfflineInterviewResult,
     ProbeRequest,
     QATurn,
+    ReportBuildRequest,
     ScoringRequest,
     TranscriptSegment,
 )
@@ -48,6 +49,7 @@ from services.interview_orchestrator.service import (
 )
 from services.jd_kb_service.service import create_job, get_job, retrieve_job_probe_patterns
 from services.probe_service.service import generate_probe
+from services.report_service.service import build_report
 from services.scoring_service.service import score_interview
 from services.signal_service.service import extract_behavior_signal
 
@@ -361,6 +363,12 @@ def api_aigc_detect(payload: AIGCDetectRequest):
 @app.post("/api/scoring/score")
 def api_scoring_score(payload: ScoringRequest):
     return score_interview(payload.context, payload.aigc_results)
+
+
+@app.post("/api/report/build")
+def api_report_build(payload: ReportBuildRequest):
+    report, _ = build_report(payload.context, payload.score, payload.aigc_results)
+    return report
 
 
 @app.post("/api/offline/evaluate", response_model=OfflineInterviewResult)
