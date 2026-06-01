@@ -156,7 +156,7 @@ def _radar_chart_uri(score: InterviewScore) -> str:
     return f"data:image/png;base64,{encoded}"
 
 
-def _write_pdf(html: str, pdf_path: Path) -> None:
+def _write_pdf(html: str, pdf_path: Path, fallback_lines: list[str]) -> None:
     try:
         with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
             from weasyprint import HTML
@@ -165,33 +165,70 @@ def _write_pdf(html: str, pdf_path: Path) -> None:
         return
     except Exception:
         # Local fallback for machines without WeasyPrint's native Pango/GObject stack.
-        text = "Shuihuo Killer interview report. Open the paired HTML report for full details."
-        escaped = text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
-        stream = f"BT /F1 12 Tf 72 720 Td ({escaped}) Tj ET"
-        objects = [
-            "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj",
-            "2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj",
-            (
-                "3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
-                "/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj"
-            ),
-            "4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj",
-            f"5 0 obj << /Length {len(stream)} >> stream\n{stream}\nendstream endobj",
-        ]
-        content = "%PDF-1.4\n"
-        offsets = [0]
-        for obj in objects:
-            offsets.append(len(content.encode("latin-1")))
-            content += obj + "\n"
-        xref_pos = len(content.encode("latin-1"))
-        content += f"xref\n0 {len(objects) + 1}\n0000000000 65535 f \n"
-        for offset in offsets[1:]:
-            content += f"{offset:010d} 00000 n \n"
-        content += (
-            f"trailer << /Size {len(objects) + 1} /Root 1 0 R >>\n"
-            f"startxref\n{xref_pos}\n%%EOF\n"
-        )
-        pdf_path.write_bytes(content.encode("latin-1"))
+        _write_text_fallback_pdf(fallback_lines, pdf_path)
+
+
+def _write_text_fallback_pdf(lines: list[str], pdf_path: Path) -> None:
+    wrapped_lines: list[str] = []
+    for line in lines:
+        wrapped_lines.extend(_wrap_pdf_text(line, width=92))
+    wrapped_lines = wrapped_lines[:42]
+    commands = ["BT", "/F1 10 Tf", "72 740 Td", "14 TL"]
+    for index, line in enumerate(wrapped_lines):
+        if index:
+            commands.append("T*")
+        commands.append(f"({_pdf_escape(_pdf_safe_text(line))}) Tj")
+    commands.append("ET")
+    stream = "\n".join(commands)
+    stream_bytes = stream.encode("latin-1")
+    objects = [
+        "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj",
+        "2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj",
+        (
+            "3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+            "/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj"
+        ),
+        "4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj",
+        f"5 0 obj << /Length {len(stream_bytes)} >> stream\n{stream}\nendstream endobj",
+    ]
+    content = "%PDF-1.4\n"
+    offsets = [0]
+    for obj in objects:
+        offsets.append(len(content.encode("latin-1")))
+        content += obj + "\n"
+    xref_pos = len(content.encode("latin-1"))
+    content += f"xref\n0 {len(objects) + 1}\n0000000000 65535 f \n"
+    for offset in offsets[1:]:
+        content += f"{offset:010d} 00000 n \n"
+    content += (
+        f"trailer << /Size {len(objects) + 1} /Root 1 0 R >>\n"
+        f"startxref\n{xref_pos}\n%%EOF\n"
+    )
+    pdf_path.write_bytes(content.encode("latin-1"))
+
+
+def _pdf_safe_text(value: str) -> str:
+    return "".join(char if 32 <= ord(char) <= 126 else "?" for char in value)
+
+
+def _pdf_escape(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+
+def _wrap_pdf_text(value: str, *, width: int) -> list[str]:
+    if len(value) <= width:
+        return [value]
+    lines: list[str] = []
+    remaining = value
+    while len(remaining) > width:
+        split_at = remaining.rfind(" ", 0, width)
+        if split_at <= 0:
+            split_at = width
+        lines.append(remaining[:split_at])
+        remaining = remaining[split_at:].lstrip()
+    if remaining:
+        lines.append(remaining)
+    return lines
 
 
 def _write_report_json(report: Report, json_path: Path) -> None:
@@ -232,7 +269,7 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
         ),
         encoding="utf-8",
     )
-    _write_pdf(html, pdf_path)
+    _write_pdf(html, pdf_path, _fallback_pdf_lines(ctx, score, aigc, summary))
     artifact_store = get_artifact_store()
     html_artifact = artifact_store.put_file(
         f"reports/{ctx.session_id}.html",
@@ -275,6 +312,45 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
         "application/json; charset=utf-8",
     )
     return report, html
+
+
+def _fallback_pdf_lines(
+    ctx: InterviewContext,
+    score: InterviewScore,
+    aigc: list[AIGCResult],
+    summary: str,
+) -> list[str]:
+    lines = [
+        "Shuihuo Killer Interview Report",
+        f"Interview: {ctx.session_id}",
+        f"Total score: {score.total_score}",
+        f"Recommendation: {score.recommendation}",
+        f"Summary: {summary}",
+        "Dimension scores:",
+    ]
+    for dimension in score.dimensions:
+        evidence = dimension.evidence[0].excerpt if dimension.evidence else ""
+        lines.append(
+            f"- {dimension.dimension}: score={dimension.score}, weight={dimension.weight}, "
+            f"evidence={evidence}"
+        )
+    lines.append("Risk notes:")
+    if score.risk_notes:
+        lines.extend(f"- {note}" for note in score.risk_notes)
+    else:
+        lines.append("- None")
+    for flag in ctx.flags:
+        lines.append(f"- Consistency {flag.severity}: {flag.description}")
+    lines.append("AIGC checks:")
+    for result in aigc:
+        lines.append(
+            f"- turn={result.turn_id}, ai_prob={result.ai_generated_prob}, "
+            f"template_similarity={result.template_similarity}, flagged={result.flagged}"
+        )
+    lines.append("Transcript:")
+    for index, turn in enumerate(ctx.turns, start=1):
+        lines.append(f"- T{index} [{turn.question_source}] Q={turn.question} A={turn.answer}")
+    return lines
 
 
 def _validate_report_inputs(

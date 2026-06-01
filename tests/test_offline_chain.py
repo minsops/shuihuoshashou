@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import builtins
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -12,6 +13,7 @@ from libs.common.events import event_bus
 from libs.common.tasks import task_queue
 from libs.schemas import (
     CandidateCreate,
+    AIGCResult,
     CompetencyItem,
     CompetencyModel,
     ConsentCreate,
@@ -52,6 +54,7 @@ from services.jd_kb_service.service import (
 )
 from libs.common.prompts import load_prompt
 from services.probe_service.service import fallback_probe, generate_probe
+from services.report_service.service import build_report
 from services.scoring_service.service import score_interview
 
 
@@ -444,6 +447,77 @@ def test_score_interview_uses_prompt_and_recomputes_total(monkeypatch) -> None:
     assert score.recommendation == "yes"
     assert all(dimension.weight != 999.0 for dimension in score.dimensions)
     assert score.risk_notes == ["LLM draft risk"]
+
+
+def test_report_pdf_fallback_contains_auditable_summary(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("REPORT_DIR", str(tmp_path / "reports"))
+    get_settings.cache_clear()
+    real_import = builtins.__import__
+
+    def fake_import(name, globals_=None, locals_=None, fromlist=(), level=0):
+        if name == "weasyprint":
+            raise ImportError("blocked in test")
+        return real_import(name, globals_, locals_, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    competency = CompetencyItem(
+        name="Backend Depth",
+        description="Backend implementation depth",
+        weight=1.0,
+    )
+    model = CompetencyModel(job_id="job-local", job_title="Backend", items=[competency])
+    turn = QATurn(
+        question="Describe the API project",
+        answer="Built FastAPI retry logic and JSON validation.",
+        answer_start_ms=100,
+        answer_end_ms=1200,
+    )
+    ctx = InterviewContext(
+        session_id="session-fallback-pdf",
+        job_id=model.job_id,
+        candidate_id="candidate-local",
+        competency_model=model,
+        turns=[turn],
+    )
+    score = InterviewScore(
+        session_id=ctx.session_id,
+        dimensions=[
+            DimensionScore(
+                dimension=competency.name,
+                score=80.0,
+                weight=competency.weight,
+                evidence=[
+                    EvidenceRef(
+                        turn_id=turn.turn_id,
+                        quote_start_ms=turn.answer_start_ms,
+                        quote_end_ms=turn.answer_end_ms,
+                        excerpt=turn.answer,
+                    )
+                ],
+            )
+        ],
+        total_score=80.0,
+        risk_notes=["Needs deeper production incident evidence"],
+        recommendation="yes",
+    )
+    aigc = [
+        AIGCResult(
+            turn_id=turn.turn_id,
+            ai_generated_prob=0.1,
+            template_similarity=0.1,
+            flagged=False,
+        )
+    ]
+
+    report, _ = build_report(ctx, score, aigc)
+
+    pdf_bytes = Path(report.pdf_path or "").read_bytes()
+    assert pdf_bytes.startswith(b"%PDF")
+    assert b"Total score: 80.0" in pdf_bytes
+    assert b"Recommendation: yes" in pdf_bytes
+    assert b"Backend Depth" in pdf_bytes
+    assert b"Transcript:" in pdf_bytes
+    assert b"Built FastAPI retry logic and JSON" in pdf_bytes
 
 
 def test_score_interview_normalizes_evidence_to_real_turns(monkeypatch) -> None:

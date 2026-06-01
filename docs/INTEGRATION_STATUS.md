@@ -61,6 +61,8 @@ The local implementation is complete as a runnable MVP:
   statements, and consistency checks run against that fact table.
 - Structured JSON and HTML/PDF reports include highlights, radar charts, AIGC risk highlights,
   recommendation, and the full interview transcript.
+- PDF generation falls back to an auditable text PDF with score, recommendation, dimension evidence,
+  risk, AIGC, and transcript summary if WeasyPrint's native rendering stack is unavailable.
 - Report input validation rejects score/session mismatches, dimension or weight mismatches,
   inconsistent totals/recommendations, unknown EvidenceRef/AIGC turn ids, out-of-range evidence
   timestamps, evidence excerpts not present in the transcript answer, and incomplete or duplicate
