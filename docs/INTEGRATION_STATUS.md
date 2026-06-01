@@ -61,7 +61,8 @@ The local implementation is complete as a runnable MVP:
   `task.worker_failed`, `interview.scoring_started`, and `interview.reported`.
 - Behavior signal module with explicit administrator enablement and candidate consent gates.
 - BehaviorSignal schema forbids extra personality, emotion, reliability, or similar derived fields.
-- Candidate behavior-signal consent can be revoked and blocks future signal-enabled interviews.
+- Candidate behavior-signal consent can be revoked and blocks future signal-enabled interviews, with
+  SQLite/PostgreSQL-compatible boolean predicates.
 - Realtime signal emission re-checks active consent, so revoked consent suppresses later WS hints.
 - Configurable LLM client with mock mode and OpenAI-compatible HTTP mode.
 - LLM JSON responses are pydantic-validated from string or object payloads with configurable retry

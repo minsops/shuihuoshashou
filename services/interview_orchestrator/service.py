@@ -48,10 +48,10 @@ def create_consent(payload: ConsentCreate) -> ConsentRecord:
                 SET revoked_at = ?
                 WHERE candidate_id = ?
                   AND consent_type = ?
-                  AND granted = 1
+                  AND granted = ?
                   AND revoked_at IS NULL
                 """,
-                (now.isoformat(), payload.candidate_id, payload.consent_type),
+                (now.isoformat(), payload.candidate_id, payload.consent_type, True),
             )
     record = ConsentRecord(
         candidate_id=payload.candidate_id,
@@ -87,11 +87,11 @@ def has_active_consent(candidate_id: str, consent_type: str) -> bool:
             SELECT 1 FROM consents
             WHERE candidate_id = ?
               AND consent_type = ?
-              AND granted = 1
+              AND granted = ?
               AND revoked_at IS NULL
             LIMIT 1
             """,
-            (candidate_id, consent_type),
+            (candidate_id, consent_type, True),
         ).fetchone()
     return row is not None
 

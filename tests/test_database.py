@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import builtins
+from pathlib import Path
 
 import pytest
 
@@ -72,6 +73,13 @@ def test_postgres_query_translation_preserves_pgvector_cast() -> None:
 
     assert "embedding_vector <=> %s::vector" in translated
     assert translated.endswith("LIMIT %s")
+
+
+def test_consent_queries_use_parameterized_boolean_comparison() -> None:
+    source = Path("services/interview_orchestrator/service.py").read_text(encoding="utf-8")
+
+    assert "granted = 1" not in source
+    assert "granted = ?" in source
 
 
 def test_loads_accepts_postgres_json_values() -> None:
