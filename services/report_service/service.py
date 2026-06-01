@@ -202,6 +202,7 @@ def _write_report_json(report: Report, json_path: Path) -> None:
 
 
 def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCResult]) -> tuple[Report, str]:
+    _validate_report_inputs(ctx, score, aigc)
     summary = (
         f"候选人在本场面试中获得 {score.total_score} 分，系统建议为 {score.recommendation}。"
         "报告中的每项评分均绑定原始回答证据，注水风险需由面试官结合上下文复核。"
@@ -274,3 +275,22 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
         "application/json; charset=utf-8",
     )
     return report, html
+
+
+def _validate_report_inputs(
+    ctx: InterviewContext,
+    score: InterviewScore,
+    aigc: list[AIGCResult],
+) -> None:
+    if score.session_id != ctx.session_id:
+        raise ValueError("score session_id must match interview context session_id")
+    turn_ids = {turn.turn_id for turn in ctx.turns}
+    if not turn_ids:
+        raise ValueError("report requires at least one transcript turn")
+    for dimension in score.dimensions:
+        for evidence in dimension.evidence:
+            if evidence.turn_id not in turn_ids:
+                raise ValueError(f"score evidence references unknown turn_id: {evidence.turn_id}")
+    for result in aigc:
+        if result.turn_id not in turn_ids:
+            raise ValueError(f"AIGC result references unknown turn_id: {result.turn_id}")

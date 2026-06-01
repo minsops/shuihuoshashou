@@ -398,8 +398,11 @@ def api_scoring_score(payload: ScoringRequest):
 
 @app.post("/api/report/build")
 def api_report_build(payload: ReportBuildRequest):
-    report, _ = build_report(payload.context, payload.score, payload.aigc_results)
-    return report
+    try:
+        report, _ = build_report(payload.context, payload.score, payload.aigc_results)
+        return report
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @app.post("/api/offline/evaluate", response_model=OfflineInterviewResult)

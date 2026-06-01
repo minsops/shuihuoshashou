@@ -356,6 +356,73 @@ def test_gateway_exposes_internal_aigc_scoring_and_report_contracts(
     assert Path(report_payload["pdf_path"]).read_bytes().startswith(b"%PDF")
 
 
+def test_gateway_report_build_rejects_mismatched_inputs(
+    tmp_path: Path, monkeypatch
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+    job = client.post(
+        "/api/jobs",
+        json={"title": "Backend", "jd_text": "Python FastAPI LLM 可靠性"},
+    ).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+    interview = client.post(
+        f"/api/interviews/{interview['id']}/turns",
+        json={
+            "question": "讲项目",
+            "answer": "我写了 FastAPI 编排、模型重试和 JSON 校验，因为线上有格式漂移。",
+            "answer_start_ms": 0,
+            "answer_end_ms": 1000,
+        },
+    ).json()
+    turns = interview["context"]["turns"]
+    aigc_results = client.post("/api/aigc/detect", json={"turns": turns}).json()
+    score = client.post(
+        "/api/scoring/score",
+        json={"context": interview["context"], "aigc_results": aigc_results},
+    ).json()
+
+    mismatched_score = {**score, "session_id": "other-session"}
+    rejected_score = client.post(
+        "/api/report/build",
+        json={
+            "context": interview["context"],
+            "score": mismatched_score,
+            "aigc_results": aigc_results,
+        },
+    )
+    assert rejected_score.status_code == 409
+    assert "score session_id" in rejected_score.text
+
+    mismatched_evidence = json.loads(json.dumps(score))
+    mismatched_evidence["dimensions"][0]["evidence"][0]["turn_id"] = "missing-turn"
+    rejected_evidence = client.post(
+        "/api/report/build",
+        json={
+            "context": interview["context"],
+            "score": mismatched_evidence,
+            "aigc_results": aigc_results,
+        },
+    )
+    assert rejected_evidence.status_code == 409
+    assert "score evidence references unknown turn_id" in rejected_evidence.text
+
+    mismatched_aigc = [{**aigc_results[0], "turn_id": "missing-turn"}]
+    rejected_aigc = client.post(
+        "/api/report/build",
+        json={
+            "context": interview["context"],
+            "score": score,
+            "aigc_results": mismatched_aigc,
+        },
+    )
+    assert rejected_aigc.status_code == 409
+    assert "AIGC result references unknown turn_id" in rejected_aigc.text
+
+
 def test_gateway_end_interview_can_return_queued_task(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("OFFLINE_TASK_EXECUTION", "async")
     client = _client(tmp_path, monkeypatch)

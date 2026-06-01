@@ -34,6 +34,7 @@ as a local-first Python MVP:
 - Report artifacts write local files by default and upload to S3-compatible storage when credentials are configured.
 - Reports include structured scores, radar charts, highlights, AIGC checks, consistency flags,
   risk highlights, recommendations, and full interview transcripts.
+- Report building rejects mismatched score sessions, evidence turn ids, or AIGC turn ids.
 - Report generation writes separate structured report JSON, HTML, PDF, and transcript JSON artifacts
   for audit and storage.
 - Interview context keeps an auditable fact-claim table for role, responsibility, technology, and
