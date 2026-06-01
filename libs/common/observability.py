@@ -69,6 +69,7 @@ class MetricsRegistry:
     def __init__(self) -> None:
         self._lock = Lock()
         self._requests: dict[tuple[str, str, int], RequestStats] = defaultdict(RequestStats)
+        self._events: dict[str, int] = defaultdict(int)
 
     def record_request(self, method: str, path: str, status_code: int, duration_seconds: float) -> None:
         key = (method.upper(), path, status_code)
@@ -77,6 +78,10 @@ class MetricsRegistry:
             stats.count += 1
             stats.duration_sum += duration_seconds
 
+    def record_event(self, topic: str) -> None:
+        with self._lock:
+            self._events[topic] += 1
+
     def render_prometheus(self) -> str:
         lines = [
             "# HELP shuihuo_http_requests_total Total HTTP requests.",
@@ -84,6 +89,7 @@ class MetricsRegistry:
         ]
         with self._lock:
             snapshot = sorted(self._requests.items())
+            event_snapshot = sorted(self._events.items())
         for (method, path, status), stats in snapshot:
             labels = (
                 f'method="{_label_value(method)}",'
@@ -122,11 +128,22 @@ class MetricsRegistry:
                 f'status="{status}"'
             )
             lines.append(f"shuihuo_http_request_duration_seconds_count{{{labels}}} {stats.count}")
+
+        lines.extend(
+            [
+                "# HELP shuihuo_events_total Total domain and task events published.",
+                "# TYPE shuihuo_events_total counter",
+            ]
+        )
+        for topic, count in event_snapshot:
+            labels = f'topic="{_label_value(topic)}"'
+            lines.append(f"shuihuo_events_total{{{labels}}} {count}")
         return "\n".join(lines) + "\n"
 
     def reset(self) -> None:
         with self._lock:
             self._requests.clear()
+            self._events.clear()
 
 
 @dataclass

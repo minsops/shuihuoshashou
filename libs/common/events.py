@@ -4,6 +4,8 @@ import asyncio
 from collections import defaultdict
 from typing import Any
 
+from libs.common.observability import metrics_registry
+
 
 class LocalEventBus:
     def __init__(self) -> None:
@@ -15,6 +17,7 @@ class LocalEventBus:
 
     def publish_nowait(self, topic: str, event: dict[str, Any]) -> None:
         self._history.append((topic, event))
+        metrics_registry.record_event(topic)
         self._queues[topic].put_nowait(event)
 
     async def next_event(self, topic: str) -> dict[str, Any]:

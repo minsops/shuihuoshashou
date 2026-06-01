@@ -331,6 +331,28 @@ def test_gateway_metrics_records_requests(tmp_path: Path, monkeypatch) -> None:
     )
 
 
+def test_gateway_metrics_include_offline_task_events(tmp_path: Path, monkeypatch) -> None:
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+    client.post(
+        f"/api/interviews/{interview['id']}/turns",
+        json={"question": "讲项目", "answer": "我写了 FastAPI 编排。"},
+    )
+    assert client.post(f"/api/interviews/{interview['id']}/end").status_code == 200
+
+    metrics = client.get("/metrics").text
+
+    assert 'shuihuo_events_total{topic="task.enqueued"} 1' in metrics
+    assert 'shuihuo_events_total{topic="task.completed"} 1' in metrics
+    assert 'shuihuo_events_total{topic="interview.finished"} 1' in metrics
+    assert 'shuihuo_events_total{topic="interview.reported"} 1' in metrics
+
+
 def test_gateway_writes_structured_request_log(
     tmp_path: Path, monkeypatch, caplog
 ) -> None:

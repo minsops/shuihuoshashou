@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from libs.common.events import event_bus
+from libs.common.observability import metrics_registry
 from libs.common.tasks import (
     CeleryBackedTaskQueue,
     CeleryTaskPublisher,
@@ -75,6 +76,7 @@ class FakeCeleryApp:
 
 def test_local_task_queue_records_success() -> None:
     event_bus.reset()
+    metrics_registry.reset()
     queue = LocalTaskQueue()
 
     record = queue.enqueue("demo.task", {"value": 2}, lambda payload: payload["value"] + 3)
@@ -83,6 +85,9 @@ def test_local_task_queue_records_success() -> None:
     assert record.result == 5
     assert queue.history("demo.task") == [record]
     assert [topic for topic, _ in event_bus.history()] == ["task.enqueued", "task.completed"]
+    metrics = metrics_registry.render_prometheus()
+    assert 'shuihuo_events_total{topic="task.enqueued"} 1' in metrics
+    assert 'shuihuo_events_total{topic="task.completed"} 1' in metrics
 
 
 def test_local_task_queue_records_failure() -> None:

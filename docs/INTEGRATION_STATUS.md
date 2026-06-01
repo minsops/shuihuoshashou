@@ -54,6 +54,7 @@ The local implementation is complete as a runnable MVP:
 - LLM JSON responses are pydantic-validated with configurable retry before deterministic fallback.
 - Safe runtime config and LLM smoke-test scripts.
 - Prometheus-style `/metrics` endpoint for local HTTP request counters and duration sums.
+- `/metrics` also exposes domain/task event counters for the offline scoring path.
 - Structured JSON request logs with propagated `X-Request-ID` correlation IDs.
 - W3C `traceparent` propagation with trace/span IDs included in request logs.
 - Optional per-client gateway rate limit gate with local and Redis-backed counter modes.

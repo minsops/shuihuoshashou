@@ -112,7 +112,9 @@ processes through Redis. Local development uses the in-memory backend by default
 HTTP responses include `X-Request-ID` and W3C `traceparent`; clients may send the same headers to
 correlate API calls, structured JSON logs, and Prometheus request metrics. Set
 `OTEL_EXPORTER_OTLP_ENDPOINT` when deploying behind an OpenTelemetry collector; the current local
-runtime emits trace-compatible IDs without requiring the SDK.
+runtime emits trace-compatible IDs without requiring the SDK. The metrics endpoint also exposes
+domain/task event counters such as `task.enqueued`, `task.completed`, `interview.finished`, and
+`interview.reported` for the offline scoring path.
 
 Check runtime configuration without exposing secrets:
 
