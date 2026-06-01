@@ -122,10 +122,10 @@ tables from the spec. The schema also applies CHECK constraints for interview st
 timestamps, question sources, score ranges, AIGC probability/similarity ranges, recommendations, and
 behavior-signal consent type.
 The runtime adapter translates the local repository parameter style and upserts for PostgreSQL.
-Set `JD_VECTOR_BACKEND=pgvector` on PostgreSQL deployments with pgvector installed to apply
-`db/postgres/002_pgvector_probe_patterns.sql` and use `embedding_vector <=> query` nearest-neighbor
-retrieval for probe-pattern search. The default `local` backend keeps Docker's plain PostgreSQL image
-runnable.
+The default compose stack mounts only the core schema into Postgres initialization so Docker's plain
+PostgreSQL image remains runnable. Set `JD_VECTOR_BACKEND=pgvector` on PostgreSQL deployments with
+pgvector installed to apply `db/postgres/002_pgvector_probe_patterns.sql` at application startup and
+use `embedding_vector <=> query` nearest-neighbor retrieval for probe-pattern search.
 
 Set `OBJECT_STORAGE_ENDPOINT`, `OBJECT_STORAGE_BUCKET`, `OBJECT_STORAGE_ACCESS_KEY`, and
 `OBJECT_STORAGE_SECRET_KEY` to upload report HTML/PDF artifacts to S3-compatible storage such as

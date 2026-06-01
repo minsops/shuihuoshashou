@@ -102,6 +102,8 @@ The local implementation is complete as a runnable MVP:
 - Docker Compose entrypoint for gateway, PostgreSQL-backed persistence, Redis, and MinIO.
 - Docker Compose forwards gateway auth, LLM retry/rate-limit, ASR mapping, probe trigger, AIGC
   detector, Redis rate-limit, and worker AIGC/LLM runtime settings into the services that use them.
+- Docker Compose mounts only the core PostgreSQL schema into initdb by default, leaving the optional
+  pgvector migration to `JD_VECTOR_BACKEND=pgvector` deployments with the extension installed.
 
 ## MiMo Configuration
 
