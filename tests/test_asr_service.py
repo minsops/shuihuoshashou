@@ -41,6 +41,18 @@ def test_stub_asr_decodes_text_and_metadata() -> None:
     assert segment.confidence == 0.7
 
 
+def test_stub_asr_normalizes_string_timestamp_bounds() -> None:
+    engine = StubASREngine()
+    audio = base64.b64encode("候选人的回答".encode("utf-8")).decode("ascii")
+
+    segment = asyncio.run(
+        engine.transcribe_chunk("session-1", 2, audio, start_ms="-10", end_ms="5.8")
+    )
+
+    assert segment.start_ms == 0
+    assert segment.end_ms == 5
+
+
 def test_http_asr_engine_posts_audio_and_maps_response(monkeypatch) -> None:
     requests: list[httpx.Request] = []
 
@@ -152,6 +164,32 @@ def test_http_asr_engine_treats_partial_strings_as_non_final(monkeypatch) -> Non
     segment = asyncio.run(engine.transcribe_chunk("session-1", 3, "YXVkaW8="))
 
     assert segment.is_final is False
+
+
+def test_http_asr_engine_normalizes_timestamp_bounds(monkeypatch) -> None:
+    def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "text": "时间戳异常片段",
+                "speaker": "candidate",
+                "start_ms": "-120",
+                "end_ms": "-240",
+                "is_final": "final",
+                "confidence": 0.8,
+            },
+        )
+
+    monkeypatch.setenv("ASR_PROVIDER", "http")
+    monkeypatch.setenv("ASR_BASE_URL", "https://asr.example.com")
+    get_settings.cache_clear()
+    engine = HTTPASREngine(transport=httpx.MockTransport(handler))
+
+    segment = asyncio.run(engine.transcribe_chunk("session-1", 3, "YXVkaW8="))
+
+    assert segment.start_ms == 0
+    assert segment.end_ms == 0
+    assert segment.is_final is True
 
 
 def test_get_asr_engine_uses_http_provider(monkeypatch) -> None:

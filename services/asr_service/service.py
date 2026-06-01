@@ -251,13 +251,17 @@ class StubASREngine(ASREngine):
             raw = base64.b64decode(audio_b64).decode("utf-8")
         except Exception:
             raw = ""
-        resolved_start_ms = seq * 1000 if start_ms is None else start_ms
+        resolved_start_ms, resolved_end_ms = _coerce_timestamp_bounds(
+            start_ms,
+            end_ms,
+            seq=seq,
+        )
         return TranscriptSegment(
             session_id=session_id,
             speaker=speaker or ("candidate" if seq % 2 else "interviewer"),
             text=raw or "本地 ASR stub 收到音频片段，生产环境请替换为云 ASR 或 faster-whisper。",
             start_ms=resolved_start_ms,
-            end_ms=resolved_start_ms + 900 if end_ms is None else end_ms,
+            end_ms=resolved_end_ms,
             is_final=is_final,
             confidence=0.8 if confidence is None else confidence,
         )
@@ -303,10 +307,11 @@ class HTTPASREngine(ASREngine):
         data = response.json()
         resolved_start_ms = _extract_optional(data, settings.asr_start_ms_path, start_ms)
         resolved_end_ms = _extract_optional(data, settings.asr_end_ms_path, end_ms)
-        if resolved_start_ms is None:
-            resolved_start_ms = seq * 1000
-        if resolved_end_ms is None:
-            resolved_end_ms = resolved_start_ms + 900
+        resolved_start_ms, resolved_end_ms = _coerce_timestamp_bounds(
+            resolved_start_ms,
+            resolved_end_ms,
+            seq=seq,
+        )
         resolved_confidence = _extract_optional(data, settings.asr_confidence_path, confidence)
         if resolved_confidence is None:
             resolved_confidence = 0.0
@@ -315,8 +320,8 @@ class HTTPASREngine(ASREngine):
             session_id=session_id,
             speaker=_coerce_speaker(_extract_optional(data, settings.asr_speaker_path, speaker)),
             text=str(_extract_path(data, settings.asr_text_path)),
-            start_ms=int(resolved_start_ms),
-            end_ms=int(resolved_end_ms),
+            start_ms=resolved_start_ms,
+            end_ms=resolved_end_ms,
             is_final=_coerce_bool(resolved_final),
             confidence=_clamp_float(resolved_confidence, minimum=0.0, maximum=1.0),
         )
@@ -386,6 +391,26 @@ def _coerce_bool(value: Any) -> bool:
 def _clamp_float(value: Any, *, minimum: float, maximum: float) -> float:
     resolved = float(value)
     return max(minimum, min(maximum, resolved))
+
+
+def _coerce_timestamp_bounds(
+    start_ms: Any,
+    end_ms: Any,
+    *,
+    seq: int,
+) -> tuple[int, int]:
+    start = max(0, _coerce_int(start_ms, seq * 1000))
+    end = _coerce_int(end_ms, start + 900)
+    return start, max(start, end)
+
+
+def _coerce_int(value: Any, fallback: int) -> int:
+    if value is None:
+        return fallback
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return fallback
 
 
 def _audio_fingerprint(audio_b64: str | None) -> str | None:
