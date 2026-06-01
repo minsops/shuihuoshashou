@@ -24,6 +24,7 @@ as a local-first Python MVP:
 - Report artifacts write local files by default and upload to S3-compatible storage when credentials are configured.
 - Reports include structured scores, radar charts, highlights, AIGC checks, consistency flags,
   risk highlights, recommendations, and full interview transcripts.
+- Report generation writes separate HTML, PDF, and transcript JSON artifacts for audit and storage.
 - Scoring uses the shared LLM JSON client for structured dimension drafts and recomputes final
   totals in Python for auditability and deterministic fallback behavior.
 - AIGC checks combine a local answer-template corpus with optional HTTP detector integration.
@@ -91,7 +92,8 @@ runnable.
 
 Set `OBJECT_STORAGE_ENDPOINT`, `OBJECT_STORAGE_BUCKET`, `OBJECT_STORAGE_ACCESS_KEY`, and
 `OBJECT_STORAGE_SECRET_KEY` to upload report HTML/PDF artifacts to S3-compatible storage such as
-MinIO. The gateway still writes a local copy first for development and auditability.
+MinIO. Transcript JSON artifacts are uploaded through the same store. The gateway still writes a
+local copy first for development and auditability.
 
 Operational endpoints:
 

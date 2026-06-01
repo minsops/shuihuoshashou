@@ -32,7 +32,8 @@ The local implementation is complete as a runnable MVP:
   integration with deterministic local fallback.
 - Structured JSON and HTML/PDF reports include highlights, radar charts, AIGC risk highlights,
   recommendation, and the full interview transcript.
-- Report artifacts support local `file://` storage and SigV4 uploads to S3-compatible storage.
+- Report artifacts support local `file://` storage and SigV4 uploads to S3-compatible storage for
+  HTML, PDF, and transcript JSON outputs.
 - Local offline scoring task flow with `FINISHED -> SCORING -> REPORTED` state transitions.
 - Local task queue boundary for offline scoring with Redis Streams task publication and worker consumption.
 - Optional Celery task publication and worker registration for `interview.offline_scoring`.

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import json
 from contextlib import redirect_stderr, redirect_stdout
 from io import BytesIO, StringIO
 from pathlib import Path
@@ -211,7 +212,17 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
     settings.report_dir.mkdir(parents=True, exist_ok=True)
     html_path = Path(settings.report_dir / f"{ctx.session_id}.html")
     pdf_path = Path(settings.report_dir / f"{ctx.session_id}.pdf")
+    transcript_path = Path(settings.report_dir / f"{ctx.session_id}.transcript.json")
     html_path.write_text(html, encoding="utf-8")
+    transcript_path.write_text(
+        json.dumps(
+            [turn.model_dump() for turn in ctx.turns],
+            ensure_ascii=False,
+            default=str,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
     _write_pdf(html, pdf_path)
     artifact_store = get_artifact_store()
     html_artifact = artifact_store.put_file(
@@ -224,6 +235,11 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
         pdf_path,
         "application/pdf",
     )
+    transcript_artifact = artifact_store.put_file(
+        f"reports/{ctx.session_id}.transcript.json",
+        transcript_path,
+        "application/json; charset=utf-8",
+    )
     report = Report(
         interview_id=ctx.session_id,
         score=score,
@@ -233,6 +249,11 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
         summary=summary,
         html_path=str(html_path),
         pdf_path=str(pdf_path),
-        artifact_uris={"html": html_artifact.uri, "pdf": pdf_artifact.uri},
+        transcript_path=str(transcript_path),
+        artifact_uris={
+            "html": html_artifact.uri,
+            "pdf": pdf_artifact.uri,
+            "transcript": transcript_artifact.uri,
+        },
     )
     return report, html

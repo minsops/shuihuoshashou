@@ -83,7 +83,9 @@ def test_offline_interview_chain(tmp_path: Path, monkeypatch) -> None:
     assert report.transcript
     assert report.transcript[0].answer == "我主要负责整体架构设计并推动项目落地最终取得显著提升"
     assert (tmp_path / "reports" / f"{interview.id}.html").exists()
+    assert (tmp_path / "reports" / f"{interview.id}.transcript.json").exists()
     html = Path(report.html_path or "").read_text(encoding="utf-8")
+    transcript_json = loads(Path(report.transcript_path or "").read_text(encoding="utf-8"))
     assert "data:image/png;base64" in html
     assert "亮点" in html
     assert "AIGC 察重" in html
@@ -92,6 +94,8 @@ def test_offline_interview_chain(tmp_path: Path, monkeypatch) -> None:
     assert report.transcript[0].answer in html
     assert report.artifact_uris["html"].startswith("file://")
     assert report.artifact_uris["pdf"].startswith("file://")
+    assert report.artifact_uris["transcript"].startswith("file://")
+    assert transcript_json[0]["answer"] == report.transcript[0].answer
     assert get_interview(interview.id).status == InterviewStatus.reported
     assert [turn.turn_id for turn in list_turns(interview.id)]
     assert [topic for topic, _ in event_bus.history()] == [
@@ -200,9 +204,11 @@ def test_report_artifact_uris_use_object_storage_when_configured(
     assert report.artifact_uris == {
         "html": f"s3://reports-bucket/reports/{interview.id}.html",
         "pdf": f"s3://reports-bucket/reports/{interview.id}.pdf",
+        "transcript": f"s3://reports-bucket/reports/{interview.id}.transcript.json",
     }
     assert Path(report.html_path or "").exists()
     assert Path(report.pdf_path or "").exists()
+    assert Path(report.transcript_path or "").exists()
 
 
 def test_probe_fallback_returns_three_suggestions() -> None:
