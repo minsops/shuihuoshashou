@@ -127,7 +127,7 @@ class CredibilitySignal(BaseModel):
 
 
 class ProbeResponse(BaseModel):
-    suggestions: list[ProbeSuggestion]
+    suggestions: list[ProbeSuggestion] = Field(min_length=1, max_length=3)
     credibility: CredibilitySignal
 
 

@@ -3,7 +3,15 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from libs.schemas import BehaviorSignal, EvidenceRef, QATurn, TranscriptSegment
+from libs.schemas import (
+    BehaviorSignal,
+    CredibilitySignal,
+    EvidenceRef,
+    ProbeResponse,
+    ProbeSuggestion,
+    QATurn,
+    TranscriptSegment,
+)
 
 
 def test_behavior_signal_forbids_compliance_sensitive_extra_fields() -> None:
@@ -103,4 +111,32 @@ def test_evidence_ref_rejects_invalid_quote_time_ranges() -> None:
             quote_start_ms=200,
             quote_end_ms=100,
             excerpt="回答片段",
+        )
+
+
+def test_probe_response_requires_one_to_three_suggestions() -> None:
+    credibility = CredibilitySignal(
+        level="vague",
+        reason="缺少具体细节",
+        drill_down_hint="追问本人负责部分",
+    )
+    suggestion = ProbeSuggestion(
+        question="请讲清楚你本人负责哪一段？",
+        target="验证项目真实性",
+        competency="项目真实性",
+        priority=1,
+    )
+
+    response = ProbeResponse(suggestions=[suggestion], credibility=credibility)
+
+    assert response.suggestions[0].priority == 1
+    with pytest.raises(ValidationError):
+        ProbeResponse(suggestions=[], credibility=credibility)
+    with pytest.raises(ValidationError):
+        ProbeResponse(
+            suggestions=[
+                suggestion.model_copy(update={"priority": priority})
+                for priority in [1, 2, 3, 3]
+            ],
+            credibility=credibility,
         )
