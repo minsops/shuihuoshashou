@@ -74,6 +74,30 @@ def test_gateway_offline_report_flow(tmp_path: Path, monkeypatch) -> None:
     pdf = client.get(f"/api/interviews/{interview['id']}/report.pdf")
     assert pdf.status_code == 200
     assert pdf.headers["content-type"] == "application/pdf"
+    assert pdf.content.startswith(b"%PDF")
+
+
+def test_gateway_report_pdf_returns_404_when_artifact_missing(
+    tmp_path: Path, monkeypatch
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+    client.post(
+        f"/api/interviews/{interview['id']}/turns",
+        json={"question": "讲项目", "answer": "我写了 FastAPI 编排。"},
+    )
+    report = client.post(f"/api/interviews/{interview['id']}/end").json()
+    Path(report["pdf_path"]).unlink()
+
+    missing = client.get(f"/api/interviews/{interview['id']}/report.pdf")
+
+    assert missing.status_code == 404
+    assert "report pdf not found" in missing.text
 
 
 def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:

@@ -407,7 +407,7 @@ def api_report_pdf(interview_id: str):
     try:
         report, _ = get_report(interview_id)
         pdf_path = report.get("pdf_path")
-        if not pdf_path:
+        if not pdf_path or not Path(pdf_path).exists():
             raise KeyError(f"report pdf not found: {interview_id}")
         return FileResponse(pdf_path, media_type="application/pdf", filename=f"{interview_id}.pdf")
     except KeyError as exc:

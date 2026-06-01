@@ -85,8 +85,10 @@ def test_offline_interview_chain(tmp_path: Path, monkeypatch) -> None:
     assert report.transcript
     assert report.transcript[0].answer == "我主要负责整体架构设计并推动项目落地最终取得显著提升"
     assert (tmp_path / "reports" / f"{interview.id}.html").exists()
+    assert (tmp_path / "reports" / f"{interview.id}.pdf").exists()
     assert (tmp_path / "reports" / f"{interview.id}.transcript.json").exists()
     html = Path(report.html_path or "").read_text(encoding="utf-8")
+    pdf_bytes = Path(report.pdf_path or "").read_bytes()
     transcript_json = loads(Path(report.transcript_path or "").read_text(encoding="utf-8"))
     assert "data:image/png;base64" in html
     assert "亮点" in html
@@ -97,6 +99,7 @@ def test_offline_interview_chain(tmp_path: Path, monkeypatch) -> None:
     assert report.artifact_uris["html"].startswith("file://")
     assert report.artifact_uris["pdf"].startswith("file://")
     assert report.artifact_uris["transcript"].startswith("file://")
+    assert pdf_bytes.startswith(b"%PDF")
     assert transcript_json[0]["answer"] == report.transcript[0].answer
     assert persisted.status == InterviewStatus.reported
     assert persisted.context.fact_claims
