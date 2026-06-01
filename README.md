@@ -21,6 +21,7 @@ as a local-first Python MVP:
 - PostgreSQL core schema SQL is provided under `db/postgres` for compose initialization.
 - Runtime database URL parsing supports SQLite and PostgreSQL targets.
 - JD knowledge base indexes competency-specific probe patterns with deterministic embeddings and optional pgvector search.
+- JD competency models are generated through the shared LLM JSON client with deterministic fallback.
 - Report artifacts write local files by default and upload to S3-compatible storage when credentials are configured.
 - Reports include structured scores, radar charts, highlights, AIGC checks, consistency flags,
   risk highlights, recommendations, and full interview transcripts.

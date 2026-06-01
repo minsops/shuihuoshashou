@@ -24,6 +24,8 @@ The local implementation is complete as a runnable MVP:
 - Database URL dialect detection and runtime connection support for SQLite and PostgreSQL targets.
 - Separate `qa_turns` persistence for auditable answer evidence.
 - JD knowledge base indexes competency-specific probe patterns with deterministic embeddings and optional pgvector nearest-neighbor search.
+- JD competency generation uses the shared LLM JSON client with `prompts/competency_gen.md` and
+  deterministic fallback.
 - Probe generation, scoring, AIGC/template checks, consistency checks, HTML/PDF report generation.
 - Scoring uses the shared LLM JSON client for structured dimension drafts, then normalizes evidence
   and recomputes final totals in Python.

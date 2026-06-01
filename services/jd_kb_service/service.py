@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import math
 import re
 from datetime import UTC, datetime
 
 from libs.common.config import get_settings
 from libs.common.database import connect, dumps, get_database_target, init_db, loads
+from libs.common.prompts import load_prompt
+from libs.llm_client import LLMMessage, get_llm_client
 from libs.schemas import (
     CompetencyItem,
     CompetencyModel,
@@ -87,6 +90,22 @@ def cosine_similarity(left: list[float], right: list[float]) -> float:
 
 
 def generate_competency_model(job_id: str, title: str, jd_text: str) -> CompetencyModel:
+    fallback = fallback_competency_model(job_id, title, jd_text)
+    messages = [
+        LLMMessage(role="system", content=load_prompt("competency_gen.md")),
+        LLMMessage(
+            role="user",
+            content=json.dumps(
+                {"job_id": job_id, "job_title": title, "jd_text": jd_text},
+                ensure_ascii=False,
+            ),
+        ),
+    ]
+    draft = get_llm_client().complete_json_sync(messages, CompetencyModel, fallback)
+    return draft.model_copy(update={"job_id": job_id, "job_title": title})
+
+
+def fallback_competency_model(job_id: str, title: str, jd_text: str) -> CompetencyModel:
     text = jd_text.lower()
     items: list[CompetencyItem] = []
     for name, description, weight in DEFAULT_DIMENSIONS:

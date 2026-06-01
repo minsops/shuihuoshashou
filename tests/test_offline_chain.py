@@ -313,6 +313,38 @@ def test_score_interview_uses_prompt_and_recomputes_total(monkeypatch) -> None:
     assert score.risk_notes == ["LLM draft risk"]
 
 
+def test_competency_generation_uses_prompt_and_overrides_ids(monkeypatch) -> None:
+    sent_messages = []
+    draft = CompetencyModel(
+        job_id="wrong",
+        job_title="wrong",
+        items=[
+            CompetencyItem(
+                name="工程深度",
+                description="验证设计和排障能力",
+                probe_patterns=["请讲一次线上故障的定位过程。"],
+                weight=1.0,
+            )
+        ],
+    )
+
+    class FakeClient:
+        def complete_json_sync(self, messages, schema, fallback):
+            sent_messages.extend(messages)
+            return draft
+
+    monkeypatch.setattr("services.jd_kb_service.service.get_llm_client", lambda: FakeClient())
+
+    model = generate_competency_model("job-local", "Backend", "Python FastAPI")
+
+    assert sent_messages[0].role == "system"
+    assert sent_messages[0].content == load_prompt("competency_gen.md")
+    assert "Python FastAPI" in sent_messages[1].content
+    assert model.job_id == "job-local"
+    assert model.job_title == "Backend"
+    assert model.items[0].name == "工程深度"
+
+
 def test_jd_kb_retrieves_relevant_probe_patterns(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'kb.db'}")
     get_settings.cache_clear()
