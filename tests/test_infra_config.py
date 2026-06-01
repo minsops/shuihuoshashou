@@ -14,6 +14,7 @@ def test_docker_compose_declares_required_infrastructure() -> None:
     assert "postgres:16-alpine" in compose
     assert "redis:7-alpine" in compose
     assert "minio/minio" in compose
+    assert "DATABASE_URL: postgresql://shuihuo:shuihuo_local@postgres:5432/shuihuo_killer" in compose
     assert "REDIS_URL: redis://redis:6379/0" in compose
     assert "OBJECT_STORAGE_ENDPOINT: http://minio:9000" in compose
     assert "./db/postgres:/docker-entrypoint-initdb.d:ro" in compose
@@ -24,7 +25,7 @@ def test_dockerfile_packages_gateway_app() -> None:
     dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
 
     assert "FROM python:3.11-slim" in dockerfile
-    assert "pip install --no-cache-dir -e ." in dockerfile
+    assert 'pip install --no-cache-dir -e ".[postgres,redis]"' in dockerfile
     assert "uvicorn" in dockerfile
     assert "services.gateway.app:app" in dockerfile
 

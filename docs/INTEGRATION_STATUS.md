@@ -59,7 +59,7 @@ The local implementation is complete as a runnable MVP:
 - Structured JSON request logs with propagated `X-Request-ID` correlation IDs.
 - W3C `traceparent` propagation with trace/span IDs included in request logs.
 - Optional per-client gateway rate limit gate with local and Redis-backed counter modes.
-- Docker Compose entrypoint for gateway, PostgreSQL, Redis, and MinIO.
+- Docker Compose entrypoint for gateway, PostgreSQL-backed persistence, Redis, and MinIO.
 
 ## MiMo Configuration
 

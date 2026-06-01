@@ -5,7 +5,7 @@ services:
       - "8000:8000"
     environment:
       APP_ENV: docker
-      DATABASE_URL: sqlite:////app/data/shuihuo_killer.db
+      DATABASE_URL: postgresql://shuihuo:shuihuo_local@postgres:5432/shuihuo_killer
       REDIS_URL: redis://redis:6379/0
       OBJECT_STORAGE_ENDPOINT: http://minio:9000
       OBJECT_STORAGE_BUCKET: shuihuo-killer

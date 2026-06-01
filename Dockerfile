@@ -22,7 +22,7 @@ COPY prompts ./prompts
 COPY scripts ./scripts
 COPY web ./web
 
-RUN pip install --no-cache-dir -e .
+RUN pip install --no-cache-dir -e ".[postgres,redis]"
 
 EXPOSE 8000
 

@@ -84,8 +84,9 @@ PostgreSQL, Redis, and S3-compatible MinIO.
 docker compose up --build
 ```
 
-The gateway uses SQLite in the default local profile. Set `DATABASE_URL` to a `postgresql://...`
-URL and install `.[postgres]` to run the same repository calls against PostgreSQL.
+The compose gateway uses PostgreSQL by default through
+`postgresql://shuihuo:shuihuo_local@postgres:5432/shuihuo_killer`, while the non-Docker local
+profile still defaults to SQLite for quick demos.
 
 PostgreSQL initializes from `db/postgres/001_core_schema.sql`, which declares the core jobs,
 candidates, interviews, turns, probe-pattern embeddings, scores, AIGC results, reports, and consent tables from the spec.
