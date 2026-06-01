@@ -52,6 +52,7 @@ def test_docker_compose_declares_required_infrastructure() -> None:
     assert "services.offline_worker.celery_tasks:celery_app" in compose
     assert "CELERY_BROKER_URL: redis://redis:6379/1" in compose
     assert "CELERY_RESULT_BACKEND: redis://redis:6379/2" in compose
+    assert compose.count("CELERY_TASK_QUEUE: ${CELERY_TASK_QUEUE:-shuihuo-offline}") == 2
     assert (
         "./db/postgres/001_core_schema.sql:/docker-entrypoint-initdb.d/001_core_schema.sql:ro"
         in compose
@@ -97,6 +98,7 @@ def test_env_example_lists_runtime_integration_knobs() -> None:
         "OFFLINE_TASK_EXECUTION=",
         "CELERY_BROKER_URL=",
         "CELERY_RESULT_BACKEND=",
+        "CELERY_TASK_QUEUE=",
         "REDIS_STREAM_PREFIX=",
         "JD_VECTOR_BACKEND=",
         "OBJECT_STORAGE_ACCESS_KEY=",

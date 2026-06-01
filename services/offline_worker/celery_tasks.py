@@ -21,7 +21,7 @@ def create_celery_app() -> Any:
         broker=settings.celery_broker_url,
         backend=settings.celery_result_backend,
     )
-    app.conf.task_default_queue = "shuihuo-offline"
+    app.conf.task_default_queue = settings.celery_task_queue
     return app
 
 

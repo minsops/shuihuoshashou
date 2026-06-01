@@ -74,6 +74,7 @@ class Settings(BaseSettings):
     offline_task_execution: str = "sync"
     celery_broker_url: str = "redis://localhost:6379/1"
     celery_result_backend: str = "redis://localhost:6379/2"
+    celery_task_queue: str = "shuihuo-offline"
     redis_url: str = "redis://localhost:6379/0"
     redis_stream_prefix: str = "shuihuo"
     jd_vector_backend: str = "local"

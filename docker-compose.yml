@@ -74,6 +74,7 @@ services:
       REDIS_RATE_LIMIT_PREFIX: ${REDIS_RATE_LIMIT_PREFIX:-shuihuo:rate_limit}
       OFFLINE_TASK_BACKEND: ${OFFLINE_TASK_BACKEND:-local}
       OFFLINE_TASK_EXECUTION: ${OFFLINE_TASK_EXECUTION:-sync}
+      CELERY_TASK_QUEUE: ${CELERY_TASK_QUEUE:-shuihuo-offline}
       REDIS_STREAM_PREFIX: ${REDIS_STREAM_PREFIX:-shuihuo}
       JD_VECTOR_BACKEND: ${JD_VECTOR_BACKEND:-local}
     volumes:
@@ -102,6 +103,7 @@ services:
       OFFLINE_TASK_BACKEND: celery
       CELERY_BROKER_URL: redis://redis:6379/1
       CELERY_RESULT_BACKEND: redis://redis:6379/2
+      CELERY_TASK_QUEUE: ${CELERY_TASK_QUEUE:-shuihuo-offline}
       OBJECT_STORAGE_ENDPOINT: http://minio:9000
       OBJECT_STORAGE_BUCKET: shuihuo-killer
       OBJECT_STORAGE_ACCESS_KEY: minioadmin

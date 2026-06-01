@@ -252,7 +252,8 @@ The offline scoring task uses `OFFLINE_TASK_BACKEND=local` by default. Set
 Streams under `{REDIS_STREAM_PREFIX}:tasks:{task_name}` while retaining synchronous local execution.
 Set `OFFLINE_TASK_BACKEND=celery` and install `.[celery]` to publish the same
 `interview.offline_scoring` task through Celery using `CELERY_BROKER_URL` and
-`CELERY_RESULT_BACKEND`.
+`CELERY_RESULT_BACKEND`. The publisher and worker both use `CELERY_TASK_QUEUE`
+(`shuihuo-offline` by default), so custom deployments must set the same queue name on both sides.
 
 Set `OFFLINE_TASK_EXECUTION=async` to make `POST /api/interviews/{id}/end` return a queued task
 instead of blocking for the report. Once queued, the interview advances to `SCORING` so repeated

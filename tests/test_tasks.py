@@ -57,8 +57,14 @@ class FakeCelerySender:
     def __init__(self) -> None:
         self.sent: list[tuple[str, dict]] = []
 
-    def send_task(self, name: str, kwargs: dict, task_id: str) -> FakeCeleryResult:
-        self.sent.append((name, {"kwargs": kwargs, "task_id": task_id}))
+    def send_task(
+        self,
+        name: str,
+        kwargs: dict,
+        task_id: str,
+        queue: str,
+    ) -> FakeCeleryResult:
+        self.sent.append((name, {"kwargs": kwargs, "task_id": task_id, "queue": queue}))
         return FakeCeleryResult()
 
 
@@ -262,9 +268,27 @@ def test_celery_task_publisher_sends_named_task() -> None:
     assert sender.sent == [
         (
             "interview.offline_scoring",
-            {"kwargs": {"interview_id": "abc"}, "task_id": "task-1"},
+            {
+                "kwargs": {"interview_id": "abc"},
+                "task_id": "task-1",
+                "queue": "shuihuo-offline",
+            },
         )
     ]
+
+
+def test_celery_task_publisher_uses_configured_queue() -> None:
+    sender = FakeCelerySender()
+    publisher = CeleryTaskPublisher(
+        broker_url="redis://localhost:6379/1",
+        result_backend="redis://localhost:6379/2",
+        queue_name="custom-offline",
+        sender=sender,
+    )
+
+    publisher.publish_task("task-1", "interview.offline_scoring", {"interview_id": "abc"})
+
+    assert sender.sent[0][1]["queue"] == "custom-offline"
 
 
 def test_celery_backed_task_queue_defers_to_celery() -> None:

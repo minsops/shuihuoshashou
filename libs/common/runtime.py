@@ -62,6 +62,7 @@ class RuntimeStatus(BaseModel):
     offline_task_execution: str
     celery_broker_configured: bool
     celery_result_backend_configured: bool
+    celery_task_queue: str
     redis_url_configured: bool
     redis_stream_prefix: str
     jd_vector_backend: str
@@ -130,6 +131,7 @@ def get_runtime_status() -> RuntimeStatus:
         offline_task_execution=settings.offline_task_execution,
         celery_broker_configured=bool(settings.celery_broker_url),
         celery_result_backend_configured=bool(settings.celery_result_backend),
+        celery_task_queue=settings.celery_task_queue,
         redis_url_configured=bool(settings.redis_url),
         redis_stream_prefix=settings.redis_stream_prefix,
         jd_vector_backend=settings.jd_vector_backend,

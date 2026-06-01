@@ -261,10 +261,12 @@ class CeleryTaskPublisher:
         self,
         broker_url: str,
         result_backend: str,
+        queue_name: str = "shuihuo-offline",
         sender: Any | None = None,
     ) -> None:
         self.broker_url = broker_url
         self.result_backend = result_backend
+        self.queue_name = queue_name
         self.sender = sender or self._connect(broker_url, result_backend)
 
     @staticmethod
@@ -283,6 +285,7 @@ class CeleryTaskPublisher:
             name,
             kwargs=payload,
             task_id=task_id,
+            queue=self.queue_name,
         )
         return str(getattr(result, "id", task_id))
 
@@ -297,6 +300,7 @@ class CeleryBackedTaskQueue(LocalTaskQueue):
             self.publisher = CeleryTaskPublisher(
                 broker_url=settings.celery_broker_url,
                 result_backend=settings.celery_result_backend,
+                queue_name=settings.celery_task_queue,
             )
 
     def enqueue(
