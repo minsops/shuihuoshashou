@@ -5,7 +5,7 @@ from enum import Enum
 from typing import Literal
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 def new_id() -> str:
@@ -51,10 +51,16 @@ class TranscriptSegment(BaseModel):
     session_id: str
     speaker: Literal["interviewer", "candidate", "unknown"]
     text: str
-    start_ms: int
-    end_ms: int
+    start_ms: int = Field(ge=0)
+    end_ms: int = Field(ge=0)
     is_final: bool
     confidence: float = Field(ge=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    def timestamps_are_monotonic(self) -> "TranscriptSegment":
+        if self.end_ms < self.start_ms:
+            raise ValueError("end_ms must be greater than or equal to start_ms")
+        return self
 
 
 class ConsistencyFlag(BaseModel):
@@ -77,9 +83,15 @@ class QATurn(BaseModel):
     question: str
     question_source: Literal["interviewer", "ai_probe"] = "interviewer"
     answer: str
-    answer_start_ms: int = 0
-    answer_end_ms: int = 0
+    answer_start_ms: int = Field(default=0, ge=0)
+    answer_end_ms: int = Field(default=0, ge=0)
     probe_target: str | None = None
+
+    @model_validator(mode="after")
+    def answer_timestamps_are_monotonic(self) -> "QATurn":
+        if self.answer_end_ms < self.answer_start_ms:
+            raise ValueError("answer_end_ms must be greater than or equal to answer_start_ms")
+        return self
 
 
 class InterviewContext(BaseModel):

@@ -16,6 +16,7 @@ The local implementation is complete as a runnable MVP:
 - Configurable HTTP cloud ASR adapter behind the `ASREngine` interface.
 - HTTP ASR responses normalize string finality flags, treat provisional labels as non-final, clamp
   confidence values, and enforce non-negative monotonic timestamp ranges.
+- Shared TranscriptSegment and QATurn schemas reject negative or inverted timestamp ranges.
 - ASR session manager supports partial-to-final chunk updates, repeated-final deduplication,
   stale-final rejection, local audio-cluster speaker resolution, and conservative short-gap
   speaker continuity smoothing.
