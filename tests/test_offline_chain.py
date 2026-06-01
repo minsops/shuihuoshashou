@@ -639,8 +639,24 @@ def test_aigc_detection_can_use_http_detector(monkeypatch) -> None:
     result = detect_interview([turn], transport=httpx.MockTransport(handler))[0]
 
     assert result.ai_generated_prob == 0.91
-    assert result.flagged is False
+    assert result.flagged is True
     assert result.template_similarity >= 0.0
+
+
+def test_aigc_http_detector_flagged_false_still_uses_probability_threshold(monkeypatch) -> None:
+    monkeypatch.setenv("AIGC_DETECTOR_PROVIDER", "http")
+    monkeypatch.setenv("AIGC_DETECTOR_BASE_URL", "https://aigc.example.test")
+    monkeypatch.setenv("AIGC_AI_PROB_THRESHOLD", "0.65")
+    get_settings.cache_clear()
+    turn = QATurn(question="q", answer="我写了 FastAPI 编排和 JSON 校验。")
+    transport = httpx.MockTransport(
+        lambda _: httpx.Response(200, json={"ai_generated_prob": "0.7", "flagged": "false"})
+    )
+
+    result = detect_interview([turn], transport=transport)[0]
+
+    assert result.ai_generated_prob == 0.7
+    assert result.flagged is True
 
 
 def test_aigc_http_detector_falls_back_on_failure(monkeypatch) -> None:

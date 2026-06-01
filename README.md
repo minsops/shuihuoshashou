@@ -202,8 +202,8 @@ a production voice-clustering service. The expected response speaker path defaul
 
 Set `AIGC_DETECTOR_PROVIDER=http`, `AIGC_DETECTOR_BASE_URL`, `AIGC_DETECTOR_API_PATH`, and
 `AIGC_DETECTOR_API_KEY` to send each answer to an external AI-text detector. The local template
-similarity result is still included and remains part of the final flag decision; HTTP failures fall
-back to the deterministic local detector.
+similarity result and configured probability threshold remain part of the final flag decision; HTTP
+failures fall back to the deterministic local detector.
 
 ## One-Shot Offline Evaluation
 

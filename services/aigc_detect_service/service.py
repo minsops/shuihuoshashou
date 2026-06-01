@@ -111,17 +111,21 @@ def _http_detect_turn(
         response = client.post(url, headers=_aigc_headers(), json=payload)
         response.raise_for_status()
     data = response.json()
-    probability = float(_extract_path(data, settings.aigc_detector_probability_path))
+    probability = max(0.0, min(1.0, float(_extract_path(data, settings.aigc_detector_probability_path))))
     flagged_value = _extract_optional(data, settings.aigc_detector_flagged_path, None)
     flagged = (
         _coerce_bool(flagged_value)
         if flagged_value is not None
         else probability >= settings.aigc_ai_prob_threshold
     )
-    flagged = flagged or local.template_similarity >= settings.aigc_template_similarity_threshold
+    flagged = (
+        flagged
+        or probability >= settings.aigc_ai_prob_threshold
+        or local.template_similarity >= settings.aigc_template_similarity_threshold
+    )
     return AIGCResult(
         turn_id=turn.turn_id,
-        ai_generated_prob=round(max(0.0, min(1.0, probability)), 3),
+        ai_generated_prob=round(probability, 3),
         template_similarity=local.template_similarity,
         matched_template=local.matched_template,
         flagged=flagged,
