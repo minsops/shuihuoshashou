@@ -133,9 +133,15 @@ class ProbeResponse(BaseModel):
 
 class EvidenceRef(BaseModel):
     turn_id: str
-    quote_start_ms: int
-    quote_end_ms: int
+    quote_start_ms: int = Field(ge=0)
+    quote_end_ms: int = Field(ge=0)
     excerpt: str
+
+    @model_validator(mode="after")
+    def quote_timestamps_are_monotonic(self) -> "EvidenceRef":
+        if self.quote_end_ms < self.quote_start_ms:
+            raise ValueError("quote_end_ms must be greater than or equal to quote_start_ms")
+        return self
 
 
 class DimensionScore(BaseModel):

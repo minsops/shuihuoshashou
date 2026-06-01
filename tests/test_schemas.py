@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from libs.schemas import BehaviorSignal, QATurn, TranscriptSegment
+from libs.schemas import BehaviorSignal, EvidenceRef, QATurn, TranscriptSegment
 
 
 def test_behavior_signal_forbids_compliance_sensitive_extra_fields() -> None:
@@ -79,3 +79,28 @@ def test_qa_turn_rejects_invalid_answer_time_ranges() -> None:
         QATurn(question="q", answer="a", answer_start_ms=-1, answer_end_ms=10)
     with pytest.raises(ValidationError):
         QATurn(question="q", answer="a", answer_start_ms=20, answer_end_ms=10)
+
+
+def test_evidence_ref_rejects_invalid_quote_time_ranges() -> None:
+    ref = EvidenceRef(
+        turn_id="turn-1",
+        quote_start_ms=100,
+        quote_end_ms=100,
+        excerpt="回答片段",
+    )
+
+    assert ref.quote_start_ms == 100
+    with pytest.raises(ValidationError):
+        EvidenceRef(
+            turn_id="turn-1",
+            quote_start_ms=-1,
+            quote_end_ms=100,
+            excerpt="回答片段",
+        )
+    with pytest.raises(ValidationError):
+        EvidenceRef(
+            turn_id="turn-1",
+            quote_start_ms=200,
+            quote_end_ms=100,
+            excerpt="回答片段",
+        )

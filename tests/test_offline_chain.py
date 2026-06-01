@@ -430,15 +430,16 @@ def test_score_interview_normalizes_evidence_to_real_turns(monkeypatch) -> None:
         competency_model=model,
         turns=[turn],
     )
-    draft = InterviewScore(
+    draft = InterviewScore.model_construct(
         session_id=ctx.session_id,
         dimensions=[
-            DimensionScore(
+            DimensionScore.model_construct(
                 dimension=item.name,
                 score=80.0,
                 weight=item.weight,
                 evidence=[
-                    EvidenceRef(
+                    # Simulate an untrusted LLM draft object that bypassed normal schema parsing.
+                    EvidenceRef.model_construct(
                         turn_id=turn.turn_id,
                         quote_start_ms=-500,
                         quote_end_ms=999999,

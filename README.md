@@ -202,8 +202,8 @@ a cloud ASR endpoint. Response mapping is configurable with `ASR_TEXT_PATH`, `AS
 `ASR_START_MS_PATH`, `ASR_END_MS_PATH`, `ASR_IS_FINAL_PATH`, and `ASR_CONFIDENCE_PATH`. Finality
 strings such as `partial`, `interim`, and `provisional` are treated as non-final so provisional ASR
 output does not trigger probes. ASR timestamps are normalized to non-negative millisecond ranges
-with `end_ms >= start_ms`; the shared transcript and Q&A schemas reject invalid timestamp ranges at
-API boundaries as well.
+with `end_ms >= start_ms`; the shared transcript, Q&A, and scoring evidence schemas reject invalid
+timestamp ranges at API boundaries as well.
 
 Set `SPEAKER_DIARIZATION_PROVIDER=http`, `SPEAKER_DIARIZATION_BASE_URL`,
 `SPEAKER_DIARIZATION_API_PATH`, and `SPEAKER_DIARIZATION_API_KEY` to resolve unknown speakers through
