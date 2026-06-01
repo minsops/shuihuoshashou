@@ -5,11 +5,16 @@ from pydantic import ValidationError
 
 from libs.schemas import (
     BehaviorSignal,
+    CandidateCreate,
     CredibilitySignal,
+    CompetencyItem,
+    CompetencyModel,
     DimensionScore,
     EvidenceRef,
     InterviewScore,
+    JobCreate,
     ProbeResponse,
+    ProbeRequest,
     ProbeSuggestion,
     QATurn,
     TranscriptSegment,
@@ -96,6 +101,38 @@ def test_qa_turn_rejects_blank_question_or_answer() -> None:
         QATurn(question=" ", answer="a")
     with pytest.raises(ValidationError):
         QATurn(question="q", answer=" ")
+
+
+def test_job_candidate_and_competency_payloads_reject_blank_required_text() -> None:
+    with pytest.raises(ValidationError):
+        JobCreate(title=" ", jd_text="Python FastAPI")
+    with pytest.raises(ValidationError):
+        JobCreate(title="Backend", jd_text=" ")
+    with pytest.raises(ValidationError):
+        CandidateCreate(name=" ")
+    with pytest.raises(ValidationError):
+        CompetencyItem(name=" ", description="验证工程能力", weight=1.0)
+    with pytest.raises(ValidationError):
+        CompetencyItem(name="工程深度", description=" ", weight=1.0)
+    with pytest.raises(ValidationError):
+        CompetencyItem(
+            name="工程深度",
+            description="验证工程能力",
+            probe_patterns=["请讲一个具体案例。", " "],
+            weight=1.0,
+        )
+    with pytest.raises(ValidationError):
+        CompetencyModel(
+            job_id="job-1",
+            job_title=" ",
+            items=[
+                CompetencyItem(
+                    name="工程深度",
+                    description="验证工程能力",
+                    weight=1.0,
+                )
+            ],
+        )
 
 
 def test_evidence_ref_rejects_invalid_quote_time_ranges() -> None:
@@ -187,3 +224,34 @@ def test_probe_response_requires_one_to_three_suggestions() -> None:
             ],
             credibility=credibility,
         )
+
+
+def test_probe_contract_rejects_blank_answer_and_card_text() -> None:
+    competency = CompetencyItem(name="项目真实性", description="验证项目经历", weight=1.0)
+    model = CompetencyModel(job_id="job-1", job_title="Backend", items=[competency])
+
+    with pytest.raises(ValidationError):
+        ProbeRequest(
+            job_id="job-1",
+            competency_model=model,
+            recent_turns=[],
+            latest_answer=" ",
+        )
+    with pytest.raises(ValidationError):
+        ProbeSuggestion(
+            question=" ",
+            target="验证项目真实性",
+            competency="项目真实性",
+            priority=1,
+        )
+    with pytest.raises(ValidationError):
+        ProbeSuggestion(
+            question="请讲清楚你本人负责哪一段？",
+            target=" ",
+            competency="项目真实性",
+            priority=1,
+        )
+    with pytest.raises(ValidationError):
+        CredibilitySignal(level="vague", reason=" ", drill_down_hint="追问本人负责部分")
+    with pytest.raises(ValidationError):
+        CredibilitySignal(level="vague", reason="缺少具体细节", drill_down_hint=" ")

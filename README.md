@@ -21,6 +21,7 @@ as a local-first Python MVP:
 - Local demo UI includes both offline evaluation and realtime WebSocket probe panels.
 - Interview turns are stored in both the interview context and a `qa_turns` table for auditability.
 - Interview Q&A turns and scoring evidence excerpts reject blank text at the shared schema boundary.
+- Job, candidate, competency, and probe-card contract fields reject blank required text.
 - WebSocket transcripts carry speaker/finality/timestamp metadata, support channel-based speaker mapping, and emit separate credibility events.
 - Docker Compose declares the gateway plus PostgreSQL, Redis, and MinIO for local infrastructure.
 - PostgreSQL core schema SQL is provided under `db/postgres` for compose initialization.

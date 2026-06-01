@@ -12,6 +12,12 @@ def new_id() -> str:
     return str(uuid4())
 
 
+def _not_blank(value: str, label: str) -> str:
+    if not value.strip():
+        raise ValueError(f"{label} must not be blank")
+    return value
+
+
 class InterviewStatus(str, Enum):
     created = "CREATED"
     in_progress = "IN_PROGRESS"
@@ -26,11 +32,28 @@ class CompetencyItem(BaseModel):
     probe_patterns: list[str] = Field(default_factory=list)
     weight: float = 0.0
 
+    @field_validator("name", "description")
+    @classmethod
+    def text_fields_are_not_blank(cls, value: str) -> str:
+        return _not_blank(value, "competency text")
+
+    @field_validator("probe_patterns")
+    @classmethod
+    def probe_patterns_are_not_blank(cls, value: list[str]) -> list[str]:
+        if any(not pattern.strip() for pattern in value):
+            raise ValueError("probe patterns must not contain blank text")
+        return value
+
 
 class CompetencyModel(BaseModel):
     job_id: str
     job_title: str
     items: list[CompetencyItem]
+
+    @field_validator("job_title")
+    @classmethod
+    def job_title_is_not_blank(cls, value: str) -> str:
+        return _not_blank(value, "job_title")
 
     @field_validator("items")
     @classmethod
@@ -45,6 +68,11 @@ class ProbePatternHit(BaseModel):
     competency: str
     pattern: str
     score: float = Field(ge=0.0)
+
+    @field_validator("competency", "pattern")
+    @classmethod
+    def text_fields_are_not_blank(cls, value: str) -> str:
+        return _not_blank(value, "probe pattern hit text")
 
 
 class TranscriptSegment(BaseModel):
@@ -68,6 +96,11 @@ class ConsistencyFlag(BaseModel):
     turn_id_b: str
     description: str
     severity: Literal["low", "high"]
+
+    @field_validator("description")
+    @classmethod
+    def description_is_not_blank(cls, value: str) -> str:
+        return _not_blank(value, "description")
 
 
 class FactClaim(BaseModel):
@@ -96,9 +129,7 @@ class QATurn(BaseModel):
     @field_validator("question", "answer")
     @classmethod
     def text_fields_are_not_blank(cls, value: str) -> str:
-        if not value.strip():
-            raise ValueError("question and answer must not be blank")
-        return value
+        return _not_blank(value, "question and answer")
 
 
 class InterviewContext(BaseModel):
@@ -119,6 +150,11 @@ class ProbeRequest(BaseModel):
     recent_turns: list[QATurn]
     latest_answer: str
 
+    @field_validator("latest_answer")
+    @classmethod
+    def latest_answer_is_not_blank(cls, value: str) -> str:
+        return _not_blank(value, "latest_answer")
+
 
 class ProbeSuggestion(BaseModel):
     question: str
@@ -126,11 +162,21 @@ class ProbeSuggestion(BaseModel):
     competency: str
     priority: int = Field(ge=1, le=3)
 
+    @field_validator("question", "target", "competency")
+    @classmethod
+    def text_fields_are_not_blank(cls, value: str) -> str:
+        return _not_blank(value, "probe suggestion text")
+
 
 class CredibilitySignal(BaseModel):
     level: Literal["solid", "vague", "suspicious"]
     reason: str
     drill_down_hint: str
+
+    @field_validator("reason", "drill_down_hint")
+    @classmethod
+    def text_fields_are_not_blank(cls, value: str) -> str:
+        return _not_blank(value, "credibility text")
 
 
 class ProbeResponse(BaseModel):
@@ -153,9 +199,7 @@ class EvidenceRef(BaseModel):
     @field_validator("excerpt")
     @classmethod
     def excerpt_is_not_blank(cls, value: str) -> str:
-        if not value.strip():
-            raise ValueError("excerpt must not be blank")
-        return value
+        return _not_blank(value, "excerpt")
 
 
 class DimensionScore(BaseModel):
@@ -163,6 +207,11 @@ class DimensionScore(BaseModel):
     score: float = Field(ge=0.0, le=100.0)
     weight: float
     evidence: list[EvidenceRef] = Field(min_length=1)
+
+    @field_validator("dimension")
+    @classmethod
+    def dimension_is_not_blank(cls, value: str) -> str:
+        return _not_blank(value, "dimension")
 
 
 class InterviewScore(BaseModel):
@@ -194,6 +243,11 @@ class JobCreate(BaseModel):
     title: str
     jd_text: str
 
+    @field_validator("title", "jd_text")
+    @classmethod
+    def text_fields_are_not_blank(cls, value: str) -> str:
+        return _not_blank(value, "job text")
+
 
 class JobRecord(BaseModel):
     id: str = Field(default_factory=new_id)
@@ -202,10 +256,20 @@ class JobRecord(BaseModel):
     competency_model: CompetencyModel
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
+    @field_validator("title", "jd_text")
+    @classmethod
+    def text_fields_are_not_blank(cls, value: str) -> str:
+        return _not_blank(value, "job text")
+
 
 class CandidateCreate(BaseModel):
     name: str
     resume_text: str = ""
+
+    @field_validator("name")
+    @classmethod
+    def name_is_not_blank(cls, value: str) -> str:
+        return _not_blank(value, "candidate name")
 
 
 class CandidateRecord(BaseModel):
@@ -213,6 +277,11 @@ class CandidateRecord(BaseModel):
     name: str
     resume_text: str = ""
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    @field_validator("name")
+    @classmethod
+    def name_is_not_blank(cls, value: str) -> str:
+        return _not_blank(value, "candidate name")
 
 
 class ConsentCreate(BaseModel):
@@ -254,6 +323,11 @@ class OfflineInterviewInput(BaseModel):
     candidate_name: str
     resume_text: str = ""
     turns: list[QATurn] = Field(min_length=1)
+
+    @field_validator("job_title", "jd_text", "candidate_name")
+    @classmethod
+    def text_fields_are_not_blank(cls, value: str) -> str:
+        return _not_blank(value, "offline input text")
 
 
 class AIGCDetectRequest(BaseModel):
