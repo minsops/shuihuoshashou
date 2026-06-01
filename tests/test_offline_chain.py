@@ -14,6 +14,7 @@ from libs.schemas import (
     CandidateCreate,
     CompetencyItem,
     CompetencyModel,
+    ConsentCreate,
     DimensionScore,
     EvidenceRef,
     InterviewCreate,
@@ -32,6 +33,7 @@ from services.interview_orchestrator.consistency import detect_consistency, extr
 from services.interview_orchestrator.service import (
     add_turn,
     create_candidate,
+    create_consent,
     create_interview,
     end_interview,
     finish_interview,
@@ -167,6 +169,27 @@ def test_offline_scoring_requires_finished_state(tmp_path: Path, monkeypatch) ->
 
     with pytest.raises(ValueError, match="offline scoring requires FINISHED or SCORING"):
         run_offline_scoring_task(interview.id)
+
+
+def test_interview_requires_existing_candidate(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'refs.db'}")
+    get_settings.cache_clear()
+    init_db()
+    job = create_job(JobCreate(title="Backend", jd_text="Python FastAPI"))
+
+    with pytest.raises(KeyError, match="candidate not found"):
+        create_interview(InterviewCreate(job_id=job.id, candidate_id="missing-candidate"))
+
+
+def test_behavior_signal_consent_requires_existing_candidate(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'consent-ref.db'}")
+    get_settings.cache_clear()
+    init_db()
+
+    with pytest.raises(KeyError, match="candidate not found"):
+        create_consent(ConsentCreate(candidate_id="missing-candidate", granted=True))
 
 
 def test_interview_state_machine_rejects_post_report_mutations(

@@ -342,7 +342,10 @@ def api_create_candidate(payload: CandidateCreate):
 
 @app.post("/api/consents")
 def api_create_consent(payload: ConsentCreate):
-    return create_consent(payload)
+    try:
+        return create_consent(payload)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @app.post("/api/interviews")

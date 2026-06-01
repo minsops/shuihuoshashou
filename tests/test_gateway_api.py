@@ -510,6 +510,39 @@ def test_signal_requires_admin_enablement(tmp_path: Path, monkeypatch) -> None:
     assert "admin enablement" in rejected.text
 
 
+def test_gateway_rejects_interview_for_missing_candidate(
+    tmp_path: Path, monkeypatch
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+
+    rejected = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": "missing-candidate"},
+    )
+
+    assert rejected.status_code == 404
+    assert "candidate not found" in rejected.text
+
+
+def test_gateway_rejects_consent_for_missing_candidate(
+    tmp_path: Path, monkeypatch
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+
+    rejected = client.post(
+        "/api/consents",
+        json={
+            "candidate_id": "missing-candidate",
+            "consent_type": "behavior_signal",
+            "granted": True,
+        },
+    )
+
+    assert rejected.status_code == 404
+    assert "candidate not found" in rejected.text
+
+
 def test_signal_requires_candidate_consent(tmp_path: Path, monkeypatch) -> None:
     client = _client(tmp_path, monkeypatch, signal_enabled=True)
     job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()

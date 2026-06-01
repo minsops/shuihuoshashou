@@ -37,8 +37,23 @@ def create_candidate(payload: CandidateCreate) -> CandidateRecord:
     return record
 
 
+def get_candidate(candidate_id: str) -> CandidateRecord:
+    init_db()
+    with connect() as conn:
+        row = conn.execute("SELECT * FROM candidates WHERE id = ?", (candidate_id,)).fetchone()
+    if row is None:
+        raise KeyError(f"candidate not found: {candidate_id}")
+    return CandidateRecord(
+        id=row["id"],
+        name=row["name"],
+        resume_text=row["resume_text"],
+        created_at=datetime.fromisoformat(row["created_at"]),
+    )
+
+
 def create_consent(payload: ConsentCreate) -> ConsentRecord:
     init_db()
+    get_candidate(payload.candidate_id)
     now = datetime.now(UTC)
     if not payload.granted:
         with connect() as conn:
@@ -98,12 +113,13 @@ def has_active_consent(candidate_id: str, consent_type: str) -> bool:
 
 def create_interview(payload: InterviewCreate) -> InterviewRecord:
     init_db()
+    job = get_job(payload.job_id)
+    get_candidate(payload.candidate_id)
     if payload.signal_enabled:
         if not get_settings().signal_enabled:
             raise PermissionError("behavior signal requires admin enablement")
         if not has_active_consent(payload.candidate_id, "behavior_signal"):
             raise PermissionError("behavior signal requires explicit candidate consent")
-    job = get_job(payload.job_id)
     ctx = InterviewContext(
         session_id="",
         job_id=payload.job_id,

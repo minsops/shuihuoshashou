@@ -22,6 +22,8 @@ as a local-first Python MVP:
 - Docker Compose declares the gateway plus PostgreSQL, Redis, and MinIO for local infrastructure.
 - PostgreSQL core schema SQL is provided under `db/postgres` for compose initialization.
 - Runtime database URL parsing supports SQLite and PostgreSQL targets.
+- Interview and consent creation validate candidate references so local SQLite behavior matches the
+  PostgreSQL foreign-key contract.
 - JD knowledge base indexes competency-specific probe patterns with deterministic embeddings and optional pgvector search.
 - JD competency models are generated through the shared LLM JSON client with deterministic fallback
   and normalized to keep the required scoring dimensions and weights present.
