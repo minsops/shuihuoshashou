@@ -144,6 +144,7 @@ def test_gateway_config_status_hides_secrets(tmp_path: Path, monkeypatch) -> Non
     response = client.get("/api/config/status")
     assert response.status_code == 200
     payload = response.json()
+    assert payload["database_url"].startswith("sqlite:///")
     assert payload["llm_api_key_configured"] is True
     assert payload["llm_max_retries"] == 1
     assert payload["llm_rate_limit_enabled"] is False
@@ -191,6 +192,20 @@ def test_gateway_config_status_hides_secrets(tmp_path: Path, monkeypatch) -> Non
     assert payload["object_storage_endpoint_configured"] is False
     assert payload["object_storage_bucket"] == "shuihuo-killer"
     assert "super-secret" not in response.text
+
+
+def test_gateway_config_status_redacts_database_password(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:db-secret@localhost:5432/app")
+    monkeypatch.setenv("LLM_PROVIDER", "mock")
+    get_settings.cache_clear()
+    response = TestClient(app).get("/api/config/status")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["database_url"] == "postgresql://user:***@localhost:5432/app"
+    assert "db-secret" not in response.text
 
 
 def test_gateway_api_key_auth_can_be_enabled(tmp_path: Path, monkeypatch) -> None:

@@ -65,6 +65,7 @@ The local implementation is complete as a runnable MVP:
 - Optional LLM provider-call rate limiting is enforced before outbound model requests.
 - Safe runtime config and LLM smoke-test scripts.
 - Runtime config status exposes non-secret provider paths, response mapping paths, and timeouts for deployment diagnostics.
+- Runtime config status redacts database URL passwords.
 - Prometheus-style `/metrics` endpoint for local HTTP request counters and duration sums.
 - `/metrics` also exposes domain/task event counters for the offline scoring path.
 - Structured JSON request logs with propagated `X-Request-ID` correlation IDs.

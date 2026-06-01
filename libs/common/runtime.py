@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from urllib.parse import urlsplit, urlunsplit
+
 from pydantic import BaseModel
 
 from libs.common.config import get_settings
@@ -72,7 +74,7 @@ def get_runtime_status() -> RuntimeStatus:
     return RuntimeStatus(
         app_env=settings.app_env,
         gateway_auth_enabled=bool(settings.gateway_api_key),
-        database_url=settings.database_url,
+        database_url=_redact_database_url(settings.database_url),
         llm_provider=settings.llm_provider,
         llm_model=settings.llm_model,
         llm_base_url_configured=bool(settings.llm_base_url),
@@ -134,3 +136,15 @@ def get_runtime_status() -> RuntimeStatus:
         object_storage_bucket=settings.object_storage_bucket,
         report_dir=str(settings.report_dir),
     )
+
+
+def _redact_database_url(value: str) -> str:
+    parsed = urlsplit(value)
+    if not parsed.password:
+        return value
+    username = parsed.username or ""
+    host = parsed.hostname or ""
+    if parsed.port:
+        host = f"{host}:{parsed.port}"
+    netloc = f"{username}:***@{host}" if username else host
+    return urlunsplit((parsed.scheme, netloc, parsed.path, parsed.query, parsed.fragment))

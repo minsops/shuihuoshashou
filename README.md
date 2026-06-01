@@ -138,7 +138,8 @@ curl -s http://127.0.0.1:8000/api/config/status
 ```
 
 `/api/config/status` reports non-secret provider paths, response mapping paths, timeout values, and
-whether secrets are configured, but never returns API keys.
+whether secrets are configured, but never returns API keys. Database URLs are returned with passwords
+redacted.
 
 When `GATEWAY_API_KEY` is set, include `X-API-Key` or a bearer token on API requests. WebSocket
 clients can pass the same key in headers or as `?api_key=...`.
