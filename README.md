@@ -241,4 +241,6 @@ Behavior signals are disabled by default. `SIGNAL_ENABLED=true` must be set by a
 before any interview can request `signal_enabled=true`, and the candidate must also grant
 `behavior_signal` consent through `POST /api/consents`; otherwise the API returns 403. Posting the
 same consent with `granted=false` revokes prior active behavior-signal consent and future
-signal-enabled interviews are rejected until both gates are satisfied again.
+signal-enabled interviews are rejected until both gates are satisfied again. The realtime WebSocket
+path also re-checks active consent before emitting each optional `signal` event, so revoked consent
+suppresses further behavior-signal hints.

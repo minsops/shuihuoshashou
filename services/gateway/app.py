@@ -39,6 +39,7 @@ from services.interview_orchestrator.service import (
     end_interview,
     get_interview,
     get_report,
+    has_active_consent,
     should_probe,
     start_interview,
 )
@@ -215,7 +216,11 @@ async def _send_probe_for_segment(websocket: WebSocket, interview_id: str, recor
     )
     await websocket.send_json({"type": "probe", "payload": probe.model_dump()})
     await websocket.send_json({"type": "credibility", "payload": probe.credibility.model_dump()})
-    signal = extract_behavior_signal(turn) if record.signal_enabled else None
+    signal = (
+        extract_behavior_signal(turn)
+        if record.signal_enabled and has_active_consent(record.candidate_id, "behavior_signal")
+        else None
+    )
     if signal is not None:
         await websocket.send_json({"type": "signal", "payload": signal.model_dump()})
     return record

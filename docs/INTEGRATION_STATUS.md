@@ -47,6 +47,7 @@ The local implementation is complete as a runnable MVP:
   `task.enqueued`, `interview.scoring_started`, `interview.reported`, and `task.completed`.
 - Behavior signal module with explicit administrator enablement and candidate consent gates.
 - Candidate behavior-signal consent can be revoked and blocks future signal-enabled interviews.
+- Realtime signal emission re-checks active consent, so revoked consent suppresses later WS hints.
 - Configurable LLM client with mock mode and OpenAI-compatible HTTP mode.
 - LLM JSON responses are pydantic-validated with configurable retry before deterministic fallback.
 - Safe runtime config and LLM smoke-test scripts.

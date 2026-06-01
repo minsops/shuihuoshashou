@@ -399,6 +399,76 @@ def test_signal_consent_can_be_revoked(tmp_path: Path, monkeypatch) -> None:
     assert rejected.status_code == 403
 
 
+def test_gateway_websocket_emits_behavior_signal_with_active_consent(
+    tmp_path: Path, monkeypatch
+) -> None:
+    client = _client(tmp_path, monkeypatch, signal_enabled=True)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    client.post(
+        "/api/consents",
+        json={"candidate_id": candidate["id"], "consent_type": "behavior_signal", "granted": True},
+    )
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"], "signal_enabled": True},
+    ).json()
+
+    with client.websocket_connect(f"/ws/interview/{interview['id']}") as websocket:
+        websocket.send_json(
+            {
+                "type": "text_turn",
+                "seq": 1,
+                "answer": "嗯这个项目里我主要负责 FastAPI 编排、重试和 JSON 校验。",
+            }
+        )
+        assert websocket.receive_json()["type"] == "transcript"
+        assert websocket.receive_json()["type"] == "probe"
+        assert websocket.receive_json()["type"] == "credibility"
+        signal = websocket.receive_json()
+
+    assert signal["type"] == "signal"
+    assert set(signal["payload"]) == {"turn_id", "fluency", "hesitation", "evasiveness_hint"}
+    assert signal["payload"]["hesitation"] > 0
+
+
+def test_gateway_websocket_suppresses_behavior_signal_after_consent_revocation(
+    tmp_path: Path, monkeypatch
+) -> None:
+    client = _client(tmp_path, monkeypatch, signal_enabled=True)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    client.post(
+        "/api/consents",
+        json={"candidate_id": candidate["id"], "consent_type": "behavior_signal", "granted": True},
+    )
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"], "signal_enabled": True},
+    ).json()
+    client.post(
+        "/api/consents",
+        json={"candidate_id": candidate["id"], "consent_type": "behavior_signal", "granted": False},
+    )
+
+    with client.websocket_connect(f"/ws/interview/{interview['id']}") as websocket:
+        websocket.send_json(
+            {
+                "type": "text_turn",
+                "seq": 1,
+                "answer": "嗯这个项目里我主要负责 FastAPI 编排、重试和 JSON 校验。",
+            }
+        )
+        assert websocket.receive_json()["type"] == "transcript"
+        assert websocket.receive_json()["type"] == "probe"
+        assert websocket.receive_json()["type"] == "credibility"
+        websocket.send_json({"type": "end"})
+        report = websocket.receive_json()
+
+    assert report["type"] == "report"
+    assert "signal" not in json.dumps(report["payload"], ensure_ascii=False)
+
+
 def test_gateway_websocket_probe_flow(tmp_path: Path, monkeypatch) -> None:
     client = _client(tmp_path, monkeypatch)
     job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
