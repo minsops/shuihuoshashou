@@ -312,6 +312,8 @@ def finish_interview(interview_id: str) -> InterviewRecord:
         return record
     if record.status not in {InterviewStatus.created, InterviewStatus.in_progress}:
         raise ValueError(f"cannot finish interview from status {record.status.value}")
+    if not record.context.turns:
+        raise ValueError("cannot finish interview without candidate turns")
     record.status = InterviewStatus.finished
     record.ended_at = datetime.now(UTC)
     record.context.ended_at = record.ended_at

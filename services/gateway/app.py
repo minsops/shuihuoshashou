@@ -390,7 +390,10 @@ def api_aigc_detect(payload: AIGCDetectRequest):
 
 @app.post("/api/scoring/score")
 def api_scoring_score(payload: ScoringRequest):
-    return score_interview(payload.context, payload.aigc_results)
+    try:
+        return score_interview(payload.context, payload.aigc_results)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @app.post("/api/report/build")

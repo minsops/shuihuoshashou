@@ -148,12 +148,12 @@ class DimensionScore(BaseModel):
     dimension: str
     score: float = Field(ge=0.0, le=100.0)
     weight: float
-    evidence: list[EvidenceRef] = Field(default_factory=list)
+    evidence: list[EvidenceRef] = Field(min_length=1)
 
 
 class InterviewScore(BaseModel):
     session_id: str
-    dimensions: list[DimensionScore]
+    dimensions: list[DimensionScore] = Field(min_length=1)
     total_score: float = Field(ge=0.0, le=100.0)
     risk_notes: list[str] = Field(default_factory=list)
     recommendation: Literal["strong_yes", "yes", "hold", "no"]
@@ -239,7 +239,7 @@ class OfflineInterviewInput(BaseModel):
     jd_text: str
     candidate_name: str
     resume_text: str = ""
-    turns: list[QATurn]
+    turns: list[QATurn] = Field(min_length=1)
 
 
 class AIGCDetectRequest(BaseModel):

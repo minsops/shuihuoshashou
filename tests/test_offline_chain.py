@@ -171,6 +171,37 @@ def test_offline_scoring_requires_finished_state(tmp_path: Path, monkeypatch) ->
         run_offline_scoring_task(interview.id)
 
 
+def test_interview_cannot_finish_without_candidate_turns(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'empty.db'}")
+    monkeypatch.setenv("REPORT_DIR", str(tmp_path / "reports"))
+    get_settings.cache_clear()
+    init_db()
+    job = create_job(JobCreate(title="Backend", jd_text="Python FastAPI"))
+    candidate = create_candidate(CandidateCreate(name="Grace"))
+    interview = create_interview(InterviewCreate(job_id=job.id, candidate_id=candidate.id))
+
+    with pytest.raises(ValueError, match="cannot finish interview without candidate turns"):
+        finish_interview(interview.id)
+    with pytest.raises(ValueError, match="cannot finish interview without candidate turns"):
+        end_interview(interview.id)
+
+    assert get_interview(interview.id).status == InterviewStatus.created
+
+
+def test_scoring_requires_candidate_turn_evidence() -> None:
+    model = generate_competency_model("job-local", "Backend", "Python FastAPI")
+    ctx = InterviewContext(
+        session_id="session-empty",
+        job_id=model.job_id,
+        candidate_id="candidate-local",
+        competency_model=model,
+        turns=[],
+    )
+
+    with pytest.raises(ValueError, match="cannot score interview without candidate turns"):
+        score_interview(ctx, [])
+
+
 def test_interview_requires_existing_candidate(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'refs.db'}")
     get_settings.cache_clear()

@@ -6,7 +6,9 @@ from pydantic import ValidationError
 from libs.schemas import (
     BehaviorSignal,
     CredibilitySignal,
+    DimensionScore,
     EvidenceRef,
+    InterviewScore,
     ProbeResponse,
     ProbeSuggestion,
     QATurn,
@@ -111,6 +113,37 @@ def test_evidence_ref_rejects_invalid_quote_time_ranges() -> None:
             quote_start_ms=200,
             quote_end_ms=100,
             excerpt="回答片段",
+        )
+
+
+def test_dimension_scores_require_evidence_and_score_requires_dimensions() -> None:
+    evidence = EvidenceRef(
+        turn_id="turn-1",
+        quote_start_ms=0,
+        quote_end_ms=100,
+        excerpt="回答片段",
+    )
+    dimension = DimensionScore(
+        dimension="项目真实性",
+        score=80.0,
+        weight=0.25,
+        evidence=[evidence],
+    )
+
+    assert dimension.evidence[0].turn_id == "turn-1"
+    with pytest.raises(ValidationError):
+        DimensionScore(
+            dimension="项目真实性",
+            score=80.0,
+            weight=0.25,
+            evidence=[],
+        )
+    with pytest.raises(ValidationError):
+        InterviewScore(
+            session_id="session-1",
+            dimensions=[],
+            total_score=80.0,
+            recommendation="yes",
         )
 
 

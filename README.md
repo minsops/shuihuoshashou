@@ -11,6 +11,7 @@ as a local-first Python MVP:
 - In-memory async events for local development, with explicit offline scoring events.
 - Local task queue boundary for offline scoring, with optional Redis Streams task publication.
 - Interview state transitions reject post-report mutation and scoring before finish.
+- Offline scoring rejects empty candidate-turn contexts so reports cannot contain unsupported scores.
 - Unified LLM client with mock mode and OpenAI-compatible HTTP mode for `mimo2.5pro`.
 - Runtime LLM prompts are stored under `prompts/` and loaded by services instead of being embedded in code.
 - Probe responses are schema-limited to one to three suggestions, matching the realtime card contract.
@@ -37,6 +38,7 @@ as a local-first Python MVP:
   metric statements used by consistency checks.
 - Scoring uses the shared LLM JSON client for structured dimension drafts and recomputes final
   totals in Python for auditability and deterministic fallback behavior.
+- Scoring schemas require at least one evidence reference per dimension.
 - AIGC checks combine a local answer-template corpus with optional HTTP detector integration.
 
 ## Important Secret Handling

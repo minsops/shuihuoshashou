@@ -26,6 +26,7 @@ def fallback_score_interview(
     ctx: InterviewContext,
     aigc_results: list[AIGCResult],
 ) -> InterviewScore:
+    _ensure_scoreable_context(ctx)
     risk_penalty = 0.0
     risk_notes: list[str] = []
     if ctx.flags:
@@ -78,6 +79,7 @@ def fallback_score_interview(
 
 
 def score_interview(ctx: InterviewContext, aigc_results: list[AIGCResult]) -> InterviewScore:
+    _ensure_scoreable_context(ctx)
     fallback = fallback_score_interview(ctx, aigc_results)
     messages = [
         LLMMessage(role="system", content=load_prompt("scoring_system.md")),
@@ -105,6 +107,11 @@ def _scoring_payload(ctx: InterviewContext, aigc_results: list[AIGCResult]) -> s
         ),
     }
     return json.dumps(payload, ensure_ascii=False, default=str)
+
+
+def _ensure_scoreable_context(ctx: InterviewContext) -> None:
+    if not ctx.turns:
+        raise ValueError("cannot score interview without candidate turns")
 
 
 def _normalize_score(

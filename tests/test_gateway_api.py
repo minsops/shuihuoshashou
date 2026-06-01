@@ -266,6 +266,16 @@ def test_gateway_websocket_requires_api_key_when_enabled(tmp_path: Path, monkeyp
         f"/ws/interview/{interview['id']}",
         headers=headers,
     ) as websocket:
+        websocket.send_json(
+            {
+                "type": "text_turn",
+                "seq": 1,
+                "answer": "我在 FastAPI 项目里负责接口编排、异常重试和 JSON 校验。",
+            }
+        )
+        assert websocket.receive_json()["type"] == "transcript"
+        assert websocket.receive_json()["type"] == "probe"
+        assert websocket.receive_json()["type"] == "credibility"
         websocket.send_json({"type": "end"})
         assert websocket.receive_json()["type"] == "report"
 
@@ -791,8 +801,9 @@ def test_gateway_websocket_ignores_non_final_and_interviewer_segments(
         assert interviewer_transcript["payload"]["speaker"] == "interviewer"
 
         websocket.send_json({"type": "end"})
-        report = websocket.receive_json()
-        assert report["type"] == "report"
+        error = websocket.receive_json()
+        assert error["type"] == "error"
+        assert "cannot finish interview without candidate turns" in error["detail"]
 
 
 def test_gateway_websocket_rejects_invalid_audio_base64(
@@ -818,12 +829,12 @@ def test_gateway_websocket_rejects_invalid_audio_base64(
         )
         warning = websocket.receive_json()
         websocket.send_json({"type": "end"})
-        report = websocket.receive_json()
+        error = websocket.receive_json()
 
     assert warning["type"] == "asr_warning"
     assert warning["payload"] == {"reason": "invalid_audio_base64", "seq": 1}
-    assert report["type"] == "report"
-    assert report["payload"]["transcript"] == []
+    assert error["type"] == "error"
+    assert "cannot finish interview without candidate turns" in error["detail"]
 
 
 def test_gateway_websocket_rejects_mismatched_audio_session(
@@ -850,11 +861,12 @@ def test_gateway_websocket_rejects_mismatched_audio_session(
         )
         warning = websocket.receive_json()
         websocket.send_json({"type": "end"})
-        report = websocket.receive_json()
+        error = websocket.receive_json()
 
     assert warning["type"] == "asr_warning"
     assert warning["payload"] == {"reason": "session_id_mismatch", "seq": 7}
-    assert report["payload"]["transcript"] == []
+    assert error["type"] == "error"
+    assert "cannot finish interview without candidate turns" in error["detail"]
 
 
 def test_gateway_websocket_maps_audio_channel_to_speaker(tmp_path: Path, monkeypatch) -> None:
