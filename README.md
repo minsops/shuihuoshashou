@@ -141,6 +141,8 @@ returns 401, generate a fresh key and set it through `LLM_API_KEY` without commi
 - `POST /api/consents`
 - `POST /api/interviews`
 - `POST /api/probe`
+- `POST /api/aigc/detect`
+- `POST /api/scoring/score`
 - `POST /api/offline/evaluate`
 - `GET /api/config/status`
 - `GET /metrics`

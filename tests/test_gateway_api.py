@@ -201,6 +201,48 @@ def test_gateway_job_probe_pattern_search(tmp_path: Path, monkeypatch) -> None:
     assert any("LLM" in item["pattern"] or "FastAPI" in item["pattern"] for item in payload)
 
 
+def test_gateway_exposes_internal_aigc_and_scoring_contracts(
+    tmp_path: Path, monkeypatch
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+    job = client.post(
+        "/api/jobs",
+        json={"title": "Backend", "jd_text": "Python FastAPI LLM 可靠性"},
+    ).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+    interview = client.post(
+        f"/api/interviews/{interview['id']}/turns",
+        json={
+            "question": "讲项目",
+            "answer": "我主要负责整体架构设计并推动项目落地最终取得显著提升",
+            "answer_start_ms": 0,
+            "answer_end_ms": 1000,
+        },
+    ).json()
+
+    turns = interview["context"]["turns"]
+    aigc = client.post("/api/aigc/detect", json={"turns": turns})
+    assert aigc.status_code == 200
+    aigc_results = aigc.json()
+    assert aigc_results[0]["turn_id"] == turns[0]["turn_id"]
+    assert aigc_results[0]["flagged"] is True
+
+    score = client.post(
+        "/api/scoring/score",
+        json={"context": interview["context"], "aigc_results": aigc_results},
+    )
+    assert score.status_code == 200
+    payload = score.json()
+    assert payload["session_id"] == interview["id"]
+    assert payload["dimensions"]
+    assert payload["total_score"] > 0
+    assert payload["risk_notes"]
+
+
 def test_gateway_end_interview_can_return_queued_task(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("OFFLINE_TASK_EXECUTION", "async")
     client = _client(tmp_path, monkeypatch)

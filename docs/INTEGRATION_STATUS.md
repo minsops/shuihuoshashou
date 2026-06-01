@@ -27,6 +27,7 @@ The local implementation is complete as a runnable MVP:
 - JD competency generation uses the shared LLM JSON client with `prompts/competency_gen.md` and
   deterministic fallback.
 - Probe generation, scoring, AIGC/template checks, consistency checks, HTML/PDF report generation.
+- Internal HTTP-style contracts for standalone probe, AIGC detection, and scoring calls.
 - Scoring uses the shared LLM JSON client for structured dimension drafts, then normalizes evidence
   and recomputes final totals in Python.
 - Runtime probe prompts are kept under `prompts/` and loaded by services instead of being embedded in code.

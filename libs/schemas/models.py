@@ -222,6 +222,15 @@ class OfflineInterviewInput(BaseModel):
     turns: list[QATurn]
 
 
+class AIGCDetectRequest(BaseModel):
+    turns: list[QATurn]
+
+
+class ScoringRequest(BaseModel):
+    context: InterviewContext
+    aigc_results: list[AIGCResult] = Field(default_factory=list)
+
+
 class OfflineInterviewResult(BaseModel):
     job: JobRecord
     candidate: CandidateRecord
