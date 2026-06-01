@@ -225,6 +225,29 @@ def test_gateway_end_interview_can_return_queued_task(tmp_path: Path, monkeypatc
     assert client.get(f"/api/interviews/{interview['id']}/report").status_code == 404
 
 
+def test_gateway_rejects_turns_after_report(tmp_path: Path, monkeypatch) -> None:
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+    client.post(
+        f"/api/interviews/{interview['id']}/turns",
+        json={"question": "讲项目", "answer": "我写了 FastAPI 编排。"},
+    )
+    assert client.post(f"/api/interviews/{interview['id']}/end").status_code == 200
+
+    rejected = client.post(
+        f"/api/interviews/{interview['id']}/turns",
+        json={"question": "补充", "answer": "继续补充"},
+    )
+
+    assert rejected.status_code == 409
+    assert "cannot add turn" in rejected.text
+
+
 def test_gateway_metrics_records_requests(tmp_path: Path, monkeypatch) -> None:
     client = _client(tmp_path, monkeypatch)
     traceparent = "00-1234567890abcdef1234567890abcdef-1234567890abcdef-01"

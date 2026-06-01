@@ -179,6 +179,10 @@ def save_interview(record: InterviewRecord) -> None:
 
 def start_interview(interview_id: str) -> InterviewRecord:
     record = get_interview(interview_id)
+    if record.status == InterviewStatus.in_progress:
+        return record
+    if record.status != InterviewStatus.created:
+        raise ValueError(f"cannot start interview from status {record.status.value}")
     record.status = InterviewStatus.in_progress
     record.started_at = datetime.now(UTC)
     record.context.started_at = record.started_at
@@ -188,6 +192,8 @@ def start_interview(interview_id: str) -> InterviewRecord:
 
 def add_turn(interview_id: str, turn: QATurn) -> InterviewRecord:
     record = get_interview(interview_id)
+    if record.status not in {InterviewStatus.created, InterviewStatus.in_progress}:
+        raise ValueError(f"cannot add turn to interview in status {record.status.value}")
     record.context.turns.append(turn)
     if len(record.context.fact_claims) != len(record.context.turns) - 1:
         record.context.fact_claims = [
@@ -264,6 +270,10 @@ def _is_drill_down_topic(text: str) -> bool:
 
 def finish_interview(interview_id: str) -> InterviewRecord:
     record = get_interview(interview_id)
+    if record.status == InterviewStatus.finished:
+        return record
+    if record.status not in {InterviewStatus.created, InterviewStatus.in_progress}:
+        raise ValueError(f"cannot finish interview from status {record.status.value}")
     record.status = InterviewStatus.finished
     record.ended_at = datetime.now(UTC)
     record.context.ended_at = record.ended_at
@@ -277,6 +287,8 @@ def finish_interview(interview_id: str) -> InterviewRecord:
 
 def run_offline_scoring_task(interview_id: str):
     record = get_interview(interview_id)
+    if record.status != InterviewStatus.finished:
+        raise ValueError(f"offline scoring requires FINISHED status, got {record.status.value}")
     record.status = InterviewStatus.scoring
     save_interview(record)
     event_bus.publish_nowait(

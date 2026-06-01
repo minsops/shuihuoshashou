@@ -10,6 +10,7 @@ as a local-first Python MVP:
 - Local SQLite persistence by default, with a PostgreSQL runtime adapter for deployment profiles.
 - In-memory async events for local development, with explicit offline scoring events.
 - Local task queue boundary for offline scoring, with optional Redis Streams task publication.
+- Interview state transitions reject post-report mutation and scoring before finish.
 - Unified LLM client with mock mode and OpenAI-compatible HTTP mode for `mimo2.5pro`.
 - Runtime LLM prompts are stored under `prompts/` and loaded by services instead of being embedded in code.
 - ASR interface supports local stub mode and configurable HTTP cloud ASR adapters.

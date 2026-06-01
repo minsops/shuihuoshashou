@@ -316,6 +316,8 @@ def api_start_interview(interview_id: str):
         return start_interview(interview_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @app.post("/api/interviews/{interview_id}/turns")
@@ -324,6 +326,8 @@ def api_add_turn(interview_id: str, turn: QATurn):
         return add_turn(interview_id, turn)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @app.post("/api/probe")
@@ -357,6 +361,8 @@ def api_end_interview(interview_id: str):
         return end_interview(interview_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @app.get("/api/interviews/{interview_id}/report")

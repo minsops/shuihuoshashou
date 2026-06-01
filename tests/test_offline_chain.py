@@ -39,6 +39,7 @@ from services.interview_orchestrator.service import (
     list_turns,
     run_offline_scoring_task,
     should_probe,
+    start_interview,
 )
 from services.jd_kb_service.service import (
     _index_probe_patterns,
@@ -145,6 +146,43 @@ def test_offline_pipeline_exposes_scoring_state(tmp_path: Path, monkeypatch) -> 
     topics = [topic for topic, _ in event_bus.history()]
     assert "interview.scoring_started" in topics
     assert "interview.reported" in topics
+
+
+def test_offline_scoring_requires_finished_state(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'state.db'}")
+    monkeypatch.setenv("REPORT_DIR", str(tmp_path / "reports"))
+    get_settings.cache_clear()
+    init_db()
+    job = create_job(JobCreate(title="Backend", jd_text="Python FastAPI"))
+    candidate = create_candidate(CandidateCreate(name="Grace"))
+    interview = create_interview(InterviewCreate(job_id=job.id, candidate_id=candidate.id))
+
+    with pytest.raises(ValueError, match="offline scoring requires FINISHED"):
+        run_offline_scoring_task(interview.id)
+
+
+def test_interview_state_machine_rejects_post_report_mutations(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'reported.db'}")
+    monkeypatch.setenv("REPORT_DIR", str(tmp_path / "reports"))
+    get_settings.cache_clear()
+    event_bus.reset()
+    task_queue.reset()
+    init_db()
+    job = create_job(JobCreate(title="Backend", jd_text="Python FastAPI"))
+    candidate = create_candidate(CandidateCreate(name="Grace"))
+    interview = create_interview(InterviewCreate(job_id=job.id, candidate_id=candidate.id))
+    add_turn(interview.id, QATurn(question="讲项目", answer="我写了 FastAPI 编排。"))
+
+    end_interview(interview.id)
+
+    with pytest.raises(ValueError, match="cannot add turn"):
+        add_turn(interview.id, QATurn(question="补充", answer="继续补充"))
+    with pytest.raises(ValueError, match="cannot start interview"):
+        start_interview(interview.id)
+    with pytest.raises(ValueError, match="cannot finish interview"):
+        finish_interview(interview.id)
 
 
 def test_end_interview_can_queue_offline_scoring_without_running_it(
