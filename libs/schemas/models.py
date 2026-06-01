@@ -90,6 +90,7 @@ class InterviewContext(BaseModel):
     turns: list[QATurn] = Field(default_factory=list)
     started_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     ended_at: datetime | None = None
+    fact_claims: list[FactClaim] = Field(default_factory=list)
     flags: list[ConsistencyFlag] = Field(default_factory=list)
 
 

@@ -20,7 +20,7 @@ from libs.schemas import (
     TranscriptSegment,
 )
 from services.aigc_detect_service.service import detect_interview
-from services.interview_orchestrator.consistency import detect_consistency
+from services.interview_orchestrator.consistency import detect_claim_conflicts, extract_fact_claim
 from services.jd_kb_service.service import get_job
 from services.report_service.service import build_report
 from services.scoring_service.service import score_interview
@@ -189,7 +189,12 @@ def start_interview(interview_id: str) -> InterviewRecord:
 def add_turn(interview_id: str, turn: QATurn) -> InterviewRecord:
     record = get_interview(interview_id)
     record.context.turns.append(turn)
-    record.context.flags = detect_consistency(record.context.turns)
+    if len(record.context.fact_claims) != len(record.context.turns) - 1:
+        record.context.fact_claims = [
+            extract_fact_claim(existing_turn) for existing_turn in record.context.turns[:-1]
+        ]
+    record.context.fact_claims.append(extract_fact_claim(turn))
+    record.context.flags = detect_claim_conflicts(record.context.fact_claims)
     save_interview(record)
     with connect() as conn:
         conn.execute(

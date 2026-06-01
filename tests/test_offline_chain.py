@@ -78,6 +78,7 @@ def test_offline_interview_chain(tmp_path: Path, monkeypatch) -> None:
         ),
     )
     report = end_interview(interview.id)
+    persisted = get_interview(interview.id)
     assert report.score.total_score > 0
     assert report.aigc_results
     assert report.transcript
@@ -96,7 +97,9 @@ def test_offline_interview_chain(tmp_path: Path, monkeypatch) -> None:
     assert report.artifact_uris["pdf"].startswith("file://")
     assert report.artifact_uris["transcript"].startswith("file://")
     assert transcript_json[0]["answer"] == report.transcript[0].answer
-    assert get_interview(interview.id).status == InterviewStatus.reported
+    assert persisted.status == InterviewStatus.reported
+    assert persisted.context.fact_claims
+    assert persisted.context.fact_claims[0].turn_id == report.transcript[0].turn_id
     assert [turn.turn_id for turn in list_turns(interview.id)]
     assert [topic for topic, _ in event_bus.history()] == [
         "qa_turn.created",
@@ -550,6 +553,30 @@ def test_consistency_detects_contribution_conflict() -> None:
     flags = detect_consistency(turns)
     assert flags
     assert flags[0].severity == "high"
+
+
+def test_add_turn_maintains_fact_claim_table(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'facts.db'}")
+    get_settings.cache_clear()
+    init_db()
+    job = create_job(JobCreate(title="Backend", jd_text="Python FastAPI"))
+    candidate = create_candidate(CandidateCreate(name="Ada"))
+    interview = create_interview(InterviewCreate(job_id=job.id, candidate_id=candidate.id))
+    first = QATurn(question="q1", answer="这个项目是我独立负责 FastAPI 编排和重试。")
+    second = QATurn(question="q2", answer="其实核心链路是团队负责，同事负责主要实现。")
+
+    add_turn(interview.id, first)
+    record = add_turn(interview.id, second)
+    reloaded = get_interview(interview.id)
+
+    assert [claim.turn_id for claim in record.context.fact_claims] == [
+        first.turn_id,
+        second.turn_id,
+    ]
+    assert record.context.fact_claims[0].contribution_scope == "solo"
+    assert "FastAPI" in record.context.fact_claims[0].technologies
+    assert reloaded.context.fact_claims[1].contribution_scope == "team"
+    assert reloaded.context.flags
 
 
 def test_should_probe_uses_configurable_thresholds(monkeypatch) -> None:

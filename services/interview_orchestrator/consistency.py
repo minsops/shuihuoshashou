@@ -45,6 +45,10 @@ def extract_fact_claim(turn: QATurn) -> FactClaim:
 
 def detect_consistency(turns: list[QATurn]) -> list[ConsistencyFlag]:
     claims = [extract_fact_claim(turn) for turn in turns]
+    return detect_claim_conflicts(claims)
+
+
+def detect_claim_conflicts(claims: list[FactClaim]) -> list[ConsistencyFlag]:
     flags: list[ConsistencyFlag] = []
     for left_index, left in enumerate(claims):
         for right in claims[left_index + 1 :]:

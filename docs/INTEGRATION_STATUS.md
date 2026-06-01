@@ -32,6 +32,8 @@ The local implementation is complete as a runnable MVP:
 - Runtime probe prompts are kept under `prompts/` and loaded by services instead of being embedded in code.
 - AIGC checks use a local corpus with character n-gram cosine similarity plus optional HTTP detector
   integration with deterministic local fallback.
+- Interview context persists extracted fact claims for role, responsibility, technology, and metric
+  statements, and consistency checks run against that fact table.
 - Structured JSON and HTML/PDF reports include highlights, radar charts, AIGC risk highlights,
   recommendation, and the full interview transcript.
 - Report artifacts support local `file://` storage and SigV4 uploads to S3-compatible storage for

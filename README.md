@@ -26,6 +26,8 @@ as a local-first Python MVP:
 - Reports include structured scores, radar charts, highlights, AIGC checks, consistency flags,
   risk highlights, recommendations, and full interview transcripts.
 - Report generation writes separate HTML, PDF, and transcript JSON artifacts for audit and storage.
+- Interview context keeps an auditable fact-claim table for role, responsibility, technology, and
+  metric statements used by consistency checks.
 - Scoring uses the shared LLM JSON client for structured dimension drafts and recomputes final
   totals in Python for auditability and deterministic fallback behavior.
 - AIGC checks combine a local answer-template corpus with optional HTTP detector integration.
