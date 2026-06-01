@@ -181,3 +181,110 @@ def test_llm_client_can_raise_safe_error(monkeypatch) -> None:
         assert "secret" not in str(exc)
     else:
         raise AssertionError("expected RuntimeError")
+
+
+def test_llm_client_sync_path_uses_mock_transport(monkeypatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "openai_compatible")
+    monkeypatch.setenv("LLM_BASE_URL", "https://llm.example.test")
+    monkeypatch.setenv("LLM_API_KEY", "secret")
+    get_settings.cache_clear()
+    calls = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        body = json.loads(request.content)
+        assert body["response_format"] == {"type": "json_object"}
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "suggestions": [
+                                        {
+                                            "question": "同步路径追问",
+                                            "target": "验证同步 LLM 封装",
+                                            "competency": "可靠性",
+                                            "priority": 1,
+                                        }
+                                    ],
+                                    "credibility": {
+                                        "level": "solid",
+                                        "reason": "同步路径可脱网 mock",
+                                        "drill_down_hint": "继续追问失败降级",
+                                    },
+                                },
+                                ensure_ascii=False,
+                            )
+                        }
+                    }
+                ]
+            },
+        )
+
+    client = LLMClient(sync_transport=httpx.MockTransport(handler))
+    response = client.complete_json_sync(
+        [LLMMessage(role="user", content="hello")],
+        ProbeResponse,
+        _fallback(),
+    )
+
+    assert calls == 1
+    assert response.suggestions[0].question == "同步路径追问"
+
+
+def test_llm_client_sync_path_retries_after_bad_json(monkeypatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "openai_compatible")
+    monkeypatch.setenv("LLM_BASE_URL", "https://llm.example.test")
+    monkeypatch.setenv("LLM_API_KEY", "secret")
+    monkeypatch.setenv("LLM_MAX_RETRIES", "1")
+    get_settings.cache_clear()
+    calls = 0
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return httpx.Response(200, json={"choices": [{"message": {"content": "not-json"}}]})
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "suggestions": [
+                                        {
+                                            "question": "同步重试后成功",
+                                            "target": "验证同步重试",
+                                            "competency": "可靠性",
+                                            "priority": 1,
+                                        }
+                                    ],
+                                    "credibility": {
+                                        "level": "solid",
+                                        "reason": "同步重试解析成功",
+                                        "drill_down_hint": "继续追问",
+                                    },
+                                },
+                                ensure_ascii=False,
+                            )
+                        }
+                    }
+                ]
+            },
+        )
+
+    client = LLMClient(sync_transport=httpx.MockTransport(handler))
+    response = client.complete_json_sync(
+        [LLMMessage(role="user", content="hello")],
+        ProbeResponse,
+        _fallback(),
+    )
+
+    assert calls == 2
+    assert response.suggestions[0].question == "同步重试后成功"

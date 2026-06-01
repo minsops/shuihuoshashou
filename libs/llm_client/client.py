@@ -19,8 +19,15 @@ class LLMMessage:
 
 
 class LLMClient:
-    def __init__(self, transport: httpx.AsyncBaseTransport | None = None) -> None:
-        self._transport = transport
+    def __init__(
+        self,
+        transport: httpx.AsyncBaseTransport | httpx.BaseTransport | None = None,
+        *,
+        async_transport: httpx.AsyncBaseTransport | None = None,
+        sync_transport: httpx.BaseTransport | None = None,
+    ) -> None:
+        self._async_transport = async_transport or transport
+        self._sync_transport = sync_transport or transport
 
     async def complete_json(
         self,
@@ -41,7 +48,7 @@ class LLMClient:
             try:
                 async with httpx.AsyncClient(
                     timeout=settings.llm_timeout_seconds,
-                    transport=self._transport,
+                    transport=self._async_transport,
                 ) as client:
                     response = await client.post(url, headers=headers, json=payload)
                     response.raise_for_status()
@@ -71,7 +78,10 @@ class LLMClient:
         max_attempts = max(1, settings.llm_max_retries + 1)
         for attempt in range(max_attempts):
             try:
-                with httpx.Client(timeout=settings.llm_timeout_seconds) as client:
+                with httpx.Client(
+                    timeout=settings.llm_timeout_seconds,
+                    transport=self._sync_transport,
+                ) as client:
                     response = client.post(url, headers=headers, json=payload)
                     response.raise_for_status()
                 return _parse_json_response(response.json(), schema)
