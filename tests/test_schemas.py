@@ -209,8 +209,15 @@ def test_shared_contract_models_reject_blank_identifiers() -> None:
 
 
 def test_aigc_detect_request_requires_candidate_turns() -> None:
+    turn = QATurn(turn_id="turn-1", question="q", answer="a")
+
+    request = AIGCDetectRequest(turns=[turn])
+
+    assert request.turns[0].turn_id == "turn-1"
     with pytest.raises(ValidationError):
         AIGCDetectRequest(turns=[])
+    with pytest.raises(ValidationError):
+        AIGCDetectRequest(turns=[turn, turn])
 
 
 def test_scoring_and_report_requests_require_aigc_results() -> None:

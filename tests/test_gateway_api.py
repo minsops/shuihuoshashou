@@ -463,6 +463,26 @@ def test_gateway_aigc_detect_rejects_empty_turns(tmp_path: Path, monkeypatch) ->
     assert "turns" in response.text
 
 
+def test_gateway_aigc_detect_rejects_duplicate_turn_ids(tmp_path: Path, monkeypatch) -> None:
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+    interview = client.post(
+        f"/api/interviews/{interview['id']}/turns",
+        json={"question": "讲项目", "answer": "我写了 FastAPI 编排。"},
+    ).json()
+    turn = interview["context"]["turns"][0]
+
+    response = client.post("/api/aigc/detect", json={"turns": [turn, turn]})
+
+    assert response.status_code == 422
+    assert "AIGC detection turns must not contain duplicate turn_id values" in response.text
+
+
 def test_gateway_scoring_rejects_empty_aigc_results(tmp_path: Path, monkeypatch) -> None:
     client = _client(tmp_path, monkeypatch)
     job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()

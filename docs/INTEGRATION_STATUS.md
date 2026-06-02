@@ -81,8 +81,8 @@ The local implementation is complete as a runnable MVP:
 - AIGC checks use a local corpus with character n-gram cosine similarity plus optional HTTP detector
   integration; the final flag applies configured probability/template thresholds with deterministic
   local fallback.
-- AIGC detection requests reject empty turn batches so the offline scoring/report pipeline does not
-  start from a no-op detection result.
+- AIGC detection requests reject empty turn batches and duplicate turn ids so the offline
+  scoring/report pipeline does not start from a no-op or ambiguous detection result.
 - Interview context persists extracted fact claims for role, responsibility, technology, and metric
   statements, and consistency checks run against that fact table.
 - Consistency fact extraction treats explicit team/other-owner statements as team scope before

@@ -430,6 +430,13 @@ class OfflineInterviewInput(BaseModel):
 class AIGCDetectRequest(BaseModel):
     turns: list[QATurn] = Field(min_length=1)
 
+    @model_validator(mode="after")
+    def turn_ids_are_unique(self) -> "AIGCDetectRequest":
+        turn_ids = [turn.turn_id for turn in self.turns]
+        if len(turn_ids) != len(set(turn_ids)):
+            raise ValueError("AIGC detection turns must not contain duplicate turn_id values")
+        return self
+
 
 class ScoringRequest(BaseModel):
     context: InterviewContext
