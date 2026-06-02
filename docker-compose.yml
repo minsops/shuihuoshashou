@@ -4,7 +4,7 @@ services:
   gateway:
     build: .
     ports:
-      - "8000:8000"
+      - "${GATEWAY_PORT:-8000}:8000"
     environment:
       APP_ENV: docker
       GATEWAY_API_KEY: ${GATEWAY_API_KEY:-}
@@ -155,7 +155,7 @@ services:
       POSTGRES_USER: shuihuo
       POSTGRES_PASSWORD: shuihuo_local
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./db/postgres/001_core_schema.sql:/docker-entrypoint-initdb.d/001_core_schema.sql:ro
@@ -168,7 +168,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -182,8 +182,8 @@ services:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
     volumes:
       - minio-data:/data
 

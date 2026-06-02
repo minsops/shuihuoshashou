@@ -132,6 +132,13 @@ PostgreSQL, Redis, and S3-compatible MinIO.
 docker compose up --build
 ```
 
+If local ports are already in use, override the host bindings without changing container-to-container
+addresses:
+
+```bash
+GATEWAY_PORT=18000 POSTGRES_PORT=15432 REDIS_PORT=16379 MINIO_PORT=19000 MINIO_CONSOLE_PORT=19001 docker compose up --build
+```
+
 To run the optional Celery offline-scoring worker in the same compose stack:
 
 ```bash
