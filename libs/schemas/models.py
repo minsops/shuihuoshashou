@@ -30,7 +30,7 @@ class CompetencyItem(BaseModel):
     name: str
     description: str
     probe_patterns: list[str] = Field(default_factory=list)
-    weight: float = 0.0
+    weight: float = Field(default=0.0, allow_inf_nan=False)
 
     @field_validator("name", "description")
     @classmethod
@@ -278,7 +278,7 @@ class EvidenceRef(BaseModel):
 class DimensionScore(BaseModel):
     dimension: str
     score: float = Field(ge=0.0, le=100.0)
-    weight: float
+    weight: float = Field(allow_inf_nan=False)
     evidence: list[EvidenceRef] = Field(min_length=1)
 
     @field_validator("dimension")

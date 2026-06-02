@@ -142,6 +142,10 @@ def test_job_candidate_and_competency_payloads_reject_blank_required_text() -> N
     with pytest.raises(ValidationError):
         CompetencyItem(name="工程深度", description=" ", weight=1.0)
     with pytest.raises(ValidationError):
+        CompetencyItem(name="工程深度", description="验证工程能力", weight=float("nan"))
+    with pytest.raises(ValidationError):
+        CompetencyItem(name="工程深度", description="验证工程能力", weight=float("inf"))
+    with pytest.raises(ValidationError):
         CompetencyItem(
             name="工程深度",
             description="验证工程能力",
@@ -465,6 +469,20 @@ def test_dimension_scores_require_evidence_and_score_requires_dimensions() -> No
             score=80.0,
             weight=0.25,
             evidence=[],
+        )
+    with pytest.raises(ValidationError):
+        DimensionScore(
+            dimension="项目真实性",
+            score=80.0,
+            weight=float("nan"),
+            evidence=[evidence],
+        )
+    with pytest.raises(ValidationError):
+        DimensionScore(
+            dimension="项目真实性",
+            score=80.0,
+            weight=float("inf"),
+            evidence=[evidence],
         )
     with pytest.raises(ValidationError):
         InterviewScore(

@@ -34,6 +34,7 @@ as a local-first Python MVP:
 - JD knowledge base indexes competency-specific probe patterns with deterministic embeddings and optional pgvector search.
 - JD competency models are generated through the shared LLM JSON client with deterministic fallback
   and normalized to keep the required scoring dimensions and weights present.
+- Competency and scoring weights reject NaN/inf values so Python-side weighted totals remain reproducible.
 - Report artifacts write local files by default and upload to S3-compatible storage when credentials are configured.
 - Reports include structured scores, radar charts, highlights, AIGC checks, consistency flags,
   de-duplicated risk highlights, recommendations, and full interview transcripts.
