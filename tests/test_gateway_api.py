@@ -615,6 +615,21 @@ def test_gateway_report_build_rejects_mismatched_inputs(
     assert rejected_evidence_excerpt.status_code == 409
     assert "score evidence excerpt is not in turn answer" in rejected_evidence_excerpt.text
 
+    duplicate_evidence = json.loads(json.dumps(score))
+    duplicate_evidence["dimensions"][0]["evidence"].append(
+        duplicate_evidence["dimensions"][0]["evidence"][0]
+    )
+    rejected_duplicate_evidence = client.post(
+        "/api/report/build",
+        json={
+            "context": interview["context"],
+            "score": duplicate_evidence,
+            "aigc_results": aigc_results,
+        },
+    )
+    assert rejected_duplicate_evidence.status_code == 409
+    assert "score evidence contains duplicate reference" in rejected_duplicate_evidence.text
+
     mismatched_flag_context = json.loads(json.dumps(interview["context"]))
     mismatched_flag_context["flags"] = [
         {

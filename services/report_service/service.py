@@ -410,10 +410,22 @@ def _validate_report_inputs(
         if flag.turn_id_b not in turns_by_id:
             raise ValueError(f"consistency flag references unknown turn_id: {flag.turn_id_b}")
     for dimension in score.dimensions:
+        evidence_refs: set[tuple[str, int, int, str]] = set()
         for evidence in dimension.evidence:
             turn = turns_by_id.get(evidence.turn_id)
             if turn is None:
                 raise ValueError(f"score evidence references unknown turn_id: {evidence.turn_id}")
+            evidence_ref = (
+                evidence.turn_id,
+                evidence.quote_start_ms,
+                evidence.quote_end_ms,
+                evidence.excerpt,
+            )
+            if evidence_ref in evidence_refs:
+                raise ValueError(
+                    f"score evidence contains duplicate reference: {dimension.dimension}"
+                )
+            evidence_refs.add(evidence_ref)
             if (
                 evidence.quote_start_ms < turn.answer_start_ms
                 or evidence.quote_end_ms > turn.answer_end_ms
