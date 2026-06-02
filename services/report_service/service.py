@@ -185,7 +185,8 @@ def _write_text_fallback_pdf(lines: list[str], pdf_path: Path) -> None:
     for index, line in enumerate(wrapped_lines):
         if index:
             commands.append("T*")
-        commands.append(f"({_pdf_escape(_pdf_safe_text(line))}) Tj")
+        commands.append(f"{_pdf_font_for_line(line)} 10 Tf")
+        commands.append(f"{_pdf_text_operand(line)} Tj")
     commands.append("ET")
     stream = "\n".join(commands)
     stream_bytes = stream.encode("latin-1")
@@ -194,10 +195,24 @@ def _write_text_fallback_pdf(lines: list[str], pdf_path: Path) -> None:
         "2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj",
         (
             "3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
-            "/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj"
+            "/Resources << /Font << /F1 4 0 R /F2 6 0 R >> >> /Contents 5 0 R >> endobj"
         ),
         "4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj",
         f"5 0 obj << /Length {len(stream_bytes)} >> stream\n{stream}\nendstream endobj",
+        (
+            "6 0 obj << /Type /Font /Subtype /Type0 /BaseFont /STSong-Light "
+            "/Encoding /UniGB-UCS2-H /DescendantFonts [7 0 R] >> endobj"
+        ),
+        (
+            "7 0 obj << /Type /Font /Subtype /CIDFontType0 /BaseFont /STSong-Light "
+            "/CIDSystemInfo << /Registry (Adobe) /Ordering (GB1) /Supplement 5 >> "
+            "/FontDescriptor 8 0 R >> endobj"
+        ),
+        (
+            "8 0 obj << /Type /FontDescriptor /FontName /STSong-Light /Flags 4 "
+            "/FontBBox [0 -120 1000 880] /ItalicAngle 0 /Ascent 880 /Descent -120 "
+            "/CapHeight 880 /StemV 80 >> endobj"
+        ),
     ]
     content = "%PDF-1.4\n"
     offsets = [0]
@@ -215,8 +230,14 @@ def _write_text_fallback_pdf(lines: list[str], pdf_path: Path) -> None:
     pdf_path.write_bytes(content.encode("latin-1"))
 
 
-def _pdf_safe_text(value: str) -> str:
-    return "".join(char if 32 <= ord(char) <= 126 else "?" for char in value)
+def _pdf_font_for_line(value: str) -> str:
+    return "/F2" if any(ord(char) > 126 for char in value) else "/F1"
+
+
+def _pdf_text_operand(value: str) -> str:
+    if any(ord(char) > 126 for char in value):
+        return f"<{value.encode('utf-16-be').hex().upper()}>"
+    return f"({_pdf_escape(value)})"
 
 
 def _pdf_escape(value: str) -> str:

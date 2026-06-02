@@ -620,6 +620,75 @@ def test_report_pdf_fallback_contains_auditable_summary(tmp_path: Path, monkeypa
     assert b"Built FastAPI retry logic and JSON" in pdf_bytes
 
 
+def test_report_pdf_fallback_preserves_chinese_text(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("REPORT_DIR", str(tmp_path / "reports"))
+    get_settings.cache_clear()
+    real_import = builtins.__import__
+
+    def fake_import(name, globals_=None, locals_=None, fromlist=(), level=0):
+        if name == "weasyprint":
+            raise ImportError("blocked in test")
+        return real_import(name, globals_, locals_, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    competency = CompetencyItem(
+        name="项目真实性",
+        description="验证项目经历",
+        weight=1.0,
+    )
+    model = CompetencyModel(job_id="job-local", job_title="Backend", items=[competency])
+    turn = QATurn(
+        question="讲项目",
+        answer="我写了 FastAPI 编排和 JSON 校验。",
+        answer_start_ms=100,
+        answer_end_ms=1200,
+    )
+    ctx = InterviewContext(
+        session_id="session-fallback-pdf-chinese",
+        job_id=model.job_id,
+        candidate_id="candidate-local",
+        competency_model=model,
+        turns=[turn],
+    )
+    score = InterviewScore(
+        session_id=ctx.session_id,
+        dimensions=[
+            DimensionScore(
+                dimension=competency.name,
+                score=80.0,
+                weight=competency.weight,
+                evidence=[
+                    EvidenceRef(
+                        turn_id=turn.turn_id,
+                        quote_start_ms=turn.answer_start_ms,
+                        quote_end_ms=turn.answer_end_ms,
+                        excerpt=turn.answer,
+                    )
+                ],
+            )
+        ],
+        total_score=80.0,
+        risk_notes=["需要继续追问线上故障细节"],
+        recommendation="yes",
+    )
+    aigc = [
+        AIGCResult(
+            turn_id=turn.turn_id,
+            ai_generated_prob=0.1,
+            template_similarity=0.1,
+            flagged=False,
+        )
+    ]
+
+    report, _ = build_report(ctx, score, aigc)
+
+    pdf_bytes = Path(report.pdf_path or "").read_bytes()
+    assert pdf_bytes.startswith(b"%PDF")
+    assert b"/STSong-Light" in pdf_bytes
+    assert "项目真实性".encode("utf-16-be").hex().upper().encode("ascii") in pdf_bytes
+    assert "我写了".encode("utf-16-be").hex().upper().encode("ascii") in pdf_bytes
+
+
 def test_report_deduplicates_risk_highlights(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("REPORT_DIR", str(tmp_path / "reports"))
     get_settings.cache_clear()

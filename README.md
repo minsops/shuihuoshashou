@@ -43,7 +43,8 @@ as a local-first Python MVP:
 - Report generation writes separate structured report JSON, HTML, PDF, and transcript JSON artifacts
   for audit and storage.
 - PDF generation uses WeasyPrint when available and falls back to an auditable text PDF with score,
-  recommendation, evidence, risk, AIGC, and transcript summary when native rendering dependencies are missing.
+  recommendation, evidence, risk, AIGC, and transcript summary, including CJK text, when native
+  rendering dependencies are missing.
 - Interview context keeps an auditable fact-claim table for role, responsibility, technology, and
   metric statements used by consistency checks, including shared-context metric conflicts.
 - Scoring uses the shared LLM JSON client for structured dimension drafts and recomputes final

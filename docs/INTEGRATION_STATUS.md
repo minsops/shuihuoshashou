@@ -90,7 +90,8 @@ The local implementation is complete as a runnable MVP:
   recommendation, and the full interview transcript.
 - HTML/PDF report risk highlights merge score risk notes and consistency flags with de-duplication.
 - PDF generation falls back to an auditable text PDF with score, recommendation, dimension evidence,
-  risk, AIGC, and transcript summary if WeasyPrint's native rendering stack is unavailable.
+  risk, AIGC, and transcript summary, including CJK text, if WeasyPrint's native rendering stack is
+  unavailable.
 - Report input validation rejects score/session mismatches, dimension or weight mismatches,
   inconsistent totals/recommendations, unknown EvidenceRef/ConsistencyFlag/AIGC turn ids,
   out-of-range evidence timestamps, evidence excerpts not present in the transcript answer, and
