@@ -271,6 +271,13 @@ class InterviewScore(BaseModel):
     def session_id_is_not_blank(cls, value: str) -> str:
         return _not_blank(value, "session_id")
 
+    @field_validator("risk_notes")
+    @classmethod
+    def risk_notes_are_not_blank(cls, value: list[str]) -> list[str]:
+        for note in value:
+            _not_blank(note, "risk note")
+        return value
+
 
 class AIGCResult(BaseModel):
     turn_id: str

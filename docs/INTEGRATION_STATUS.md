@@ -49,6 +49,7 @@ The local implementation is complete as a runnable MVP:
   foreign-key behavior.
 - Separate `qa_turns` persistence for auditable answer evidence.
 - Shared QATurn and EvidenceRef schemas reject blank question, answer, and excerpt text.
+- Shared InterviewScore schemas reject blank risk-note entries.
 - Shared job, candidate, competency, and probe-card schemas reject blank required text.
 - Shared cross-service schemas reject blank identifiers for jobs, candidates, interviews, turns,
   evidence, reports, and offline task metadata.

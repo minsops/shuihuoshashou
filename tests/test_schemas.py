@@ -311,6 +311,14 @@ def test_dimension_scores_require_evidence_and_score_requires_dimensions() -> No
             total_score=80.0,
             recommendation="yes",
         )
+    with pytest.raises(ValidationError):
+        InterviewScore(
+            session_id="session-1",
+            dimensions=[dimension],
+            total_score=80.0,
+            risk_notes=[" "],
+            recommendation="yes",
+        )
 
 
 def test_probe_response_requires_one_to_three_suggestions() -> None:
