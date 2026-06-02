@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_docker_compose_declares_required_infrastructure() -> None:
     compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
 
+    assert compose.startswith("name: shuihuo-killer")
     for service in ["gateway:", "offline-worker:", "postgres:", "redis:", "minio:"]:
         assert service in compose
     assert "postgres:16-alpine" in compose

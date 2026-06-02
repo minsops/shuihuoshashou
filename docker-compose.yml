@@ -1,3 +1,5 @@
+name: shuihuo-killer
+
 services:
   gateway:
     build: .
