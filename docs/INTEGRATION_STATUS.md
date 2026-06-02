@@ -45,6 +45,8 @@ The local implementation is complete as a runnable MVP:
 - Separate `qa_turns` persistence for auditable answer evidence.
 - Shared QATurn and EvidenceRef schemas reject blank question, answer, and excerpt text.
 - Shared job, candidate, competency, and probe-card schemas reject blank required text.
+- Shared cross-service schemas reject blank identifiers for jobs, candidates, interviews, turns,
+  evidence, reports, and offline task metadata.
 - JD knowledge base indexes competency-specific probe patterns with deterministic embeddings and optional pgvector nearest-neighbor search.
 - JD competency generation uses the shared LLM JSON client with `prompts/competency_gen.md` and
   deterministic fallback, then normalizes outputs to preserve required scoring dimensions and

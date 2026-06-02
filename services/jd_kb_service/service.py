@@ -326,12 +326,13 @@ def _pgvector_literal(vector: list[float]) -> str:
 
 def create_job(payload: JobCreate) -> JobRecord:
     init_db()
+    job_id = new_id()
     record = JobRecord(
+        id=job_id,
         title=payload.title,
         jd_text=payload.jd_text,
-        competency_model=generate_competency_model("", payload.title, payload.jd_text),
+        competency_model=generate_competency_model(job_id, payload.title, payload.jd_text),
     )
-    record.competency_model.job_id = record.id
     with connect() as conn:
         conn.execute(
             "INSERT INTO jobs (id, title, jd_text, competency_model, created_at) VALUES (?, ?, ?, ?, ?)",

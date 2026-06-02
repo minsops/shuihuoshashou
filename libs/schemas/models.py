@@ -50,6 +50,11 @@ class CompetencyModel(BaseModel):
     job_title: str
     items: list[CompetencyItem]
 
+    @field_validator("job_id")
+    @classmethod
+    def job_id_is_not_blank(cls, value: str) -> str:
+        return _not_blank(value, "job_id")
+
     @field_validator("job_title")
     @classmethod
     def job_title_is_not_blank(cls, value: str) -> str:
@@ -68,6 +73,11 @@ class ProbePatternHit(BaseModel):
     competency: str
     pattern: str
     score: float = Field(ge=0.0)
+
+    @field_validator("job_id")
+    @classmethod
+    def job_id_is_not_blank(cls, value: str) -> str:
+        return _not_blank(value, "job_id")
 
     @field_validator("competency", "pattern")
     @classmethod
@@ -102,6 +112,11 @@ class ConsistencyFlag(BaseModel):
     description: str
     severity: Literal["low", "high"]
 
+    @field_validator("turn_id_a", "turn_id_b")
+    @classmethod
+    def turn_ids_are_not_blank(cls, value: str, info: ValidationInfo) -> str:
+        return _not_blank(value, info.field_name)
+
     @field_validator("description")
     @classmethod
     def description_is_not_blank(cls, value: str) -> str:
@@ -114,6 +129,11 @@ class FactClaim(BaseModel):
     responsibilities: list[str] = Field(default_factory=list)
     technologies: list[str] = Field(default_factory=list)
     metrics: list[str] = Field(default_factory=list)
+
+    @field_validator("turn_id")
+    @classmethod
+    def turn_id_is_not_blank(cls, value: str) -> str:
+        return _not_blank(value, "turn_id")
 
 
 class QATurn(BaseModel):
@@ -130,6 +150,11 @@ class QATurn(BaseModel):
         if self.answer_end_ms < self.answer_start_ms:
             raise ValueError("answer_end_ms must be greater than or equal to answer_start_ms")
         return self
+
+    @field_validator("turn_id")
+    @classmethod
+    def turn_id_is_not_blank(cls, value: str) -> str:
+        return _not_blank(value, "turn_id")
 
     @field_validator("question", "answer")
     @classmethod
@@ -159,6 +184,11 @@ class ProbeRequest(BaseModel):
     competency_model: CompetencyModel
     recent_turns: list[QATurn]
     latest_answer: str
+
+    @field_validator("job_id")
+    @classmethod
+    def job_id_is_not_blank(cls, value: str) -> str:
+        return _not_blank(value, "job_id")
 
     @field_validator("latest_answer")
     @classmethod
@@ -206,6 +236,11 @@ class EvidenceRef(BaseModel):
             raise ValueError("quote_end_ms must be greater than or equal to quote_start_ms")
         return self
 
+    @field_validator("turn_id")
+    @classmethod
+    def turn_id_is_not_blank(cls, value: str) -> str:
+        return _not_blank(value, "turn_id")
+
     @field_validator("excerpt")
     @classmethod
     def excerpt_is_not_blank(cls, value: str) -> str:
@@ -231,6 +266,11 @@ class InterviewScore(BaseModel):
     risk_notes: list[str] = Field(default_factory=list)
     recommendation: Literal["strong_yes", "yes", "hold", "no"]
 
+    @field_validator("session_id")
+    @classmethod
+    def session_id_is_not_blank(cls, value: str) -> str:
+        return _not_blank(value, "session_id")
+
 
 class AIGCResult(BaseModel):
     turn_id: str
@@ -238,6 +278,11 @@ class AIGCResult(BaseModel):
     template_similarity: float = Field(ge=0.0, le=1.0)
     matched_template: str | None = None
     flagged: bool = False
+
+    @field_validator("turn_id")
+    @classmethod
+    def turn_id_is_not_blank(cls, value: str) -> str:
+        return _not_blank(value, "turn_id")
 
 
 class BehaviorSignal(BaseModel):
@@ -247,6 +292,11 @@ class BehaviorSignal(BaseModel):
     fluency: float = Field(ge=0.0, le=1.0)
     hesitation: float = Field(ge=0.0, le=1.0)
     evasiveness_hint: bool
+
+    @field_validator("turn_id")
+    @classmethod
+    def turn_id_is_not_blank(cls, value: str) -> str:
+        return _not_blank(value, "turn_id")
 
 
 class JobCreate(BaseModel):
@@ -271,6 +321,11 @@ class JobRecord(BaseModel):
     def text_fields_are_not_blank(cls, value: str) -> str:
         return _not_blank(value, "job text")
 
+    @field_validator("id")
+    @classmethod
+    def id_is_not_blank(cls, value: str) -> str:
+        return _not_blank(value, "job id")
+
 
 class CandidateCreate(BaseModel):
     name: str
@@ -293,11 +348,21 @@ class CandidateRecord(BaseModel):
     def name_is_not_blank(cls, value: str) -> str:
         return _not_blank(value, "candidate name")
 
+    @field_validator("id")
+    @classmethod
+    def id_is_not_blank(cls, value: str) -> str:
+        return _not_blank(value, "candidate id")
+
 
 class ConsentCreate(BaseModel):
     candidate_id: str
     consent_type: Literal["behavior_signal"] = "behavior_signal"
     granted: bool = True
+
+    @field_validator("candidate_id")
+    @classmethod
+    def candidate_id_is_not_blank(cls, value: str) -> str:
+        return _not_blank(value, "candidate_id")
 
 
 class ConsentRecord(BaseModel):
@@ -308,11 +373,21 @@ class ConsentRecord(BaseModel):
     granted_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     revoked_at: datetime | None = None
 
+    @field_validator("id", "candidate_id")
+    @classmethod
+    def identifiers_are_not_blank(cls, value: str, info: ValidationInfo) -> str:
+        return _not_blank(value, info.field_name)
+
 
 class InterviewCreate(BaseModel):
     job_id: str
     candidate_id: str
     signal_enabled: bool = False
+
+    @field_validator("job_id", "candidate_id")
+    @classmethod
+    def identifiers_are_not_blank(cls, value: str, info: ValidationInfo) -> str:
+        return _not_blank(value, info.field_name)
 
 
 class InterviewRecord(BaseModel):
@@ -325,6 +400,11 @@ class InterviewRecord(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     started_at: datetime | None = None
     ended_at: datetime | None = None
+
+    @field_validator("id", "job_id", "candidate_id")
+    @classmethod
+    def identifiers_are_not_blank(cls, value: str, info: ValidationInfo) -> str:
+        return _not_blank(value, info.field_name)
 
 
 class OfflineInterviewInput(BaseModel):
@@ -369,6 +449,11 @@ class OfflineTaskAccepted(BaseModel):
     status: Literal["queued"]
     message: str = "offline scoring task queued"
 
+    @field_validator("interview_id", "task_id", "task_name")
+    @classmethod
+    def identifiers_are_not_blank(cls, value: str, info: ValidationInfo) -> str:
+        return _not_blank(value, info.field_name)
+
 
 class Report(BaseModel):
     interview_id: str
@@ -383,3 +468,8 @@ class Report(BaseModel):
     transcript_path: str | None = None
     artifact_uris: dict[str, str] = Field(default_factory=dict)
     generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    @field_validator("interview_id")
+    @classmethod
+    def interview_id_is_not_blank(cls, value: str) -> str:
+        return _not_blank(value, "interview_id")

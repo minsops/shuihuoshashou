@@ -4,19 +4,27 @@ import pytest
 from pydantic import ValidationError
 
 from libs.schemas import (
+    AIGCResult,
     BehaviorSignal,
     CandidateCreate,
+    ConsentCreate,
+    ConsistencyFlag,
     CredibilitySignal,
     CompetencyItem,
     CompetencyModel,
     DimensionScore,
     EvidenceRef,
+    FactClaim,
+    InterviewCreate,
     InterviewScore,
     JobCreate,
+    OfflineTaskAccepted,
+    ProbePatternHit,
     ProbeResponse,
     ProbeRequest,
     ProbeSuggestion,
     QATurn,
+    Report,
     TranscriptSegment,
 )
 
@@ -132,6 +140,66 @@ def test_job_candidate_and_competency_payloads_reject_blank_required_text() -> N
                     weight=1.0,
                 )
             ],
+        )
+
+
+def test_shared_contract_models_reject_blank_identifiers() -> None:
+    competency = CompetencyItem(name="项目真实性", description="验证项目经历", weight=1.0)
+    model = CompetencyModel(job_id="job-1", job_title="Backend", items=[competency])
+    evidence = EvidenceRef(turn_id="turn-1", quote_start_ms=0, quote_end_ms=10, excerpt="回答")
+    dimension = DimensionScore(
+        dimension="项目真实性",
+        score=80.0,
+        weight=1.0,
+        evidence=[evidence],
+    )
+    score = InterviewScore(
+        session_id="session-1",
+        dimensions=[dimension],
+        total_score=80.0,
+        recommendation="yes",
+    )
+
+    with pytest.raises(ValidationError):
+        CompetencyModel(job_id=" ", job_title="Backend", items=[competency])
+    with pytest.raises(ValidationError):
+        ProbePatternHit(job_id=" ", competency="项目真实性", pattern="请讲具体项目。", score=1.0)
+    with pytest.raises(ValidationError):
+        ConsistencyFlag(turn_id_a=" ", turn_id_b="turn-2", description="矛盾", severity="high")
+    with pytest.raises(ValidationError):
+        FactClaim(turn_id=" ")
+    with pytest.raises(ValidationError):
+        QATurn(turn_id=" ", question="q", answer="a")
+    with pytest.raises(ValidationError):
+        ProbeRequest(job_id=" ", competency_model=model, recent_turns=[], latest_answer="回答")
+    with pytest.raises(ValidationError):
+        EvidenceRef(turn_id=" ", quote_start_ms=0, quote_end_ms=10, excerpt="回答")
+    with pytest.raises(ValidationError):
+        InterviewScore(
+            session_id=" ",
+            dimensions=[dimension],
+            total_score=80.0,
+            recommendation="yes",
+        )
+    with pytest.raises(ValidationError):
+        AIGCResult(turn_id=" ", ai_generated_prob=0.2, template_similarity=0.1)
+    with pytest.raises(ValidationError):
+        BehaviorSignal(turn_id=" ", fluency=0.8, hesitation=0.1, evasiveness_hint=False)
+    with pytest.raises(ValidationError):
+        ConsentCreate(candidate_id=" ")
+    with pytest.raises(ValidationError):
+        InterviewCreate(job_id=" ", candidate_id="candidate-1")
+    with pytest.raises(ValidationError):
+        InterviewCreate(job_id="job-1", candidate_id=" ")
+    with pytest.raises(ValidationError):
+        OfflineTaskAccepted(interview_id=" ", task_id="task-1", task_name="task")
+    with pytest.raises(ValidationError):
+        Report(
+            interview_id=" ",
+            score=score,
+            aigc_results=[],
+            consistency_flags=[],
+            summary="报告摘要",
         )
 
 
