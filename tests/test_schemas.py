@@ -678,7 +678,7 @@ def test_report_requires_aigc_results_and_summary() -> None:
     aigc = AIGCResult(turn_id="turn-1", ai_generated_prob=0.2, template_similarity=0.1)
 
     report = Report(
-        interview_id="interview-1",
+        interview_id="session-1",
         score=score,
         aigc_results=[aigc],
         consistency_flags=[],
@@ -690,13 +690,21 @@ def test_report_requires_aigc_results_and_summary() -> None:
         Report(
             interview_id="interview-1",
             score=score,
+            aigc_results=[aigc],
+            consistency_flags=[],
+            summary="报告摘要",
+        )
+    with pytest.raises(ValidationError):
+        Report(
+            interview_id="session-1",
+            score=score,
             aigc_results=[],
             consistency_flags=[],
             summary="报告摘要",
         )
     with pytest.raises(ValidationError):
         Report(
-            interview_id="interview-1",
+            interview_id="session-1",
             score=score,
             aigc_results=[aigc],
             consistency_flags=[],
@@ -704,7 +712,7 @@ def test_report_requires_aigc_results_and_summary() -> None:
         )
     with pytest.raises(ValidationError):
         Report(
-            interview_id="interview-1",
+            interview_id="session-1",
             score=score,
             aigc_results=[aigc],
             consistency_flags=[],
@@ -713,7 +721,7 @@ def test_report_requires_aigc_results_and_summary() -> None:
         )
     with pytest.raises(ValidationError):
         Report(
-            interview_id="interview-1",
+            interview_id="session-1",
             score=score,
             aigc_results=[aigc],
             consistency_flags=[],
@@ -722,7 +730,7 @@ def test_report_requires_aigc_results_and_summary() -> None:
         )
     with pytest.raises(ValidationError):
         Report(
-            interview_id="interview-1",
+            interview_id="session-1",
             score=score,
             aigc_results=[aigc],
             consistency_flags=[],

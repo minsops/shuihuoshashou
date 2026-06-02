@@ -673,3 +673,9 @@ class Report(BaseModel):
             _not_blank(name, "artifact uri key")
             _not_blank(uri, "artifact uri value")
         return value
+
+    @model_validator(mode="after")
+    def interview_id_matches_score_session(self) -> "Report":
+        if self.interview_id != self.score.session_id:
+            raise ValueError("report interview_id must match score session_id")
+        return self
