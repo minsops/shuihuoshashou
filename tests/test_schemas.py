@@ -168,6 +168,23 @@ def test_job_candidate_and_competency_payloads_reject_blank_required_text() -> N
                 )
             ],
         )
+    with pytest.raises(ValidationError):
+        CompetencyModel(
+            job_id="job-1",
+            job_title="Backend",
+            items=[
+                CompetencyItem(
+                    name="工程深度",
+                    description="验证工程能力",
+                    weight=1.0,
+                ),
+                CompetencyItem(
+                    name=" 工程深度 ",
+                    description="重复维度会让评分证据归属不清",
+                    weight=1.0,
+                ),
+            ],
+        )
 
 
 def test_shared_contract_models_reject_blank_identifiers() -> None:

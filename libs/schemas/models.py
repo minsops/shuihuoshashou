@@ -67,6 +67,13 @@ class CompetencyModel(BaseModel):
             raise ValueError("competency model must include at least one item")
         return value
 
+    @model_validator(mode="after")
+    def item_names_are_unique(self) -> "CompetencyModel":
+        names = [item.name.strip() for item in self.items]
+        if len(names) != len(set(names)):
+            raise ValueError("competency model items must not contain duplicate names")
+        return self
+
 
 class ProbePatternHit(BaseModel):
     job_id: str
