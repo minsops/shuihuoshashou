@@ -136,6 +136,67 @@ def test_sqlite_interviews_enforce_status_timestamp_contract(tmp_path, monkeypat
                 )
 
 
+def test_sqlite_text_tables_enforce_nonblank_contract(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'text-contract.db'}")
+    get_settings.cache_clear()
+    init_db()
+
+    with connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO jobs (id, title, jd_text, competency_model, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            ("job-valid", "Backend", None, "{}", "2026-06-02T10:00:00+00:00"),
+        )
+        conn.execute(
+            """
+            INSERT INTO candidates (id, name, resume_text, created_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            ("candidate-valid", None, "", "2026-06-02T10:00:00+00:00"),
+        )
+        conn.execute(
+            """
+            INSERT INTO probe_patterns (id, job_id, competency, pattern, embedding, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "pattern-valid",
+                "job-valid",
+                "项目真实性",
+                "请追问本人负责部分。",
+                "[]",
+                "2026-06-02T10:00:00+00:00",
+            ),
+        )
+        invalid_statements = [
+            (
+                "INSERT INTO jobs (id, title, jd_text, competency_model, created_at) VALUES (?, ?, ?, ?, ?)",
+                ("job-blank-title", " ", "Python", "{}", "2026-06-02T10:00:00+00:00"),
+            ),
+            (
+                "INSERT INTO jobs (id, title, jd_text, competency_model, created_at) VALUES (?, ?, ?, ?, ?)",
+                ("job-blank-jd", "Backend", " ", "{}", "2026-06-02T10:00:00+00:00"),
+            ),
+            (
+                "INSERT INTO candidates (id, name, resume_text, created_at) VALUES (?, ?, ?, ?)",
+                ("candidate-blank-name", " ", "", "2026-06-02T10:00:00+00:00"),
+            ),
+            (
+                "INSERT INTO probe_patterns (id, job_id, competency, pattern, embedding, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                ("pattern-blank-competency", "job-valid", " ", "请追问。", "[]", "2026-06-02T10:00:00+00:00"),
+            ),
+            (
+                "INSERT INTO probe_patterns (id, job_id, competency, pattern, embedding, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                ("pattern-blank-text", "job-valid", "项目真实性", " ", "[]", "2026-06-02T10:00:00+00:00"),
+            ),
+        ]
+        for statement, params in invalid_statements:
+            with pytest.raises(sqlite3.IntegrityError):
+                conn.execute(statement, params)
+
+
 def test_sqlite_qa_turns_enforce_core_contract(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'turn-contract.db'}")
     get_settings.cache_clear()

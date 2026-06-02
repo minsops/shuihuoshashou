@@ -202,14 +202,14 @@ def init_db() -> None:
             """
             CREATE TABLE IF NOT EXISTS jobs (
                 id TEXT PRIMARY KEY,
-                title TEXT NOT NULL,
-                jd_text TEXT,
+                title TEXT NOT NULL CHECK (trim(title) <> ''),
+                jd_text TEXT CHECK (jd_text IS NULL OR trim(jd_text) <> ''),
                 competency_model TEXT NOT NULL,
                 created_at TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS candidates (
                 id TEXT PRIMARY KEY,
-                name TEXT,
+                name TEXT CHECK (name IS NULL OR trim(name) <> ''),
                 resume_text TEXT,
                 created_at TEXT NOT NULL
             );
@@ -252,8 +252,8 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS probe_patterns (
                 id TEXT PRIMARY KEY,
                 job_id TEXT NOT NULL,
-                competency TEXT NOT NULL,
-                pattern TEXT NOT NULL,
+                competency TEXT NOT NULL CHECK (trim(competency) <> ''),
+                pattern TEXT NOT NULL CHECK (trim(pattern) <> ''),
                 embedding TEXT NOT NULL,
                 created_at TEXT NOT NULL
             );
@@ -353,8 +353,8 @@ def _ensure_sqlite_columns(conn: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS probe_patterns (
             id TEXT PRIMARY KEY,
             job_id TEXT NOT NULL,
-            competency TEXT NOT NULL,
-            pattern TEXT NOT NULL,
+            competency TEXT NOT NULL CHECK (trim(competency) <> ''),
+            pattern TEXT NOT NULL CHECK (trim(pattern) <> ''),
             embedding TEXT NOT NULL,
             created_at TEXT NOT NULL
         )

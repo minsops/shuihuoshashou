@@ -142,7 +142,8 @@ schemas. Fresh local SQLite `qa_turns` tables also enforce the same turn-index, 
 range, and probe-target checks used by the PostgreSQL audit table. Fresh SQLite `aigc_results`
 tables enforce the same probability, template-similarity, matched-template, and flag bounds. Fresh
 SQLite `scores` tables enforce non-empty dimension arrays, score bounds, risk-note arrays, and
-recommendation values.
+recommendation values. Fresh SQLite job, candidate, and probe-pattern tables reject blank text where
+the PostgreSQL core schema does.
 The runtime adapter translates the local repository parameter style and upserts for PostgreSQL.
 The default compose stack mounts only the core schema into Postgres initialization so Docker's plain
 PostgreSQL image remains runnable. Set `JD_VECTOR_BACKEND=pgvector` on PostgreSQL deployments with
