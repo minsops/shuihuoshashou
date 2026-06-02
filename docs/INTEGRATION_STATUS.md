@@ -77,7 +77,8 @@ The local implementation is complete as a runnable MVP:
   structured report JSON, HTML, PDF, and transcript JSON outputs.
 - Gateway exposes report JSON, HTML, PDF, and transcript JSON artifact endpoints.
 - Gateway report JSON and transcript JSON endpoints fall back to the persisted report payload when
-  local artifact files are unavailable, while PDF downloads still require the binary artifact.
+  local artifact files are unavailable, while PDF downloads can fall back to the configured
+  S3-compatible artifact store.
 - Local offline scoring task flow with `FINISHED -> SCORING -> REPORTED` state transitions.
 - State guards prevent scoring before `FINISHED` and prevent turn edits or restarts after reporting.
 - Local task queue boundary for offline scoring with Redis Streams task publication and worker consumption.

@@ -21,6 +21,7 @@ from libs.common.observability import (
     trace_context_from_header,
 )
 from libs.common.runtime import RuntimeStatus, get_runtime_status
+from libs.common.storage import get_artifact_store
 from libs.schemas import (
     AIGCDetectRequest,
     CandidateCreate,
@@ -578,11 +579,21 @@ def api_report_pdf(interview_id: str):
     try:
         report, _ = get_report(interview_id)
         pdf_path = report.get("pdf_path")
-        if not pdf_path or not Path(pdf_path).exists():
-            raise KeyError(f"report pdf not found: {interview_id}")
-        return FileResponse(pdf_path, media_type="application/pdf", filename=f"{interview_id}.pdf")
+        if pdf_path and Path(pdf_path).exists():
+            return FileResponse(pdf_path, media_type="application/pdf", filename=f"{interview_id}.pdf")
+        pdf_uri = report.get("artifact_uris", {}).get("pdf")
+        if pdf_uri:
+            artifact = get_artifact_store().get_file(pdf_uri)
+            return Response(
+                content=artifact.content,
+                media_type=artifact.content_type or "application/pdf",
+                headers={"content-disposition": f'attachment; filename="{interview_id}.pdf"'},
+            )
+        raise KeyError(f"report pdf not found: {interview_id}")
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (OSError, ValueError, httpx.HTTPError) as exc:
+        raise HTTPException(status_code=404, detail=f"report pdf not found: {interview_id}") from exc
 
 
 @app.get("/api/interviews/{interview_id}/report.transcript.json")

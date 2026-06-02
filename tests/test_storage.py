@@ -78,3 +78,45 @@ def test_s3_artifact_store_skips_upload_without_credentials(tmp_path: Path) -> N
 
     assert artifact.uri == "s3://reports/reports/demo.pdf"
     assert requests == []
+
+
+def test_local_artifact_store_reads_file_uri(tmp_path: Path) -> None:
+    path = tmp_path / "report.pdf"
+    path.write_bytes(b"%PDF local")
+    store = LocalArtifactStore()
+
+    artifact = store.get_file(path.as_uri())
+
+    assert artifact.uri == path.as_uri()
+    assert artifact.content == b"%PDF local"
+    assert artifact.content_type == "application/octet-stream"
+
+
+def test_s3_artifact_store_downloads_with_credentials() -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, content=b"%PDF s3", headers={"content-type": "application/pdf"})
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    store = S3CompatibleArtifactStore(
+        endpoint="http://minio:9000",
+        bucket="reports",
+        access_key="minioadmin",
+        secret_key="minioadmin",
+        region="us-east-1",
+        client=client,
+    )
+
+    artifact = store.get_file("s3://reports/reports/demo report.pdf")
+
+    assert artifact.uri == "s3://reports/reports/demo report.pdf"
+    assert artifact.content == b"%PDF s3"
+    assert artifact.content_type == "application/pdf"
+    assert len(requests) == 1
+    request = requests[0]
+    assert request.method == "GET"
+    assert str(request.url) == "http://minio:9000/reports/reports/demo%20report.pdf"
+    assert request.headers["x-amz-content-sha256"]
+    assert "AWS4-HMAC-SHA256 Credential=minioadmin/" in request.headers["authorization"]

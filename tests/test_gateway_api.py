@@ -9,8 +9,10 @@ from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
 from libs.common.config import get_settings
+from libs.common.database import connect, dumps
 from libs.common.events import event_bus
 from libs.common.observability import metrics_registry, reset_rate_limiters
+from libs.common.storage import ArtifactContent
 from libs.common.tasks import task_queue
 from libs.schemas import TranscriptSegment
 from services.asr_service.service import asr_session_manager
@@ -137,6 +139,44 @@ def test_gateway_report_pdf_returns_404_when_artifact_missing(
 
     assert missing.status_code == 404
     assert "report pdf not found" in missing.text
+
+
+def test_gateway_report_pdf_falls_back_to_artifact_store_when_local_file_missing(
+    tmp_path: Path, monkeypatch
+) -> None:
+    class FakeArtifactStore:
+        def get_file(self, uri: str) -> ArtifactContent:
+            return ArtifactContent(uri=uri, content=b"%PDF remote", content_type="application/pdf")
+
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+    client.post(
+        f"/api/interviews/{interview['id']}/turns",
+        json={"question": "讲项目", "answer": "我写了 FastAPI 编排。"},
+    )
+    report = client.post(f"/api/interviews/{interview['id']}/end").json()
+    Path(report["pdf_path"]).unlink()
+    report["artifact_uris"]["pdf"] = "s3://reports/reports/demo.pdf"
+    with connect() as conn:
+        conn.execute(
+            "UPDATE reports SET payload = ? WHERE interview_id = ?",
+            (dumps(report), interview["id"]),
+        )
+    monkeypatch.setattr("services.gateway.app.get_artifact_store", lambda: FakeArtifactStore())
+
+    response = client.get(f"/api/interviews/{interview['id']}/report.pdf")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/pdf"
+    assert response.headers["content-disposition"] == (
+        f'attachment; filename="{interview["id"]}.pdf"'
+    )
+    assert response.content == b"%PDF remote"
 
 
 def test_gateway_report_transcript_falls_back_to_persisted_payload_when_artifact_missing(
