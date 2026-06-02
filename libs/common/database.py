@@ -292,7 +292,7 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS reports (
                 interview_id TEXT PRIMARY KEY,
                 payload TEXT NOT NULL,
-                html TEXT NOT NULL
+                html TEXT NOT NULL CHECK (trim(html) <> '')
             );
             CREATE TABLE IF NOT EXISTS consents (
                 id TEXT PRIMARY KEY,

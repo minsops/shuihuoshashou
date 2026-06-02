@@ -402,6 +402,23 @@ def test_sqlite_scores_enforce_core_contract(tmp_path, monkeypatch) -> None:
             insert_score(*row)
 
 
+def test_sqlite_reports_enforce_nonblank_html(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'report-contract.db'}")
+    get_settings.cache_clear()
+    init_db()
+
+    with connect() as conn:
+        conn.execute(
+            "INSERT INTO reports (interview_id, payload, html) VALUES (?, ?, ?)",
+            ("interview-valid", "{}", "<html>报告</html>"),
+        )
+        with pytest.raises(sqlite3.IntegrityError):
+            conn.execute(
+                "INSERT INTO reports (interview_id, payload, html) VALUES (?, ?, ?)",
+                ("interview-blank", "{}", " "),
+            )
+
+
 def test_loads_accepts_postgres_json_values() -> None:
     payload = {"score": 88}
 
