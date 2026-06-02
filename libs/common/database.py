@@ -239,14 +239,15 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS qa_turns (
                 id TEXT PRIMARY KEY,
                 interview_id TEXT NOT NULL,
-                turn_index INTEGER NOT NULL,
-                question TEXT NOT NULL,
-                question_source TEXT NOT NULL,
-                answer TEXT NOT NULL,
-                answer_start_ms INTEGER NOT NULL,
-                answer_end_ms INTEGER NOT NULL,
-                probe_target TEXT,
-                payload TEXT NOT NULL
+                turn_index INTEGER NOT NULL CHECK (turn_index >= 0),
+                question TEXT NOT NULL CHECK (trim(question) <> ''),
+                question_source TEXT NOT NULL CHECK (question_source IN ('interviewer', 'ai_probe')),
+                answer TEXT NOT NULL CHECK (trim(answer) <> ''),
+                answer_start_ms INTEGER NOT NULL CHECK (answer_start_ms >= 0),
+                answer_end_ms INTEGER NOT NULL CHECK (answer_end_ms >= answer_start_ms),
+                probe_target TEXT CHECK (probe_target IS NULL OR trim(probe_target) <> ''),
+                payload TEXT NOT NULL,
+                UNIQUE (interview_id, turn_index)
             );
             CREATE TABLE IF NOT EXISTS probe_patterns (
                 id TEXT PRIMARY KEY,
