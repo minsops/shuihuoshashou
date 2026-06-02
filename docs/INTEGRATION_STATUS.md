@@ -87,6 +87,7 @@ The local implementation is complete as a runnable MVP:
 - Docker Compose includes an optional `worker` profile for running the Celery offline-scoring worker.
 - Configurable async end-interview mode returns queued task metadata while workers generate reports.
 - Async end-interview advances queued interviews to `SCORING` and rejects duplicate queueing.
+- WebSocket `end` emits `task_queued` instead of `report` when async offline scoring is configured.
 - In-memory event bus topics for `qa_turn.created`, `interview.finished`,
   `task.enqueued`, `task.completed`, `task.failed`, `task.worker_completed`,
   `task.worker_failed`, `interview.scoring_started`, and `interview.reported`.

@@ -870,6 +870,39 @@ def test_gateway_websocket_suppresses_behavior_signal_after_consent_revocation(
     assert "signal" not in json.dumps(report["payload"], ensure_ascii=False)
 
 
+def test_gateway_websocket_end_returns_task_queued_in_async_mode(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("OFFLINE_TASK_EXECUTION", "async")
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+
+    with client.websocket_connect(f"/ws/interview/{interview['id']}") as websocket:
+        websocket.send_json(
+            {
+                "type": "text_turn",
+                "seq": 1,
+                "answer": "嗯这个项目里我主要负责 FastAPI 编排、重试和 JSON 校验。",
+            }
+        )
+        assert websocket.receive_json()["type"] == "transcript"
+        assert websocket.receive_json()["type"] == "probe"
+        assert websocket.receive_json()["type"] == "credibility"
+        websocket.send_json({"type": "end"})
+        queued = websocket.receive_json()
+
+    assert queued["type"] == "task_queued"
+    assert queued["payload"]["interview_id"] == interview["id"]
+    assert queued["payload"]["status"] == "queued"
+    assert queued["payload"]["task_name"] == "interview.offline_scoring"
+    assert client.get(f"/api/interviews/{interview['id']}/report").status_code == 404
+
+
 def test_gateway_websocket_probe_flow(tmp_path: Path, monkeypatch) -> None:
     client = _client(tmp_path, monkeypatch)
     job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()

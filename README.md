@@ -205,7 +205,8 @@ WebSocket `audio_chunk` events may include `speaker`, `channel`/`audio_channel`/
 `is_final`, `start_ms`, `end_ms`, and `confidence`. If `speaker` is omitted, channels listed in
 `ASR_INTERVIEWER_CHANNELS` map to `interviewer`, and channels listed in `ASR_CANDIDATE_CHANNELS` map
 to `candidate`. Only final candidate segments trigger a probe. Downstream events include
-`transcript`, `probe`, `credibility`, optional `signal`, and `report`. Repeated final ASR chunks
+`transcript`, `probe`, `credibility`, optional `signal`, `report`, and async-mode `task_queued`.
+Repeated final ASR chunks
 with the same sequence are deduplicated and returned as `asr_warning` events instead of triggering
 duplicate probe generation. When ASR returns `unknown` speaker, the session manager first tries to
 resolve it from a previously observed local audio cluster, then falls back to short-gap continuity.

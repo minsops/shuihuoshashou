@@ -517,6 +517,11 @@
             "报告",
             `<a class="button secondary" href="/api/interviews/${id}/report.html" target="_blank">HTML</a> <a class="button secondary" href="/api/interviews/${id}/report.pdf" target="_blank">PDF</a>`
           );
+        } else if (message.type === "task_queued") {
+          appendLiveEvent(
+            "任务已排队",
+            `${escapeHtml(message.payload.task_name)} · ${escapeHtml(message.payload.task_id)}`
+          );
         } else if (message.type === "error") {
           appendLiveEvent("错误", escapeHtml(message.detail || "unknown error"), "risk");
         }

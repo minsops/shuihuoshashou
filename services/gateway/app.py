@@ -29,6 +29,7 @@ from libs.schemas import (
     JobCreate,
     OfflineInterviewInput,
     OfflineInterviewResult,
+    OfflineTaskAccepted,
     ProbeRequest,
     QATurn,
     ReportBuildRequest,
@@ -687,8 +688,9 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                 segment = _manual_probe_segment(interview_id, event)
                 record = await _send_probe_for_segment(websocket, interview_id, record, segment)
             elif event.get("type") == "end":
-                report = end_interview(interview_id)
-                await websocket.send_json({"type": "report", "payload": report.model_dump(mode="json")})
+                result = end_interview(interview_id)
+                event_type = "task_queued" if isinstance(result, OfflineTaskAccepted) else "report"
+                await websocket.send_json({"type": event_type, "payload": result.model_dump(mode="json")})
                 asr_session_manager.close(interview_id)
                 break
     except WebSocketDisconnect:
