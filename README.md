@@ -32,6 +32,7 @@ as a local-first Python MVP:
 - Interview and consent creation validate candidate references so local SQLite behavior matches the
   PostgreSQL foreign-key contract.
 - JD knowledge base indexes competency-specific probe patterns with deterministic embeddings and optional pgvector search.
+- Probe-pattern retrieval scores reject infinite values so ranking remains deterministic.
 - JD competency models are generated through the shared LLM JSON client with deterministic fallback
   and normalized to keep the required scoring dimensions and weights present.
 - Competency and scoring weights reject NaN/inf values so Python-side weighted totals remain reproducible.

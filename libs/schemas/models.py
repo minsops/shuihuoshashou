@@ -72,7 +72,7 @@ class ProbePatternHit(BaseModel):
     job_id: str
     competency: str
     pattern: str
-    score: float = Field(ge=0.0)
+    score: float = Field(ge=0.0, allow_inf_nan=False)
 
     @field_validator("job_id")
     @classmethod

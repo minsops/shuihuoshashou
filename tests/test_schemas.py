@@ -191,6 +191,13 @@ def test_shared_contract_models_reject_blank_identifiers() -> None:
     with pytest.raises(ValidationError):
         ProbePatternHit(job_id=" ", competency="项目真实性", pattern="请讲具体项目。", score=1.0)
     with pytest.raises(ValidationError):
+        ProbePatternHit(
+            job_id="job-1",
+            competency="项目真实性",
+            pattern="请讲具体项目。",
+            score=float("inf"),
+        )
+    with pytest.raises(ValidationError):
         ConsistencyFlag(turn_id_a=" ", turn_id_b="turn-2", description="矛盾", severity="high")
     with pytest.raises(ValidationError):
         ConsistencyFlag(
