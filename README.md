@@ -49,6 +49,8 @@ as a local-first Python MVP:
   for audit and storage.
 - Report artifact paths and URI entries reject blank values at the shared output boundary.
 - Report output records reject interview ids that do not match the embedded score session.
+- Report output records require non-empty transcripts and reject evidence, AIGC, or consistency
+  references that are outside the transcript.
 - PDF generation uses WeasyPrint when available and falls back to an auditable text PDF with score,
   recommendation, evidence, risk, AIGC, and transcript summary, including CJK text, when native
   rendering dependencies are missing.

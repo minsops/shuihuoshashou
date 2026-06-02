@@ -656,6 +656,8 @@ def test_scoring_and_report_requests_require_aigc_turn_coverage() -> None:
 
 
 def test_report_requires_aigc_results_and_summary() -> None:
+    turn = QATurn(turn_id="turn-1", question="q1", answer="回答", answer_start_ms=0, answer_end_ms=10)
+    second_turn = QATurn(turn_id="turn-2", question="q2", answer="补充回答")
     evidence = EvidenceRef(
         turn_id="turn-1",
         quote_start_ms=0,
@@ -676,12 +678,14 @@ def test_report_requires_aigc_results_and_summary() -> None:
         recommendation="yes",
     )
     aigc = AIGCResult(turn_id="turn-1", ai_generated_prob=0.2, template_similarity=0.1)
+    unknown_aigc = AIGCResult(turn_id="missing-turn", ai_generated_prob=0.2, template_similarity=0.1)
 
     report = Report(
         interview_id="session-1",
         score=score,
         aigc_results=[aigc],
         consistency_flags=[],
+        transcript=[turn],
         summary="报告摘要",
     )
 
@@ -692,6 +696,7 @@ def test_report_requires_aigc_results_and_summary() -> None:
             score=score,
             aigc_results=[aigc],
             consistency_flags=[],
+            transcript=[turn],
             summary="报告摘要",
         )
     with pytest.raises(ValidationError):
@@ -700,6 +705,7 @@ def test_report_requires_aigc_results_and_summary() -> None:
             score=score,
             aigc_results=[],
             consistency_flags=[],
+            transcript=[turn],
             summary="报告摘要",
         )
     with pytest.raises(ValidationError):
@@ -708,6 +714,7 @@ def test_report_requires_aigc_results_and_summary() -> None:
             score=score,
             aigc_results=[aigc],
             consistency_flags=[],
+            transcript=[turn],
             summary=" ",
         )
     with pytest.raises(ValidationError):
@@ -716,6 +723,7 @@ def test_report_requires_aigc_results_and_summary() -> None:
             score=score,
             aigc_results=[aigc],
             consistency_flags=[],
+            transcript=[turn],
             summary="报告摘要",
             pdf_path=" ",
         )
@@ -725,6 +733,7 @@ def test_report_requires_aigc_results_and_summary() -> None:
             score=score,
             aigc_results=[aigc],
             consistency_flags=[],
+            transcript=[turn],
             summary="报告摘要",
             artifact_uris={"pdf": " "},
         )
@@ -734,8 +743,61 @@ def test_report_requires_aigc_results_and_summary() -> None:
             score=score,
             aigc_results=[aigc],
             consistency_flags=[],
+            transcript=[turn],
             summary="报告摘要",
             artifact_uris={" ": "file:///tmp/report.pdf"},
+        )
+    with pytest.raises(ValidationError):
+        Report(
+            interview_id="session-1",
+            score=score,
+            aigc_results=[aigc],
+            consistency_flags=[],
+            transcript=[],
+            summary="报告摘要",
+        )
+    with pytest.raises(ValidationError):
+        Report(
+            interview_id="session-1",
+            score=score,
+            aigc_results=[aigc, AIGCResult(turn_id="turn-2", ai_generated_prob=0.2, template_similarity=0.1)],
+            consistency_flags=[],
+            transcript=[turn, turn],
+            summary="报告摘要",
+        )
+    with pytest.raises(ValidationError):
+        Report(
+            interview_id="session-1",
+            score=score,
+            aigc_results=[aigc],
+            consistency_flags=[],
+            transcript=[second_turn],
+            summary="报告摘要",
+        )
+    with pytest.raises(ValidationError):
+        Report(
+            interview_id="session-1",
+            score=score,
+            aigc_results=[unknown_aigc],
+            consistency_flags=[],
+            transcript=[turn],
+            summary="报告摘要",
+        )
+    with pytest.raises(ValidationError):
+        Report(
+            interview_id="session-1",
+            score=score,
+            aigc_results=[aigc],
+            consistency_flags=[
+                ConsistencyFlag(
+                    turn_id_a="turn-1",
+                    turn_id_b="missing-turn",
+                    description="未知来源的一致性标记",
+                    severity="high",
+                )
+            ],
+            transcript=[turn],
+            summary="报告摘要",
         )
 
 

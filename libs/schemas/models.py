@@ -376,7 +376,13 @@ def _validate_aigc_results_cover_turns(
     context: "InterviewContext",
     aigc_results: list[AIGCResult],
 ) -> None:
-    expected = {turn.turn_id for turn in context.turns}
+    _validate_aigc_results_cover_turn_ids({turn.turn_id for turn in context.turns}, aigc_results)
+
+
+def _validate_aigc_results_cover_turn_ids(
+    expected: set[str],
+    aigc_results: list[AIGCResult],
+) -> None:
     result_ids = [item.turn_id for item in aigc_results]
     duplicates = {turn_id for turn_id in result_ids if result_ids.count(turn_id) > 1}
     if duplicates:
@@ -640,7 +646,7 @@ class Report(BaseModel):
     score: InterviewScore
     aigc_results: list[AIGCResult] = Field(min_length=1)
     consistency_flags: list[ConsistencyFlag]
-    transcript: list[QATurn] = Field(default_factory=list)
+    transcript: list[QATurn] = Field(min_length=1)
     summary: str
     json_path: str | None = None
     html_path: str | None = None
@@ -678,4 +684,22 @@ class Report(BaseModel):
     def interview_id_matches_score_session(self) -> "Report":
         if self.interview_id != self.score.session_id:
             raise ValueError("report interview_id must match score session_id")
+        return self
+
+    @model_validator(mode="after")
+    def references_match_transcript_turns(self) -> "Report":
+        turn_ids = [turn.turn_id for turn in self.transcript]
+        if len(turn_ids) != len(set(turn_ids)):
+            raise ValueError("report transcript must not contain duplicate turn_id values")
+        transcript_turn_ids = set(turn_ids)
+        for dimension in self.score.dimensions:
+            for evidence in dimension.evidence:
+                if evidence.turn_id not in transcript_turn_ids:
+                    raise ValueError(f"report score evidence references unknown turn_id: {evidence.turn_id}")
+        for flag in self.consistency_flags:
+            if flag.turn_id_a not in transcript_turn_ids:
+                raise ValueError(f"report consistency flag references unknown turn_id: {flag.turn_id_a}")
+            if flag.turn_id_b not in transcript_turn_ids:
+                raise ValueError(f"report consistency flag references unknown turn_id: {flag.turn_id_b}")
+        _validate_aigc_results_cover_turn_ids(transcript_turn_ids, self.aigc_results)
         return self
