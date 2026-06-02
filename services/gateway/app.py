@@ -675,6 +675,11 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
         record = start_interview(interview_id)
         while True:
             event = await websocket.receive_json()
+            if not isinstance(event, dict):
+                await websocket.send_json(
+                    {"type": "error", "detail": "event payload must be an object"}
+                )
+                continue
             if event.get("type") == "audio_chunk":
                 seq = _event_seq(event, 0)
                 if seq is None:

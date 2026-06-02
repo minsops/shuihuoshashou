@@ -214,7 +214,8 @@ If an `audio_chunk` includes a `session_id`, it must match the WebSocket intervi
 returned as `asr_warning` events and skipped.
 Invalid or empty `audio_chunk.audio` payloads are rejected with `asr_warning` instead of being
 converted into placeholder transcripts. Blank `text_turn.answer` values are rejected with an
-`error` event for the same reason. If audio metadata is provided, the gateway accepts only
+`error` event for the same reason. Non-object WebSocket JSON payloads are rejected with an `error`
+event while keeping the session open for later valid events. If audio metadata is provided, the gateway accepts only
 PCM/Opus-style formats, `sample_rate_hz=16000`, and `channels=1`; unsupported values are rejected
 before reaching ASR.
 Tune `PROBE_MIN_ANSWER_CHARS` and `PROBE_MIN_INTERVAL_MS` to control when candidate final segments
