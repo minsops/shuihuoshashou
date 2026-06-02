@@ -228,6 +228,10 @@ def test_sqlite_json_columns_enforce_valid_json(tmp_path, monkeypatch) -> None:
             ("job-invalid-json", "Backend", "Python", "not-json", "2026-06-02T10:00:00+00:00"),
         ),
         (
+            "INSERT INTO jobs (id, title, jd_text, competency_model, created_at) VALUES (?, ?, ?, ?, ?)",
+            ("job-array-model", "Backend", "Python", "[]", "2026-06-02T10:00:00+00:00"),
+        ),
+        (
             """
             INSERT INTO interviews
             (id, job_id, candidate_id, status, context, signal_enabled, created_at, started_at, ended_at)
@@ -239,6 +243,24 @@ def test_sqlite_json_columns_enforce_valid_json(tmp_path, monkeypatch) -> None:
                 "candidate-1",
                 "CREATED",
                 "not-json",
+                0,
+                "2026-06-02T10:00:00+00:00",
+                None,
+                None,
+            ),
+        ),
+        (
+            """
+            INSERT INTO interviews
+            (id, job_id, candidate_id, status, context, signal_enabled, created_at, started_at, ended_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "interview-array-context",
+                "job-1",
+                "candidate-1",
+                "CREATED",
+                "[]",
                 0,
                 "2026-06-02T10:00:00+00:00",
                 None,
@@ -266,6 +288,26 @@ def test_sqlite_json_columns_enforce_valid_json(tmp_path, monkeypatch) -> None:
             ),
         ),
         (
+            """
+            INSERT INTO qa_turns
+            (id, interview_id, turn_index, question, question_source, answer,
+             answer_start_ms, answer_end_ms, probe_target, payload)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "turn-array-payload",
+                "interview-1",
+                0,
+                "q",
+                "interviewer",
+                "a",
+                0,
+                10,
+                None,
+                "[]",
+            ),
+        ),
+        (
             "INSERT INTO probe_patterns (id, job_id, competency, pattern, embedding, created_at) VALUES (?, ?, ?, ?, ?, ?)",
             (
                 "pattern-invalid-json",
@@ -273,6 +315,17 @@ def test_sqlite_json_columns_enforce_valid_json(tmp_path, monkeypatch) -> None:
                 "项目真实性",
                 "请追问本人负责部分。",
                 "not-json",
+                "2026-06-02T10:00:00+00:00",
+            ),
+        ),
+        (
+            "INSERT INTO probe_patterns (id, job_id, competency, pattern, embedding, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                "pattern-object-embedding",
+                "job-1",
+                "项目真实性",
+                "请追问本人负责部分。",
+                "{}",
                 "2026-06-02T10:00:00+00:00",
             ),
         ),
@@ -289,6 +342,21 @@ def test_sqlite_json_columns_enforce_valid_json(tmp_path, monkeypatch) -> None:
                 "[]",
                 "yes",
                 "not-json",
+            ),
+        ),
+        (
+            """
+            INSERT INTO scores
+            (interview_id, dimensions, total_score, risk_notes, recommendation, payload)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "score-array-payload",
+                '[{"dimension":"项目真实性"}]',
+                80.0,
+                "[]",
+                "yes",
+                "[]",
             ),
         ),
         (
@@ -310,8 +378,30 @@ def test_sqlite_json_columns_enforce_valid_json(tmp_path, monkeypatch) -> None:
             ),
         ),
         (
+            """
+            INSERT INTO aigc_results
+            (id, interview_id, turn_id, ai_generated_prob, template_similarity,
+             matched_template, flagged, payload)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "aigc-array-payload",
+                "interview-1",
+                "turn-1",
+                0.2,
+                0.4,
+                None,
+                0,
+                "[]",
+            ),
+        ),
+        (
             "INSERT INTO reports (interview_id, payload, html) VALUES (?, ?, ?)",
             ("report-invalid-json", "not-json", "<html>报告</html>"),
+        ),
+        (
+            "INSERT INTO reports (interview_id, payload, html) VALUES (?, ?, ?)",
+            ("report-array-payload", "[]", "<html>报告</html>"),
         ),
     ]
     with connect() as conn:
