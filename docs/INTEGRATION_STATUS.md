@@ -97,9 +97,9 @@ The local implementation is complete as a runnable MVP:
   unavailable.
 - Report input validation rejects score/session mismatches, dimension or weight mismatches,
   inconsistent totals/recommendations, unknown EvidenceRef/ConsistencyFlag/AIGC turn ids,
-  out-of-range evidence timestamps, evidence excerpts not present in the transcript answer, and
-  incomplete or duplicate AIGC coverage; unflagged AIGC results above configured thresholds are
-  also rejected.
+  out-of-range evidence timestamps, duplicate evidence references, evidence excerpts not present in
+  the transcript answer, and incomplete or duplicate AIGC coverage; unflagged AIGC results above
+  configured thresholds are also rejected.
 - Report artifacts support local `file://` storage and SigV4 uploads to S3-compatible storage for
   structured report JSON, HTML, PDF, and transcript JSON outputs.
 - Gateway exposes report JSON, HTML, PDF, and transcript JSON artifact endpoints.

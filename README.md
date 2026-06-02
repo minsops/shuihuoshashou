@@ -38,8 +38,8 @@ as a local-first Python MVP:
   de-duplicated risk highlights, recommendations, and full interview transcripts.
 - Report building rejects mismatched score sessions, dimension names/weights, totals,
   recommendations, evidence turn ids, out-of-range evidence timestamps, non-transcript evidence
-  excerpts, unknown consistency-flag turn ids, incomplete/duplicate AIGC coverage, unknown AIGC
-  turn ids, or unflagged AIGC results above configured thresholds.
+  excerpts, duplicate evidence references, unknown consistency-flag turn ids, incomplete/duplicate
+  AIGC coverage, unknown AIGC turn ids, or unflagged AIGC results above configured thresholds.
 - Report generation writes separate structured report JSON, HTML, PDF, and transcript JSON artifacts
   for audit and storage.
 - PDF generation uses WeasyPrint when available and falls back to an auditable text PDF with score,
