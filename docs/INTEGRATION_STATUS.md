@@ -106,6 +106,7 @@ The local implementation is complete as a runnable MVP:
 - Async end-interview advances queued interviews to `SCORING` and rejects duplicate queueing.
 - WebSocket `end` emits `task_queued` instead of `report` when async offline scoring is configured.
 - WebSocket `end` state errors return a recoverable `error` event without closing the session.
+- WebSocket binary frames return a recoverable `error` event without closing the session.
 - WebSocket invalid JSON text frames return a recoverable `error` event without closing the session.
 - WebSocket non-object JSON payloads return a recoverable `error` event without closing the session.
 - In-memory event bus topics for `qa_turn.created`, `interview.finished`,

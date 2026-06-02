@@ -682,6 +682,11 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                     {"type": "error", "detail": "event payload must be valid JSON"}
                 )
                 continue
+            except KeyError:
+                await websocket.send_json(
+                    {"type": "error", "detail": "event payload must be a text JSON frame"}
+                )
+                continue
             if not isinstance(event, dict):
                 await websocket.send_json(
                     {"type": "error", "detail": "event payload must be an object"}
