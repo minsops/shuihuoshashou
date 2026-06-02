@@ -109,6 +109,7 @@ The local implementation is complete as a runnable MVP:
   configured thresholds are also rejected.
 - Report artifacts support local `file://` storage and SigV4 uploads to S3-compatible storage for
   structured report JSON, HTML, PDF, and transcript JSON outputs.
+- Report artifact paths and URI entries reject blank values at the shared output boundary.
 - Gateway exposes report JSON, HTML, PDF, and transcript JSON artifact endpoints.
 - Gateway report JSON and transcript JSON endpoints fall back to the persisted report payload when
   local artifact files are unavailable, while PDF downloads can fall back to the configured

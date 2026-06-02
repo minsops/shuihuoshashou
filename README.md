@@ -43,6 +43,7 @@ as a local-first Python MVP:
   AIGC coverage, unknown AIGC turn ids, or unflagged AIGC results above configured thresholds.
 - Report generation writes separate structured report JSON, HTML, PDF, and transcript JSON artifacts
   for audit and storage.
+- Report artifact paths and URI entries reject blank values at the shared output boundary.
 - PDF generation uses WeasyPrint when available and falls back to an auditable text PDF with score,
   recommendation, evidence, risk, AIGC, and transcript summary, including CJK text, when native
   rendering dependencies are missing.

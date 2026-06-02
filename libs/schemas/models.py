@@ -527,3 +527,18 @@ class Report(BaseModel):
     @classmethod
     def summary_is_not_blank(cls, value: str) -> str:
         return _not_blank(value, "summary")
+
+    @field_validator("json_path", "html_path", "pdf_path", "transcript_path")
+    @classmethod
+    def artifact_paths_are_not_blank(cls, value: str | None, info: ValidationInfo) -> str | None:
+        if value is not None:
+            return _not_blank(value, info.field_name)
+        return value
+
+    @field_validator("artifact_uris")
+    @classmethod
+    def artifact_uris_are_not_blank(cls, value: dict[str, str]) -> dict[str, str]:
+        for name, uri in value.items():
+            _not_blank(name, "artifact uri key")
+            _not_blank(uri, "artifact uri value")
+        return value

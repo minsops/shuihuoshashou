@@ -361,6 +361,33 @@ def test_report_requires_aigc_results_and_summary() -> None:
             consistency_flags=[],
             summary=" ",
         )
+    with pytest.raises(ValidationError):
+        Report(
+            interview_id="interview-1",
+            score=score,
+            aigc_results=[aigc],
+            consistency_flags=[],
+            summary="报告摘要",
+            pdf_path=" ",
+        )
+    with pytest.raises(ValidationError):
+        Report(
+            interview_id="interview-1",
+            score=score,
+            aigc_results=[aigc],
+            consistency_flags=[],
+            summary="报告摘要",
+            artifact_uris={"pdf": " "},
+        )
+    with pytest.raises(ValidationError):
+        Report(
+            interview_id="interview-1",
+            score=score,
+            aigc_results=[aigc],
+            consistency_flags=[],
+            summary="报告摘要",
+            artifact_uris={" ": "file:///tmp/report.pdf"},
+        )
 
 
 def test_evidence_ref_rejects_invalid_quote_time_ranges() -> None:
