@@ -250,6 +250,42 @@ def test_redis_stream_worker_publishes_failure_without_ack() -> None:
     assert 'shuihuo_events_total{topic="task.worker_failed"} 1' in metrics
 
 
+def test_redis_stream_worker_reports_malformed_payload_without_ack() -> None:
+    event_bus.reset()
+    metrics_registry.reset()
+    client = FakeRedis()
+    client.messages.append(
+        (
+            "test:tasks:interview.offline_scoring",
+            {
+                "task_id": "task-1",
+                "name": "interview.offline_scoring",
+                "payload": "{not-json",
+            },
+        )
+    )
+    handled: list[dict] = []
+    worker = RedisStreamWorker(
+        "interview.offline_scoring",
+        handled.append,
+        redis_url="redis://localhost:6379/0",
+        stream_prefix="test",
+        client=client,
+    )
+
+    with pytest.raises(ValueError):
+        worker.consume_once()
+
+    assert handled == []
+    assert client.acked == []
+    history = event_bus.history()
+    assert [topic for topic, _ in history] == ["task.worker_failed"]
+    assert history[0][1]["task_id"] == "task-1"
+    assert history[0][1]["name"] == "interview.offline_scoring"
+    metrics = metrics_registry.render_prometheus()
+    assert 'shuihuo_events_total{topic="task.worker_failed"} 1' in metrics
+
+
 def test_celery_task_publisher_sends_named_task() -> None:
     sender = FakeCelerySender()
     publisher = CeleryTaskPublisher(

@@ -155,8 +155,8 @@ class RedisStreamWorker:
         processed = 0
         for stream, entries in messages:
             for message_id, fields in entries:
-                payload = loads(fields["payload"])
                 try:
+                    payload = loads(fields["payload"])
                     self.handler(payload)
                 except Exception as exc:
                     event_bus.publish_nowait(

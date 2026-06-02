@@ -273,6 +273,8 @@ OFFLINE_TASK_BACKEND=redis_stream python scripts/run_offline_worker.py
 ```
 
 Use `--once` for a single poll cycle in deployment smoke tests.
+Redis Streams workers emit `task.worker_failed` for handler errors or malformed payloads and leave
+failed messages unacknowledged for retry or manual inspection.
 
 Run a Celery worker for offline scoring tasks with:
 

@@ -79,6 +79,8 @@ The local implementation is complete as a runnable MVP:
 - Local offline scoring task flow with `FINISHED -> SCORING -> REPORTED` state transitions.
 - State guards prevent scoring before `FINISHED` and prevent turn edits or restarts after reporting.
 - Local task queue boundary for offline scoring with Redis Streams task publication and worker consumption.
+- Redis Streams workers publish `task.worker_failed` events for handler failures and malformed task
+  payloads without acknowledging the failed message.
 - Optional Celery task publication and worker registration for `interview.offline_scoring`.
 - Celery task publisher and offline worker share configurable `CELERY_TASK_QUEUE` routing so async
   report generation lands on the queue the worker consumes.
