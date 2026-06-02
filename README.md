@@ -50,6 +50,7 @@ as a local-first Python MVP:
 - Scoring uses the shared LLM JSON client for structured dimension drafts and recomputes final
   totals in Python for auditability; deterministic risk signals cap affected dimensions even when
   an LLM draft returns higher scores, and deterministic risk notes are preserved in reports.
+- Scoring evidence is normalized to real transcript spans and de-duplicated before reporting.
 - Scoring schemas require at least one evidence reference per dimension.
 - AIGC checks combine a local answer-template corpus with optional HTTP detector integration.
 

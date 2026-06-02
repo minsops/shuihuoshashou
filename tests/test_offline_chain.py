@@ -811,6 +811,54 @@ def test_score_interview_normalizes_evidence_to_real_turns(monkeypatch) -> None:
         assert ref.quote_end_ms == turn.answer_end_ms
 
 
+def test_score_interview_deduplicates_normalized_evidence_refs(monkeypatch) -> None:
+    model = generate_competency_model("job-local", "Backend", "Python FastAPI")
+    turn = QATurn(
+        question="讲项目",
+        answer="我负责 FastAPI 接口优化，延迟降低 30%。",
+        answer_start_ms=100,
+        answer_end_ms=1200,
+    )
+    ctx = InterviewContext(
+        session_id="session-local",
+        job_id=model.job_id,
+        candidate_id="candidate-local",
+        competency_model=model,
+        turns=[turn],
+    )
+    duplicate = EvidenceRef(
+        turn_id=turn.turn_id,
+        quote_start_ms=turn.answer_start_ms,
+        quote_end_ms=turn.answer_end_ms,
+        excerpt=turn.answer,
+    )
+    draft = InterviewScore(
+        session_id=ctx.session_id,
+        dimensions=[
+            DimensionScore(
+                dimension=item.name,
+                score=80.0,
+                weight=item.weight,
+                evidence=[duplicate, duplicate],
+            )
+            for item in model.items
+        ],
+        total_score=80.0,
+        risk_notes=[],
+        recommendation="yes",
+    )
+
+    class FakeClient:
+        def complete_json_sync(self, messages, schema, fallback):
+            return draft
+
+    monkeypatch.setattr("services.scoring_service.service.get_llm_client", lambda: FakeClient())
+
+    score = score_interview(ctx, _aigc_results_for(turn))
+
+    assert all(len(dimension.evidence) == 1 for dimension in score.dimensions)
+
+
 def test_score_interview_preserves_deterministic_consistency_risk(monkeypatch) -> None:
     model = generate_competency_model("job-local", "Backend", "Python FastAPI")
     turn = QATurn(

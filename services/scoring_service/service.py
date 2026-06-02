@@ -203,6 +203,7 @@ def _normalize_evidence_refs(
     turns_by_id: dict[str, QATurn],
 ) -> list[EvidenceRef]:
     normalized: list[EvidenceRef] = []
+    seen: set[tuple[str, int, int, str]] = set()
     for ref in refs:
         turn = turns_by_id.get(ref.turn_id)
         if turn is None or not ref.excerpt.strip():
@@ -215,6 +216,10 @@ def _normalize_evidence_refs(
         answer_end_ms = turn.answer_end_ms
         quote_start_ms = max(answer_start_ms, min(ref.quote_start_ms, answer_end_ms))
         quote_end_ms = max(quote_start_ms, min(ref.quote_end_ms, answer_end_ms))
+        key = (ref.turn_id, quote_start_ms, quote_end_ms, excerpt)
+        if key in seen:
+            continue
+        seen.add(key)
         normalized.append(
             EvidenceRef(
                 turn_id=ref.turn_id,

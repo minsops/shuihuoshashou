@@ -74,6 +74,8 @@ The local implementation is complete as a runnable MVP:
   result batches before entering service logic.
 - Scoring evidence is re-anchored to persisted turns so fabricated excerpts or out-of-range
   timestamps from LLM drafts do not enter reports.
+- Scoring evidence references are de-duplicated after normalization so repeated LLM citations do
+  not inflate report evidence.
 - Runtime probe prompts are kept under `prompts/` and loaded by services instead of being embedded in code.
 - AIGC checks use a local corpus with character n-gram cosine similarity plus optional HTTP detector
   integration; the final flag applies configured probability/template thresholds with deterministic
