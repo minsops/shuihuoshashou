@@ -18,6 +18,7 @@ from libs.schemas import (
     CompetencyModel,
     ConsentCreate,
     ConsistencyFlag,
+    CredibilitySignal,
     DimensionScore,
     EvidenceRef,
     InterviewCreate,
@@ -28,6 +29,8 @@ from libs.schemas import (
     JobCreate,
     JobRecord,
     ProbeRequest,
+    ProbeResponse,
+    ProbeSuggestion,
     QATurn,
     TranscriptSegment,
 )
@@ -427,6 +430,67 @@ def test_generate_probe_uses_prompt_file(monkeypatch) -> None:
 
     assert messages[0].role == "system"
     assert messages[0].content == load_prompt("probe_system.md")
+
+
+def test_generate_probe_normalizes_llm_suggestion_priorities(monkeypatch) -> None:
+    model = CompetencyModel(
+        job_id="job-local",
+        job_title="Backend",
+        items=[
+            CompetencyItem(name="项目真实性", description="验证项目经历", weight=1.0),
+            CompetencyItem(name="工程深度", description="验证工程判断", weight=1.0),
+            CompetencyItem(name="异常处理", description="验证故障经验", weight=1.0),
+        ],
+    )
+    request = ProbeRequest(
+        job_id="job-local",
+        competency_model=model,
+        recent_turns=[],
+        latest_answer="我主要负责 FastAPI 优化和模型调用降级。",
+    )
+    draft = ProbeResponse(
+        suggestions=[
+            ProbeSuggestion(
+                question="第三优先级问题",
+                target="测试能力深度",
+                competency="异常处理",
+                priority=3,
+            ),
+            ProbeSuggestion(
+                question="第一优先级问题",
+                target="验证项目真实性",
+                competency="项目真实性",
+                priority=1,
+            ),
+            ProbeSuggestion(
+                question="第二优先级问题",
+                target="测试能力深度",
+                competency="工程深度",
+                priority=2,
+            ),
+        ],
+        credibility=CredibilitySignal(
+            level="vague",
+            reason="缺少具体细节",
+            drill_down_hint="追问本人负责部分",
+        ),
+    )
+
+    class FakeClient:
+        async def complete_json(self, messages, schema, fallback):
+            return draft
+
+    monkeypatch.setattr("services.probe_service.service.retrieve_job_probe_patterns", lambda *args, **kwargs: [])
+    monkeypatch.setattr("services.probe_service.service.get_llm_client", lambda: FakeClient())
+
+    response = __import__("asyncio").run(generate_probe(request))
+
+    assert [suggestion.question for suggestion in response.suggestions] == [
+        "第一优先级问题",
+        "第二优先级问题",
+        "第三优先级问题",
+    ]
+    assert [suggestion.priority for suggestion in response.suggestions] == [1, 2, 3]
 
 
 def test_score_interview_uses_prompt_and_recomputes_total(monkeypatch) -> None:

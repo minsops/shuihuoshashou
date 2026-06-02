@@ -15,6 +15,7 @@ as a local-first Python MVP:
 - Unified LLM client with mock mode and OpenAI-compatible HTTP mode for `mimo2.5pro`.
 - Runtime LLM prompts are stored under `prompts/` and loaded by services instead of being embedded in code.
 - Probe responses are schema-limited to one to three suggestions, matching the realtime card contract.
+- LLM-generated probe cards are sorted by priority and re-numbered before reaching realtime clients.
 - ASR interface supports local stub mode and configurable HTTP cloud ASR adapters.
 - ASR sessions deduplicate repeated final chunks, allow partial-to-final updates, learn local speaker clusters from known audio, and smooth short unknown-speaker gaps.
 - Transcript segments reject blank session ids or transcript text before they enter orchestration.

@@ -58,6 +58,7 @@ The local implementation is complete as a runnable MVP:
   weights.
 - ProbeResponse schema validation enforces the one-to-three suggestion contract for realtime
   interviewer cards.
+- LLM-generated probe cards are sorted by priority and re-numbered before realtime delivery.
 - Probe generation, scoring, AIGC/template checks, consistency checks, HTML/PDF report generation.
 - Internal HTTP-style contracts for standalone probe, AIGC detection, scoring, and report calls.
 - Scoring uses the shared LLM JSON client for structured dimension drafts, then normalizes evidence

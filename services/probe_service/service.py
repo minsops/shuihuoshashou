@@ -66,4 +66,16 @@ async def generate_probe(request: ProbeRequest) -> ProbeResponse:
         LLMMessage(role="system", content=load_prompt("probe_system.md")),
         LLMMessage(role="user", content=request.model_dump_json()),
     ]
-    return await get_llm_client().complete_json(messages, ProbeResponse, fallback)
+    draft = await get_llm_client().complete_json(messages, ProbeResponse, fallback)
+    return _normalize_probe_response(draft)
+
+
+def _normalize_probe_response(response: ProbeResponse) -> ProbeResponse:
+    suggestions = [
+        suggestion.model_copy(update={"priority": index})
+        for index, suggestion in enumerate(
+            sorted(response.suggestions, key=lambda item: item.priority),
+            start=1,
+        )
+    ]
+    return ProbeResponse(suggestions=suggestions, credibility=response.credibility)
