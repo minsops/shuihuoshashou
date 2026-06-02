@@ -163,6 +163,7 @@ def test_shared_contract_models_reject_blank_identifiers() -> None:
         total_score=80.0,
         recommendation="yes",
     )
+    aigc = AIGCResult(turn_id="turn-1", ai_generated_prob=0.2, template_similarity=0.1)
 
     with pytest.raises(ValidationError):
         CompetencyModel(job_id=" ", job_title="Backend", items=[competency])
@@ -201,7 +202,7 @@ def test_shared_contract_models_reject_blank_identifiers() -> None:
         Report(
             interview_id=" ",
             score=score,
-            aigc_results=[],
+            aigc_results=[aigc],
             consistency_flags=[],
             summary="报告摘要",
         )
@@ -248,6 +249,55 @@ def test_scoring_and_report_requests_require_aigc_results() -> None:
         ScoringRequest(context=context, aigc_results=[])
     with pytest.raises(ValidationError):
         ReportBuildRequest(context=context, score=score, aigc_results=[])
+
+
+def test_report_requires_aigc_results_and_summary() -> None:
+    evidence = EvidenceRef(
+        turn_id="turn-1",
+        quote_start_ms=0,
+        quote_end_ms=10,
+        excerpt="回答",
+    )
+    score = InterviewScore(
+        session_id="session-1",
+        dimensions=[
+            DimensionScore(
+                dimension="项目真实性",
+                score=80.0,
+                weight=1.0,
+                evidence=[evidence],
+            )
+        ],
+        total_score=80.0,
+        recommendation="yes",
+    )
+    aigc = AIGCResult(turn_id="turn-1", ai_generated_prob=0.2, template_similarity=0.1)
+
+    report = Report(
+        interview_id="interview-1",
+        score=score,
+        aigc_results=[aigc],
+        consistency_flags=[],
+        summary="报告摘要",
+    )
+
+    assert report.aigc_results[0].turn_id == "turn-1"
+    with pytest.raises(ValidationError):
+        Report(
+            interview_id="interview-1",
+            score=score,
+            aigc_results=[],
+            consistency_flags=[],
+            summary="报告摘要",
+        )
+    with pytest.raises(ValidationError):
+        Report(
+            interview_id="interview-1",
+            score=score,
+            aigc_results=[aigc],
+            consistency_flags=[],
+            summary=" ",
+        )
 
 
 def test_evidence_ref_rejects_invalid_quote_time_ranges() -> None:

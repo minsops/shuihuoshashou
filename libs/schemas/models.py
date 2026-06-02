@@ -465,7 +465,7 @@ class OfflineTaskAccepted(BaseModel):
 class Report(BaseModel):
     interview_id: str
     score: InterviewScore
-    aigc_results: list[AIGCResult]
+    aigc_results: list[AIGCResult] = Field(min_length=1)
     consistency_flags: list[ConsistencyFlag]
     transcript: list[QATurn] = Field(default_factory=list)
     summary: str
@@ -480,3 +480,8 @@ class Report(BaseModel):
     @classmethod
     def interview_id_is_not_blank(cls, value: str) -> str:
         return _not_blank(value, "interview_id")
+
+    @field_validator("summary")
+    @classmethod
+    def summary_is_not_blank(cls, value: str) -> str:
+        return _not_blank(value, "summary")
