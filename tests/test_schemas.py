@@ -814,13 +814,29 @@ def test_probe_response_requires_one_to_three_suggestions() -> None:
 def test_probe_contract_rejects_blank_answer_and_card_text() -> None:
     competency = CompetencyItem(name="项目真实性", description="验证项目经历", weight=1.0)
     model = CompetencyModel(job_id="job-1", job_title="Backend", items=[competency])
+    turn = QATurn(turn_id="turn-1", question="q", answer="a")
 
+    request = ProbeRequest(
+        job_id="job-1",
+        competency_model=model,
+        recent_turns=[turn],
+        latest_answer="回答",
+    )
+
+    assert request.recent_turns[0].turn_id == "turn-1"
     with pytest.raises(ValidationError):
         ProbeRequest(
             job_id="job-1",
             competency_model=model,
             recent_turns=[],
             latest_answer=" ",
+        )
+    with pytest.raises(ValidationError):
+        ProbeRequest(
+            job_id="job-1",
+            competency_model=model,
+            recent_turns=[turn, turn],
+            latest_answer="回答",
         )
     with pytest.raises(ValidationError):
         ProbeSuggestion(

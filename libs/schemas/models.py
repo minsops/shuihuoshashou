@@ -247,6 +247,13 @@ class ProbeRequest(BaseModel):
     def latest_answer_is_not_blank(cls, value: str) -> str:
         return _not_blank(value, "latest_answer")
 
+    @model_validator(mode="after")
+    def recent_turn_ids_are_unique(self) -> "ProbeRequest":
+        turn_ids = [turn.turn_id for turn in self.recent_turns]
+        if len(turn_ids) != len(set(turn_ids)):
+            raise ValueError("probe request recent_turns must not contain duplicate turn_id values")
+        return self
+
 
 class ProbeSuggestion(BaseModel):
     question: str
