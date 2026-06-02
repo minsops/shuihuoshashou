@@ -238,6 +238,52 @@ def test_sqlite_aigc_results_enforce_core_contract(tmp_path, monkeypatch) -> Non
             insert_aigc(*row)
 
 
+def test_sqlite_scores_enforce_core_contract(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'score-contract.db'}")
+    get_settings.cache_clear()
+    init_db()
+
+    def insert_score(
+        interview_id: str,
+        dimensions: str,
+        total_score: float,
+        risk_notes: str,
+        recommendation: str,
+    ) -> None:
+        with connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO scores
+                (interview_id, dimensions, total_score, risk_notes, recommendation, payload)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    interview_id,
+                    dimensions,
+                    total_score,
+                    risk_notes,
+                    recommendation,
+                    "{}",
+                ),
+            )
+
+    insert_score("interview-valid", '[{"dimension":"项目真实性"}]', 80.0, "[]", "yes")
+
+    invalid_rows = [
+        ("score-empty-dimensions", "[]", 80.0, "[]", "yes"),
+        ("score-object-dimensions", "{}", 80.0, "[]", "yes"),
+        ("score-invalid-dimensions", "not-json", 80.0, "[]", "yes"),
+        ("score-negative-total", '[{"dimension":"项目真实性"}]', -0.1, "[]", "yes"),
+        ("score-high-total", '[{"dimension":"项目真实性"}]', 100.1, "[]", "yes"),
+        ("score-object-risk", '[{"dimension":"项目真实性"}]', 80.0, "{}", "yes"),
+        ("score-invalid-risk", '[{"dimension":"项目真实性"}]', 80.0, "not-json", "yes"),
+        ("score-invalid-recommendation", '[{"dimension":"项目真实性"}]', 80.0, "[]", "maybe"),
+    ]
+    for row in invalid_rows:
+        with pytest.raises(sqlite3.IntegrityError):
+            insert_score(*row)
+
+
 def test_loads_accepts_postgres_json_values() -> None:
     payload = {"score": 88}
 

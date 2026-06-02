@@ -259,10 +259,18 @@ def init_db() -> None:
             );
             CREATE TABLE IF NOT EXISTS scores (
                 interview_id TEXT PRIMARY KEY,
-                dimensions TEXT,
-                total_score REAL,
-                risk_notes TEXT,
-                recommendation TEXT,
+                dimensions TEXT NOT NULL CHECK (
+                    json_valid(dimensions)
+                    AND json_type(dimensions) = 'array'
+                    AND json_array_length(dimensions) > 0
+                ),
+                total_score REAL NOT NULL CHECK (total_score >= 0 AND total_score <= 100),
+                risk_notes TEXT NOT NULL DEFAULT '[]' CHECK (
+                    json_valid(risk_notes) AND json_type(risk_notes) = 'array'
+                ),
+                recommendation TEXT NOT NULL CHECK (
+                    recommendation IN ('strong_yes', 'yes', 'hold', 'no')
+                ),
                 payload TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS aigc_results (
