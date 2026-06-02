@@ -76,6 +76,8 @@ The local implementation is complete as a runnable MVP:
 - Report artifacts support local `file://` storage and SigV4 uploads to S3-compatible storage for
   structured report JSON, HTML, PDF, and transcript JSON outputs.
 - Gateway exposes report JSON, HTML, PDF, and transcript JSON artifact endpoints.
+- Gateway report JSON and transcript JSON endpoints fall back to the persisted report payload when
+  local artifact files are unavailable, while PDF downloads still require the binary artifact.
 - Local offline scoring task flow with `FINISHED -> SCORING -> REPORTED` state transitions.
 - State guards prevent scoring before `FINISHED` and prevent turn edits or restarts after reporting.
 - Local task queue boundary for offline scoring with Redis Streams task publication and worker consumption.
