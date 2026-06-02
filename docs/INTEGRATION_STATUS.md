@@ -87,6 +87,8 @@ The local implementation is complete as a runnable MVP:
 - Interview context persists extracted fact claims for role, responsibility, technology, and metric
   statements, rejects duplicate turn ids at write time, and consistency checks run against that
   fact table.
+- Fact-claim responsibility, technology, and metric lists reject blank entries before consistency
+  checks run.
 - Consistency fact extraction treats explicit team/other-owner statements as team scope before
   generic lead wording, so "team-led" answers still conflict with solo-ownership claims.
 - Consistency flags require two distinct transcript turns so same-turn risk markers cannot masquerade

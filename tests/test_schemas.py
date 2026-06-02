@@ -193,6 +193,12 @@ def test_shared_contract_models_reject_blank_identifiers() -> None:
     with pytest.raises(ValidationError):
         FactClaim(turn_id=" ")
     with pytest.raises(ValidationError):
+        FactClaim(turn_id="turn-1", responsibilities=["架构", " "])
+    with pytest.raises(ValidationError):
+        FactClaim(turn_id="turn-1", technologies=["FastAPI", " "])
+    with pytest.raises(ValidationError):
+        FactClaim(turn_id="turn-1", metrics=["30%", " "])
+    with pytest.raises(ValidationError):
         QATurn(turn_id=" ", question="q", answer="a")
     with pytest.raises(ValidationError):
         ProbeRequest(job_id=" ", competency_model=model, recent_turns=[], latest_answer="回答")

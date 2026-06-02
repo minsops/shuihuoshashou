@@ -48,6 +48,7 @@ as a local-first Python MVP:
   rendering dependencies are missing.
 - Interview context keeps an auditable fact-claim table for role, responsibility, technology, and
   metric statements used by consistency checks, including shared-context metric conflicts.
+- Fact-claim responsibility, technology, and metric entries reject blank text before consistency checks.
 - Consistency flags require two distinct transcript turns so risk highlights remain traceable.
 - Scoring uses the shared LLM JSON client for structured dimension drafts and recomputes final
   totals in Python for auditability; deterministic risk signals cap affected dimensions even when

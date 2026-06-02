@@ -141,6 +141,13 @@ class FactClaim(BaseModel):
     def turn_id_is_not_blank(cls, value: str) -> str:
         return _not_blank(value, "turn_id")
 
+    @field_validator("responsibilities", "technologies", "metrics")
+    @classmethod
+    def fact_items_are_not_blank(cls, value: list[str], info: ValidationInfo) -> list[str]:
+        if any(not item.strip() for item in value):
+            raise ValueError(f"fact claim {info.field_name} must not contain blank text")
+        return value
+
 
 class QATurn(BaseModel):
     turn_id: str = Field(default_factory=new_id)
