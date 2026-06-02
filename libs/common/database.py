@@ -296,11 +296,12 @@ def init_db() -> None:
             );
             CREATE TABLE IF NOT EXISTS consents (
                 id TEXT PRIMARY KEY,
-                candidate_id TEXT NOT NULL,
-                consent_type TEXT NOT NULL,
-                granted INTEGER NOT NULL,
+                candidate_id TEXT NOT NULL CHECK (trim(candidate_id) <> ''),
+                consent_type TEXT NOT NULL CHECK (consent_type IN ('behavior_signal')),
+                granted INTEGER NOT NULL CHECK (granted IN (0, 1)),
                 granted_at TEXT NOT NULL,
-                revoked_at TEXT
+                revoked_at TEXT,
+                CHECK (revoked_at IS NULL OR revoked_at >= granted_at)
             );
             """
         )

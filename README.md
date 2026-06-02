@@ -143,7 +143,8 @@ range, and probe-target checks used by the PostgreSQL audit table. Fresh SQLite 
 tables enforce the same probability, template-similarity, matched-template, and flag bounds. Fresh
 SQLite `scores` tables enforce non-empty dimension arrays, score bounds, risk-note arrays, and
 recommendation values. Fresh SQLite job, candidate, and probe-pattern tables reject blank text where
-the PostgreSQL core schema does.
+the PostgreSQL core schema does. Fresh SQLite consent tables enforce consent type, boolean grant
+values, and revocation timestamps.
 The runtime adapter translates the local repository parameter style and upserts for PostgreSQL.
 The default compose stack mounts only the core schema into Postgres initialization so Docker's plain
 PostgreSQL image remains runnable. Set `JD_VECTOR_BACKEND=pgvector` on PostgreSQL deployments with

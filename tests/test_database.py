@@ -197,6 +197,63 @@ def test_sqlite_text_tables_enforce_nonblank_contract(tmp_path, monkeypatch) -> 
                 conn.execute(statement, params)
 
 
+def test_sqlite_consents_enforce_core_contract(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'consent-contract.db'}")
+    get_settings.cache_clear()
+    init_db()
+
+    def insert_consent(
+        consent_id: str,
+        candidate_id: str,
+        consent_type: str,
+        granted: int,
+        granted_at: str,
+        revoked_at: str | None,
+    ) -> None:
+        with connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO consents
+                (id, candidate_id, consent_type, granted, granted_at, revoked_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    consent_id,
+                    candidate_id,
+                    consent_type,
+                    granted,
+                    granted_at,
+                    revoked_at,
+                ),
+            )
+
+    insert_consent(
+        "consent-valid",
+        "candidate-1",
+        "behavior_signal",
+        1,
+        "2026-06-02T10:00:00+00:00",
+        None,
+    )
+
+    invalid_rows = [
+        ("consent-blank-candidate", " ", "behavior_signal", 1, "2026-06-02T10:00:00+00:00", None),
+        ("consent-bad-type", "candidate-1", "face_scan", 1, "2026-06-02T10:00:00+00:00", None),
+        ("consent-bad-granted", "candidate-1", "behavior_signal", 2, "2026-06-02T10:00:00+00:00", None),
+        (
+            "consent-backwards-revoke",
+            "candidate-1",
+            "behavior_signal",
+            0,
+            "2026-06-02T10:00:00+00:00",
+            "2026-06-02T09:59:59+00:00",
+        ),
+    ]
+    for row in invalid_rows:
+        with pytest.raises(sqlite3.IntegrityError):
+            insert_consent(*row)
+
+
 def test_sqlite_qa_turns_enforce_core_contract(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'turn-contract.db'}")
     get_settings.cache_clear()
