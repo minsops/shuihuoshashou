@@ -221,6 +221,10 @@ def add_turn(interview_id: str, turn: QATurn) -> InterviewRecord:
         ).fetchone()
     if existing is not None:
         raise ValueError("turn_id already exists")
+    if record.status == InterviewStatus.created:
+        record.status = InterviewStatus.in_progress
+        record.started_at = datetime.now(UTC)
+        record.context.started_at = record.started_at
     record.context.turns.append(turn)
     if len(record.context.fact_claims) != len(record.context.turns) - 1:
         record.context.fact_claims = [

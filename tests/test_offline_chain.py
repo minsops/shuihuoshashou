@@ -145,6 +145,22 @@ def test_offline_interview_chain(tmp_path: Path, monkeypatch) -> None:
     assert tasks[0].status == "completed"
 
 
+def test_add_turn_auto_starts_created_interview(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'auto-start.db'}")
+    get_settings.cache_clear()
+    init_db()
+    job = create_job(JobCreate(title="Backend", jd_text="Python FastAPI"))
+    candidate = create_candidate(CandidateCreate(name="Grace"))
+    interview = create_interview(InterviewCreate(job_id=job.id, candidate_id=candidate.id))
+
+    record = add_turn(interview.id, QATurn(question="讲项目", answer="我写了 FastAPI 编排。"))
+
+    assert record.status == InterviewStatus.in_progress
+    assert record.started_at is not None
+    assert record.context.started_at == record.started_at
+    assert get_interview(interview.id).status == InterviewStatus.in_progress
+
+
 def test_offline_pipeline_exposes_scoring_state(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'pipeline.db'}")
     monkeypatch.setenv("REPORT_DIR", str(tmp_path / "reports"))

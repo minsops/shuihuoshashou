@@ -263,7 +263,8 @@ report plus generated HTML/PDF paths.
 
 In the local profile, `POST /api/interviews/{id}/end` publishes task events and runs the offline
 pipeline synchronously so demos still return the report immediately. The persisted interview state
-still follows the spec flow: `FINISHED -> SCORING -> REPORTED`.
+still follows the spec flow: the first turn write starts a created interview, then end advances
+`IN_PROGRESS -> FINISHED -> SCORING -> REPORTED`.
 
 The offline scoring task uses `OFFLINE_TASK_BACKEND=local` by default. Set
 `OFFLINE_TASK_BACKEND=redis_stream` and install `.[redis]` to also publish task payloads to Redis

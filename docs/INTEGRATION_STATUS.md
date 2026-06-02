@@ -107,7 +107,8 @@ The local implementation is complete as a runnable MVP:
 - Gateway report JSON and transcript JSON endpoints fall back to the persisted report payload when
   local artifact files are unavailable, while PDF downloads can fall back to the configured
   S3-compatible artifact store.
-- Local offline scoring task flow with `FINISHED -> SCORING -> REPORTED` state transitions.
+- First turn writes auto-start created interviews, and local offline scoring then follows
+  `IN_PROGRESS -> FINISHED -> SCORING -> REPORTED` state transitions.
 - State guards prevent scoring before `FINISHED` and prevent turn edits or restarts after reporting.
 - Local task queue boundary for offline scoring with Redis Streams task publication and worker consumption.
 - Redis Streams workers publish `task.worker_failed` events for handler failures and malformed task
