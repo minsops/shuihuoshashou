@@ -178,6 +178,13 @@ class InterviewContext(BaseModel):
     def identifiers_are_not_blank(cls, value: str, info: ValidationInfo) -> str:
         return _not_blank(value, f"interview context {info.field_name}")
 
+    @model_validator(mode="after")
+    def turn_ids_are_unique(self) -> "InterviewContext":
+        turn_ids = [turn.turn_id for turn in self.turns]
+        if len(turn_ids) != len(set(turn_ids)):
+            raise ValueError("interview context turns must not contain duplicate turn_id values")
+        return self
+
 
 class ProbeRequest(BaseModel):
     job_id: str

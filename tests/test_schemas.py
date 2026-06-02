@@ -220,6 +220,30 @@ def test_aigc_detect_request_requires_candidate_turns() -> None:
         AIGCDetectRequest(turns=[turn, turn])
 
 
+def test_interview_context_rejects_duplicate_turn_ids() -> None:
+    competency = CompetencyItem(name="项目真实性", description="验证项目经历", weight=1.0)
+    model = CompetencyModel(job_id="job-1", job_title="Backend", items=[competency])
+    turn = QATurn(turn_id="turn-1", question="q", answer="a")
+
+    context = InterviewContext(
+        session_id="session-1",
+        job_id="job-1",
+        candidate_id="candidate-1",
+        competency_model=model,
+        turns=[turn],
+    )
+
+    assert context.turns[0].turn_id == "turn-1"
+    with pytest.raises(ValidationError):
+        InterviewContext(
+            session_id="session-1",
+            job_id="job-1",
+            candidate_id="candidate-1",
+            competency_model=model,
+            turns=[turn, turn],
+        )
+
+
 def test_scoring_and_report_requests_require_aigc_results() -> None:
     competency = CompetencyItem(name="项目真实性", description="验证项目经历", weight=1.0)
     model = CompetencyModel(job_id="job-1", job_title="Backend", items=[competency])
