@@ -8,7 +8,7 @@ from time import perf_counter
 import httpx
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from starlette.datastructures import Headers
-from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, Response
 
 from libs.common.config import get_settings
 from libs.common.database import init_db
@@ -559,12 +559,15 @@ def api_report_json(interview_id: str):
     try:
         report, _ = get_report(interview_id)
         json_path = report.get("json_path")
-        if not json_path or not Path(json_path).exists():
-            raise KeyError(f"report json not found: {interview_id}")
-        return FileResponse(
-            json_path,
-            media_type="application/json",
-            filename=f"{interview_id}.report.json",
+        if json_path and Path(json_path).exists():
+            return FileResponse(
+                json_path,
+                media_type="application/json",
+                filename=f"{interview_id}.report.json",
+            )
+        return JSONResponse(
+            report,
+            headers={"content-disposition": f'attachment; filename="{interview_id}.report.json"'},
         )
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
