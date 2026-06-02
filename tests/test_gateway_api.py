@@ -929,6 +929,22 @@ def test_gateway_websocket_text_turn_probe_flow(tmp_path: Path, monkeypatch) -> 
         assert credibility["type"] == "credibility"
 
 
+def test_gateway_websocket_rejects_blank_text_turn(tmp_path: Path, monkeypatch) -> None:
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+
+    with client.websocket_connect(f"/ws/interview/{interview['id']}") as websocket:
+        websocket.send_json({"type": "text_turn", "seq": 1, "answer": "   "})
+        error = websocket.receive_json()
+
+    assert error == {"type": "error", "detail": "text_turn requires answer"}
+
+
 def test_gateway_websocket_manual_probe_bypasses_auto_gates(
     tmp_path: Path, monkeypatch
 ) -> None:

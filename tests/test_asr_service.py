@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import base64
 import asyncio
+import base64
 
 import httpx
+import pytest
 
 from libs.common.config import get_settings
 from libs.schemas import TranscriptSegment
@@ -53,6 +54,30 @@ def test_stub_asr_normalizes_string_timestamp_bounds() -> None:
 
     assert segment.start_ms == 0
     assert segment.end_ms == 5
+
+
+def test_transcript_segment_rejects_blank_contract_fields() -> None:
+    with pytest.raises(ValueError, match="transcript segment session_id"):
+        TranscriptSegment(
+            session_id=" ",
+            speaker="candidate",
+            text="候选人的回答",
+            start_ms=0,
+            end_ms=100,
+            is_final=True,
+            confidence=0.8,
+        )
+
+    with pytest.raises(ValueError, match="transcript segment text"):
+        TranscriptSegment(
+            session_id="session-1",
+            speaker="candidate",
+            text=" ",
+            start_ms=0,
+            end_ms=100,
+            is_final=True,
+            confidence=0.8,
+        )
 
 
 def test_http_asr_engine_posts_audio_and_maps_response(monkeypatch) -> None:
@@ -192,6 +217,19 @@ def test_http_asr_engine_normalizes_timestamp_bounds(monkeypatch) -> None:
     assert segment.start_ms == 0
     assert segment.end_ms == 0
     assert segment.is_final is True
+
+
+def test_http_asr_engine_rejects_blank_transcript_text(monkeypatch) -> None:
+    def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"text": "   ", "speaker": "candidate"})
+
+    monkeypatch.setenv("ASR_PROVIDER", "http")
+    monkeypatch.setenv("ASR_BASE_URL", "https://asr.example.com")
+    get_settings.cache_clear()
+    engine = HTTPASREngine(transport=httpx.MockTransport(handler))
+
+    with pytest.raises(ValueError, match="transcript segment text"):
+        asyncio.run(engine.transcribe_chunk("session-1", 3, "YXVkaW8="))
 
 
 def test_get_asr_engine_uses_http_provider(monkeypatch) -> None:

@@ -17,6 +17,7 @@ as a local-first Python MVP:
 - Probe responses are schema-limited to one to three suggestions, matching the realtime card contract.
 - ASR interface supports local stub mode and configurable HTTP cloud ASR adapters.
 - ASR sessions deduplicate repeated final chunks, allow partial-to-final updates, learn local speaker clusters from known audio, and smooth short unknown-speaker gaps.
+- Transcript segments reject blank session ids or transcript text before they enter orchestration.
 - End-to-end offline demo from JD + interview turns to probe, scoring, AIGC checks, and report.
 - Local demo UI includes both offline evaluation and realtime WebSocket probe panels.
 - Interview turns are stored in both the interview context and a `qa_turns` table for auditability.
@@ -209,7 +210,8 @@ resolve it from a previously observed local audio cluster, then falls back to sh
 If an `audio_chunk` includes a `session_id`, it must match the WebSocket interview id; mismatches are
 returned as `asr_warning` events and skipped.
 Invalid or empty `audio_chunk.audio` payloads are rejected with `asr_warning` instead of being
-converted into placeholder transcripts. If audio metadata is provided, the gateway accepts only
+converted into placeholder transcripts. Blank `text_turn.answer` values are rejected with an
+`error` event for the same reason. If audio metadata is provided, the gateway accepts only
 PCM/Opus-style formats, `sample_rate_hz=16000`, and `channels=1`; unsupported values are rejected
 before reaching ASR.
 Tune `PROBE_MIN_ANSWER_CHARS` and `PROBE_MIN_INTERVAL_MS` to control when candidate final segments

@@ -11,6 +11,8 @@ The local implementation is complete as a runnable MVP:
 - WebSocket real-time text/audio-stub probe flow with speaker/finality/timestamp metadata and channel-based speaker mapping.
 - Invalid or empty WebSocket audio chunks are rejected with `asr_warning` before transcription.
 - WebSocket audio chunks with mismatched `session_id` values are rejected before ASR processing.
+- WebSocket text turns with blank answers are rejected before local ASR fallback can create placeholder
+  transcripts.
 - Optional WebSocket audio metadata is validated against the startup contract: PCM/Opus-style
   payloads, 16 kHz sample rate, and one channel.
 - Configurable real-time probe trigger rules for candidate answer length, drill-down topic matching,
@@ -19,6 +21,8 @@ The local implementation is complete as a runnable MVP:
 - HTTP ASR responses normalize string finality flags, treat provisional labels as non-final, clamp
   confidence values, and enforce non-negative monotonic timestamp ranges.
 - Shared TranscriptSegment, QATurn, and EvidenceRef schemas reject negative or inverted timestamp ranges.
+- Shared TranscriptSegment schemas also reject blank `session_id` and transcript text so empty ASR
+  output cannot enter orchestration.
 - ASR session manager supports partial-to-final chunk updates, repeated-final deduplication,
   stale-final rejection, local audio-cluster speaker resolution, and conservative short-gap
   speaker continuity smoothing.

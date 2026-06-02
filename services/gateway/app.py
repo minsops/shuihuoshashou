@@ -608,7 +608,12 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                     record = await _send_probe_for_segment(websocket, interview_id, record, segment)
             elif event.get("type") == "text_turn":
                 seq = int(event.get("seq", 1))
-                text = str(event.get("answer", ""))
+                text = str(event.get("answer", "")).strip()
+                if not text:
+                    await websocket.send_json(
+                        {"type": "error", "detail": "text_turn requires answer"}
+                    )
+                    continue
                 encoded = base64.b64encode(text.encode("utf-8")).decode("ascii")
                 segment = await engine.transcribe_chunk(
                     interview_id,
@@ -631,12 +636,12 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                 if should_probe(segment, record):
                     record = await _send_probe_for_segment(websocket, interview_id, record, segment)
             elif event.get("type") == "manual_probe":
-                segment = _manual_probe_segment(interview_id, event)
-                if not segment.text:
+                if not str(event.get("answer") or event.get("latest_answer") or "").strip():
                     await websocket.send_json(
                         {"type": "error", "detail": "manual_probe requires answer"}
                     )
                     continue
+                segment = _manual_probe_segment(interview_id, event)
                 record = await _send_probe_for_segment(websocket, interview_id, record, segment)
             elif event.get("type") == "end":
                 report = end_interview(interview_id)

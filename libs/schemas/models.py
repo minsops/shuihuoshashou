@@ -5,7 +5,7 @@ from enum import Enum
 from typing import Literal
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 
 
 def new_id() -> str:
@@ -90,6 +90,11 @@ class TranscriptSegment(BaseModel):
             raise ValueError("end_ms must be greater than or equal to start_ms")
         return self
 
+    @field_validator("session_id", "text")
+    @classmethod
+    def required_text_fields_are_not_blank(cls, value: str, info: ValidationInfo) -> str:
+        return _not_blank(value, f"transcript segment {info.field_name}")
+
 
 class ConsistencyFlag(BaseModel):
     turn_id_a: str
@@ -142,6 +147,11 @@ class InterviewContext(BaseModel):
     ended_at: datetime | None = None
     fact_claims: list[FactClaim] = Field(default_factory=list)
     flags: list[ConsistencyFlag] = Field(default_factory=list)
+
+    @field_validator("session_id", "job_id", "candidate_id")
+    @classmethod
+    def identifiers_are_not_blank(cls, value: str, info: ValidationInfo) -> str:
+        return _not_blank(value, f"interview context {info.field_name}")
 
 
 class ProbeRequest(BaseModel):

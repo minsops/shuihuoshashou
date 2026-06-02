@@ -18,6 +18,7 @@ from libs.schemas import (
     OfflineTaskAccepted,
     QATurn,
     TranscriptSegment,
+    new_id,
 )
 from services.aigc_detect_service.service import detect_interview
 from services.interview_orchestrator.consistency import detect_claim_conflicts, extract_fact_claim
@@ -120,19 +121,20 @@ def create_interview(payload: InterviewCreate) -> InterviewRecord:
             raise PermissionError("behavior signal requires admin enablement")
         if not has_active_consent(payload.candidate_id, "behavior_signal"):
             raise PermissionError("behavior signal requires explicit candidate consent")
+    interview_id = new_id()
     ctx = InterviewContext(
-        session_id="",
+        session_id=interview_id,
         job_id=payload.job_id,
         candidate_id=payload.candidate_id,
         competency_model=job.competency_model,
     )
     record = InterviewRecord(
+        id=interview_id,
         job_id=payload.job_id,
         candidate_id=payload.candidate_id,
         context=ctx,
         signal_enabled=payload.signal_enabled,
     )
-    record.context.session_id = record.id
     with connect() as conn:
         conn.execute(
             """

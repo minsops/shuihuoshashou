@@ -74,6 +74,7 @@ def test_offline_interview_chain(tmp_path: Path, monkeypatch) -> None:
     job = create_job(JobCreate(title="AI Engineer", jd_text="Python FastAPI LLM"))
     candidate = create_candidate(CandidateCreate(name="Ada"))
     interview = create_interview(InterviewCreate(job_id=job.id, candidate_id=candidate.id))
+    assert interview.context.session_id == interview.id
     add_turn(
         interview.id,
         QATurn(
