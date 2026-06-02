@@ -1243,6 +1243,7 @@ def test_jd_kb_pgvector_index_writes_vector_column(monkeypatch) -> None:
     get_settings.cache_clear()
     inserted: list[tuple[str, tuple]] = []
     job = JobRecord(
+        id="00000000-0000-0000-0000-000000000001",
         title="LLM Backend",
         jd_text="Python FastAPI LLM",
         competency_model=generate_competency_model(

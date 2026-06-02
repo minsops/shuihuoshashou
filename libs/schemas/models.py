@@ -409,6 +409,12 @@ class JobRecord(BaseModel):
     def id_is_not_blank(cls, value: str) -> str:
         return _not_blank(value, "job id")
 
+    @model_validator(mode="after")
+    def competency_model_matches_job(self) -> "JobRecord":
+        if self.competency_model.job_id != self.id:
+            raise ValueError("job competency_model.job_id must match job id")
+        return self
+
 
 class CandidateCreate(BaseModel):
     name: str
@@ -499,6 +505,14 @@ class InterviewRecord(BaseModel):
     @classmethod
     def identifiers_are_not_blank(cls, value: str, info: ValidationInfo) -> str:
         return _not_blank(value, info.field_name)
+
+    @model_validator(mode="after")
+    def context_identifiers_match_record(self) -> "InterviewRecord":
+        if self.context.job_id != self.job_id:
+            raise ValueError("interview context job_id must match interview job_id")
+        if self.context.candidate_id != self.candidate_id:
+            raise ValueError("interview context candidate_id must match interview candidate_id")
+        return self
 
     @model_validator(mode="after")
     def ended_at_is_not_before_started_at(self) -> "InterviewRecord":
