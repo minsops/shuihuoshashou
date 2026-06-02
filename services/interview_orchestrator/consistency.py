@@ -20,14 +20,14 @@ RESPONSIBILITY_PATTERNS = ["架构", "编排", "重试", "校验", "优化", "�
 
 def extract_fact_claim(turn: QATurn) -> FactClaim:
     answer = turn.answer
-    if any(word in answer for word in ["独立完成", "独立负责", "我一个人"]):
+    if any(word in answer for word in ["团队主导", "团队负责", "别人负责", "同事负责"]):
+        scope = "team"
+    elif any(word in answer for word in ["独立完成", "独立负责", "我一个人"]):
         scope = "solo"
     elif any(word in answer for word in ["主导", "牵头", "owner"]):
         scope = "lead"
     elif any(word in answer for word in ["参与", "配合", "协助"]):
         scope = "participant"
-    elif any(word in answer for word in ["团队主导", "团队负责", "别人负责", "同事负责"]):
-        scope = "team"
     else:
         scope = "unknown"
 

@@ -77,6 +77,8 @@ The local implementation is complete as a runnable MVP:
   start from a no-op detection result.
 - Interview context persists extracted fact claims for role, responsibility, technology, and metric
   statements, and consistency checks run against that fact table.
+- Consistency fact extraction treats explicit team/other-owner statements as team scope before
+  generic lead wording, so "team-led" answers still conflict with solo-ownership claims.
 - Structured JSON and HTML/PDF reports include highlights, radar charts, AIGC risk highlights,
   recommendation, and the full interview transcript.
 - PDF generation falls back to an auditable text PDF with score, recommendation, dimension evidence,

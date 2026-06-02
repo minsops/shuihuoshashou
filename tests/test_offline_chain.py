@@ -878,6 +878,18 @@ def test_consistency_detects_contribution_conflict() -> None:
     assert flags[0].severity == "high"
 
 
+def test_consistency_treats_team_led_work_as_team_scope() -> None:
+    solo = QATurn(question="q1", answer="这个项目是我独立完成的，我负责整体架构。")
+    team_led = QATurn(question="q2", answer="后来确认核心链路其实是团队主导，我只负责配合联调。")
+
+    team_claim = extract_fact_claim(team_led)
+    flags = detect_consistency([solo, team_led])
+
+    assert team_claim.contribution_scope == "team"
+    assert flags
+    assert flags[0].severity == "high"
+
+
 def test_add_turn_maintains_fact_claim_table(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'facts.db'}")
     get_settings.cache_clear()
