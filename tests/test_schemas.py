@@ -798,6 +798,21 @@ def test_dimension_scores_require_evidence_and_score_requires_dimensions() -> No
             risk_notes=[" "],
             recommendation="yes",
         )
+    with pytest.raises(ValidationError):
+        InterviewScore(
+            session_id="session-1",
+            dimensions=[
+                dimension,
+                DimensionScore(
+                    dimension=" 项目真实性 ",
+                    score=70.0,
+                    weight=0.25,
+                    evidence=[evidence],
+                ),
+            ],
+            total_score=80.0,
+            recommendation="yes",
+        )
 
 
 def test_probe_response_requires_one_to_three_suggestions() -> None:

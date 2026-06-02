@@ -344,6 +344,13 @@ class InterviewScore(BaseModel):
             _not_blank(note, "risk note")
         return value
 
+    @model_validator(mode="after")
+    def dimension_names_are_unique(self) -> "InterviewScore":
+        names = [dimension.dimension.strip() for dimension in self.dimensions]
+        if len(names) != len(set(names)):
+            raise ValueError("interview score dimensions must not contain duplicate names")
+        return self
+
 
 class AIGCResult(BaseModel):
     turn_id: str

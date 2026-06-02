@@ -63,6 +63,7 @@ as a local-first Python MVP:
 - Scoring evidence is normalized to real transcript spans and de-duplicated before reporting.
 - Scoring and report request envelopes reject missing, duplicate, or unknown AIGC turn coverage
   before business logic runs.
+- Interview scores reject duplicate dimension names before totals or reports are accepted.
 - Scoring risk notes reject blank entries at the shared schema boundary.
 - Scoring schemas require at least one evidence reference per dimension.
 - AIGC checks combine a local answer-template corpus with optional HTTP detector integration.
