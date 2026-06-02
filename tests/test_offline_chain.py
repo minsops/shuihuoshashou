@@ -890,6 +890,43 @@ def test_consistency_treats_team_led_work_as_team_scope() -> None:
     assert flags[0].severity == "high"
 
 
+def test_consistency_detects_metric_conflict_for_shared_context() -> None:
+    turns = [
+        QATurn(question="q1", answer="我负责 FastAPI 优化，接口耗时降低 30%。"),
+        QATurn(question="q2", answer="后来复盘 FastAPI 优化其实只降低 5%。"),
+    ]
+
+    flags = detect_consistency(turns)
+
+    assert flags
+    assert flags[0].severity == "high"
+    assert "成果数字描述不一致" in flags[0].description
+    assert "降低 30%" in flags[0].description
+    assert "降低 5%" in flags[0].description
+
+
+def test_consistency_ignores_unrelated_metric_differences() -> None:
+    turns = [
+        QATurn(question="q1", answer="我负责 FastAPI 优化，接口耗时降低 30%。"),
+        QATurn(question="q2", answer="我参与 Redis 排查，缓存命中提升 5%。"),
+    ]
+
+    flags = detect_consistency(turns)
+
+    assert not flags
+
+
+def test_consistency_treats_same_direction_metric_verbs_as_consistent() -> None:
+    turns = [
+        QATurn(question="q1", answer="我负责 FastAPI 优化，接口耗时降低 30%。"),
+        QATurn(question="q2", answer="复盘 FastAPI 优化后确认耗时减少 30%。"),
+    ]
+
+    flags = detect_consistency(turns)
+
+    assert not flags
+
+
 def test_add_turn_maintains_fact_claim_table(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'facts.db'}")
     get_settings.cache_clear()

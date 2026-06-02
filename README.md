@@ -44,7 +44,7 @@ as a local-first Python MVP:
 - PDF generation uses WeasyPrint when available and falls back to an auditable text PDF with score,
   recommendation, evidence, risk, AIGC, and transcript summary when native rendering dependencies are missing.
 - Interview context keeps an auditable fact-claim table for role, responsibility, technology, and
-  metric statements used by consistency checks.
+  metric statements used by consistency checks, including shared-context metric conflicts.
 - Scoring uses the shared LLM JSON client for structured dimension drafts and recomputes final
   totals in Python for auditability and deterministic fallback behavior.
 - Scoring schemas require at least one evidence reference per dimension.
