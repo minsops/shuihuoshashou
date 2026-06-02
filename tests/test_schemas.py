@@ -214,6 +214,13 @@ def test_shared_contract_models_reject_blank_identifiers() -> None:
     with pytest.raises(ValidationError):
         AIGCResult(turn_id=" ", ai_generated_prob=0.2, template_similarity=0.1)
     with pytest.raises(ValidationError):
+        AIGCResult(
+            turn_id="turn-1",
+            ai_generated_prob=0.2,
+            template_similarity=0.1,
+            matched_template=" ",
+        )
+    with pytest.raises(ValidationError):
         BehaviorSignal(turn_id=" ", fluency=0.8, hesitation=0.1, evasiveness_hint=False)
     with pytest.raises(ValidationError):
         ConsentCreate(candidate_id=" ")

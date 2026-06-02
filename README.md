@@ -58,6 +58,7 @@ as a local-first Python MVP:
 - Scoring schemas require at least one evidence reference per dimension.
 - AIGC checks combine a local answer-template corpus with optional HTTP detector integration.
 - AIGC detection requests reject empty turn batches and duplicate turn ids before scoring/reporting.
+- AIGC matched template names reject blank text when a template hit is recorded.
 - Interview turn writes reject duplicate turn ids so evidence, AIGC, and report references stay unambiguous.
 
 ## Important Secret Handling

@@ -84,6 +84,7 @@ The local implementation is complete as a runnable MVP:
   local fallback.
 - AIGC detection requests reject empty turn batches and duplicate turn ids so the offline
   scoring/report pipeline does not start from a no-op or ambiguous detection result.
+- AIGC matched template names reject blank text when a template hit is recorded.
 - Interview context persists extracted fact claims for role, responsibility, technology, and metric
   statements, rejects duplicate turn ids at write time, and consistency checks run against that
   fact table.

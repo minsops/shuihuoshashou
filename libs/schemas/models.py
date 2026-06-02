@@ -319,6 +319,13 @@ class AIGCResult(BaseModel):
     def turn_id_is_not_blank(cls, value: str) -> str:
         return _not_blank(value, "turn_id")
 
+    @field_validator("matched_template")
+    @classmethod
+    def matched_template_is_not_blank(cls, value: str | None) -> str | None:
+        if value is not None:
+            return _not_blank(value, "matched_template")
+        return value
+
 
 class BehaviorSignal(BaseModel):
     model_config = ConfigDict(extra="forbid")
