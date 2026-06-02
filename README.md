@@ -1,85 +1,68 @@
-# Shuihuo Killer
+# 水货杀手
 
-AI real-time interview probe assistant and anti-padding evaluation system.
+AI 实时深挖面试官助手与反注水面试评估系统。
 
-This repository implements the engineering spec in `/Users/zhangyifan/Downloads/水货杀手_工程规格.md`
-as a local-first Python MVP:
+本仓库按 `/Users/zhangyifan/Downloads/水货杀手_工程规格.md` 实现，是一个本地优先的 Python MVP：
 
-- Python 3.11+ with Pydantic v2 schemas.
-- FastAPI services and gateway.
-- Local SQLite persistence by default, with a PostgreSQL runtime adapter for deployment profiles.
-- In-memory async events for local development, with explicit offline scoring events.
-- Local task queue boundary for offline scoring, with optional Redis Streams task publication.
-- Interview state transitions reject post-report mutation and scoring before finish.
-- Offline scoring rejects empty candidate-turn contexts so reports cannot contain unsupported scores.
-- Unified LLM client with mock mode and OpenAI-compatible HTTP mode for `mimo2.5pro`.
-- Runtime LLM prompts are stored under `prompts/` and loaded by services instead of being embedded in code.
-- Probe responses are schema-limited to one to three suggestions, matching the realtime card contract.
-- Probe requests reject duplicate recent turn ids before prompt construction.
-- LLM-generated probe cards are sorted by priority and re-numbered before reaching realtime clients.
-- ASR interface supports local stub mode and configurable HTTP cloud ASR adapters.
-- ASR sessions deduplicate repeated final chunks, allow partial-to-final updates, learn local speaker clusters from known audio, and smooth short unknown-speaker gaps.
-- Transcript segments reject blank session ids or transcript text before they enter orchestration.
-- End-to-end offline demo from JD + interview turns to probe, scoring, AIGC checks, and report.
-- Local demo UI includes both offline evaluation and realtime WebSocket probe panels.
-- Interview turns are stored in both the interview context and a `qa_turns` table for auditability.
-- Interview Q&A turns and scoring evidence excerpts reject blank text at the shared schema boundary.
-- AI-probe Q&A turns require a non-blank `probe_target` so report transcripts keep the probe purpose.
-- Job, candidate, competency, and probe-card contract fields reject blank required text.
-- WebSocket transcripts carry speaker/finality/timestamp metadata, support channel-based speaker mapping, and emit separate credibility events.
-- Docker Compose declares the gateway plus PostgreSQL, Redis, and MinIO for local infrastructure.
-- PostgreSQL core schema SQL is provided under `db/postgres` for compose initialization.
-- Runtime database URL parsing supports SQLite and PostgreSQL targets.
-- Interview and consent creation validate candidate references so local SQLite behavior matches the
-  PostgreSQL foreign-key contract.
-- JD knowledge base indexes competency-specific probe patterns with deterministic embeddings and optional pgvector search.
-- Probe-pattern retrieval scores reject infinite values so ranking remains deterministic.
-- JD competency models are generated through the shared LLM JSON client with deterministic fallback
-  and normalized to keep the required scoring dimensions and weights present.
-- Competency models reject duplicate dimension names before probe, scoring, or report matching.
-- Competency and scoring weights reject NaN/inf values so Python-side weighted totals remain reproducible.
-- Report artifacts write local files by default and upload to S3-compatible storage when credentials are configured.
-- Reports include structured scores, radar charts, highlights, AIGC checks, consistency flags,
-  de-duplicated risk highlights, recommendations, and full interview transcripts.
-- Report building rejects mismatched score sessions, dimension names/weights, totals,
-  recommendations, evidence turn ids, out-of-range evidence timestamps, non-transcript evidence
-  excerpts, duplicate evidence references, unknown consistency-flag turn ids, incomplete/duplicate
-  AIGC coverage, unknown AIGC turn ids, or unflagged AIGC results above configured thresholds.
-- Report generation writes separate structured report JSON, HTML, PDF, and transcript JSON artifacts
-  for audit and storage.
-- Report artifact paths and URI entries reject blank values at the shared output boundary.
-- Report output records reject interview ids that do not match the embedded score session.
-- Report output records require non-empty transcripts and reject evidence, AIGC, or consistency
-  references that are outside the transcript.
-- PDF generation uses WeasyPrint when available and falls back to an auditable text PDF with score,
-  recommendation, evidence, risk, AIGC, and transcript summary, including CJK text, when native
-  rendering dependencies are missing.
-- Interview context keeps an auditable fact-claim table for role, responsibility, technology, and
-  metric statements used by consistency checks, including shared-context metric conflicts.
-- Interview contexts reject fact claims or consistency flags that reference turns outside the
-  current transcript.
-- Fact-claim responsibility, technology, and metric entries reject blank text before consistency checks.
-- Consistency flags require two distinct transcript turns so risk highlights remain traceable.
-- Scoring uses the shared LLM JSON client for structured dimension drafts and recomputes final
-  totals in Python for auditability; deterministic risk signals cap affected dimensions even when
-  an LLM draft returns higher scores, and deterministic risk notes are preserved in reports.
-- Scoring evidence is normalized to real transcript spans and de-duplicated before reporting.
-- Scoring and report request envelopes reject missing, duplicate, or unknown AIGC turn coverage
-  before business logic runs.
-- Interview scores reject duplicate dimension names before totals or reports are accepted.
-- Scoring risk notes reject blank entries at the shared schema boundary.
-- Scoring schemas require at least one evidence reference per dimension.
-- AIGC checks combine a local answer-template corpus with optional HTTP detector integration.
-- AIGC detection requests reject empty turn batches and duplicate turn ids before scoring/reporting.
-- AIGC matched template names reject blank text when a template hit is recorded.
-- Offline evaluation inputs reject duplicate turn ids before building the local demo chain.
-- Interview turn writes reject duplicate turn ids so evidence, AIGC, and report references stay unambiguous.
-- Job and interview records reject nested context or competency-model identifiers that do not match
-  their parent records, including interview session ids.
+- 使用 Python 3.11+ 和 Pydantic v2 定义跨服务数据契约。
+- 基于 FastAPI 实现服务和 API 网关。
+- 本地默认使用 SQLite 持久化，部署 profile 支持 PostgreSQL 运行时适配。
+- 本地开发使用内存异步事件，并显式发布离线评分事件。
+- 离线评分有本地任务队列边界，并可选发布到 Redis Streams。
+- 面试状态机拒绝报告后的修改，也拒绝面试未结束就进入评分。
+- 离线评分拒绝空候选人问答上下文，避免生成无依据报告。
+- 统一 LLM client，支持 mock 模式和 OpenAI 兼容 HTTP 模式，默认模型名为 `mimo2.5pro`。
+- 运行时 LLM prompt 放在 `prompts/` 下，由服务加载，不硬编码在业务代码中。
+- 追问响应在 schema 层限制为 1 到 3 条建议，符合实时追问卡契约。
+- 追问请求会在构建 prompt 前拒绝重复的 recent turn id。
+- LLM 生成的追问卡会按优先级排序并重新编号后再返回实时客户端。
+- ASR 接口支持本地 stub 模式和可配置 HTTP 云 ASR 适配器。
+- ASR 会话会去重重复 final chunk，支持 partial 到 final 更新，从已知音频学习本地说话人簇，并平滑短间隔 unknown speaker。
+- 转写片段进入编排前会拒绝空 session id 或空文本。
+- 支持从 JD 和面试问答到追问、评分、AIGC 检测、报告的端到端离线 demo。
+- 本地 demo UI 同时包含离线评估和实时 WebSocket 追问面板。
+- 面试问答会同时写入 interview context 和 `qa_turns` 审计表。
+- 面试问答、评分证据摘录等共享 schema 边界会拒绝空文本。
+- AI 追问生成的问答必须带非空 `probe_target`，保证报告 transcript 保留追问目的。
+- 岗位、候选人、胜任力维度、追问卡等契约字段都会拒绝空的必填文本。
+- WebSocket transcript 携带 speaker、finality、timestamp 元数据，支持按 channel 映射说话人，并单独发送可信度事件。
+- Docker Compose 声明 gateway、PostgreSQL、Redis 和 MinIO 本地基础设施。
+- PostgreSQL core schema SQL 位于 `db/postgres`，用于 compose 初始化。
+- 运行时数据库 URL 解析支持 SQLite 和 PostgreSQL。
+- 创建面试和同意记录时会校验候选人引用，使本地 SQLite 行为与 PostgreSQL 外键契约一致。
+- JD 知识库会为各胜任力维度的追问范式建立确定性 embedding，并支持可选 pgvector 检索。
+- 追问范式检索分数拒绝 infinite 值，确保排序可复现。
+- JD 胜任力模型通过共享 LLM JSON client 生成，并带确定性 fallback；输出会归一化，确保必需评分维度和权重存在。
+- 胜任力模型拒绝重复维度名，避免追问、评分和报告匹配产生歧义。
+- 胜任力权重和评分权重拒绝 NaN/inf，保证 Python 侧加权总分可复现。
+- 报告产物默认写本地文件，配置对象存储后上传到 S3 兼容存储。
+- 报告包含结构化评分、雷达图、亮点、AIGC 检查、一致性标记、去重风险高亮、建议和完整 transcript。
+- 报告构建会拒绝 score session 不匹配、维度名/权重不匹配、总分不匹配、建议不匹配、证据 turn id 异常、证据时间越界、证据摘录不在 transcript 中、重复证据引用、未知一致性标记 turn id、AIGC 覆盖缺失/重复、未知 AIGC turn id，以及超过阈值但未 flagged 的 AIGC 结果。
+- 报告生成会分别写出结构化 JSON、HTML、PDF 和 transcript JSON，便于审计和存储。
+- 报告 artifact path 和 URI 在共享输出边界拒绝空值。
+- 报告输出记录会拒绝与嵌入 score session 不一致的 interview id。
+- 报告输出记录要求 transcript 非空，并拒绝 transcript 外的 evidence、AIGC 或 consistency 引用。
+- PDF 生成优先使用 WeasyPrint；缺少原生渲染依赖时，回退为可审计文本 PDF，包含分数、建议、证据、风险、AIGC 和 transcript 摘要，并支持中文文本。
+- Interview context 保留可审计事实表，记录角色、职责、技术和指标陈述，供一致性检查使用，包括共享上下文中的指标冲突。
+- Interview context 会拒绝引用当前 transcript 外 turn 的 fact claim 或 consistency flag。
+- Fact claim 的职责、技术和指标条目会在一致性检查前拒绝空文本。
+- Consistency flag 必须引用两个不同 transcript turn，保证风险高亮可追溯。
+- 评分使用共享 LLM JSON client 生成结构化维度草稿，并在 Python 中重新计算总分，保证可审计；即使 LLM 草稿给出更高分，确定性风险信号仍会封顶相关维度，且确定性风险备注会保留到报告中。
+- 评分证据会归一化到真实 transcript span，并在报告前去重。
+- 评分和报告请求 envelope 会在业务逻辑执行前拒绝缺失、重复或未知的 AIGC turn 覆盖。
+- Interview score 在总分或报告接受前拒绝重复维度名。
+- 评分风险备注在共享 schema 边界拒绝空条目。
+- 评分 schema 要求每个维度至少有一条 evidence reference。
+- AIGC 检查结合本地回答模板语料和可选 HTTP detector。
+- AIGC 检测请求在评分/报告前拒绝空 turn batch 和重复 turn id。
+- 记录 AIGC 模板命中时，matched template 名称拒绝空文本。
+- 离线评估输入在构建本地 demo 链路前拒绝重复 turn id。
+- 面试 turn 写入拒绝重复 turn id，保证 evidence、AIGC 和 report 引用不歧义。
+- Job 和 interview 记录会拒绝与父记录不匹配的嵌套 context 或 competency-model 标识符，包括 interview session id。
 
-## Important Secret Handling
+## 密钥处理
 
-Do not commit API keys. Put them in `.env` or your shell:
+不要提交 API key。请放到 `.env` 或当前 shell：
 
 ```bash
 export LLM_PROVIDER=openai_compatible
@@ -96,20 +79,15 @@ export LLM_RATE_LIMIT_ENABLED=false
 export LLM_RATE_LIMIT_REQUESTS_PER_MINUTE=60
 ```
 
-If `LLM_PROVIDER=mock` or no API key is present, the system runs with deterministic local mock output.
+如果 `LLM_PROVIDER=mock`，或没有配置 API key，系统会使用确定性的本地 mock 输出。
 
-The default values follow the MiMo OpenAI-compatible chat completions protocol. If the provider changes
-the endpoint, auth header, response JSON shape, or retry policy, change only the `LLM_*` environment
-variables above. LLM JSON parsing is validated with pydantic; failed HTTP/JSON/schema attempts retry
-once by default before falling back to deterministic local behavior. The configured response path can
-resolve to either a JSON string or an already-decoded JSON object.
-Set `LLM_RATE_LIMIT_ENABLED=true` to cap provider calls per model before they leave the process;
-limited calls fall back locally unless diagnostic code asks for `raise_on_error`.
+默认值遵循 MiMo OpenAI 兼容 chat completions 协议。如果供应商变更 endpoint、鉴权 header、响应 JSON 结构或重试策略，只需要修改上面的 `LLM_*` 环境变量。LLM JSON 解析会经过 Pydantic 校验；HTTP、JSON 或 schema 失败时默认重试一次，然后回退到确定性本地行为。配置的响应路径可以解析到 JSON 字符串，也可以解析到已经解码的 JSON 对象。
 
-Set `GATEWAY_API_KEY` in deployed environments to require `X-API-Key: ...` or
-`Authorization: Bearer ...` for `/api/*` and WebSocket traffic. It is empty by default for local demos.
+设置 `LLM_RATE_LIMIT_ENABLED=true` 可以在请求离开进程前按模型限流；限流调用默认本地 fallback，除非诊断代码明确要求 `raise_on_error`。
 
-## Run Locally
+部署环境建议设置 `GATEWAY_API_KEY`，要求 `/api/*` 和 WebSocket 流量携带 `X-API-Key: ...` 或 `Authorization: Bearer ...`。本地 demo 默认不启用。
+
+## 本地运行
 
 ```bash
 python3 -m venv .venv
@@ -119,85 +97,54 @@ python scripts/run_offline_demo.py
 uvicorn services.gateway.app:app --reload --port 8000
 ```
 
-Open API docs at `http://127.0.0.1:8000/docs`.
+API 文档地址：`http://127.0.0.1:8000/docs`。
 
-Open the local demo UI at `http://127.0.0.1:8000/`.
+本地 demo UI 地址：`http://127.0.0.1:8000/`。
 
-## Run With Docker Compose
+## 使用 Docker Compose 运行
 
-Docker Compose starts the gateway together with the infrastructure named in the engineering spec:
-PostgreSQL, Redis, and S3-compatible MinIO.
+Docker Compose 会启动工程规格中要求的 gateway、PostgreSQL、Redis 和 S3 兼容 MinIO。
 
 ```bash
 docker compose up --build
 ```
 
-If local ports are already in use, override the host bindings without changing container-to-container
-addresses:
+如果本地端口已被占用，可以覆盖宿主机端口绑定，不影响容器间地址：
 
 ```bash
 GATEWAY_PORT=18000 POSTGRES_PORT=15432 REDIS_PORT=16379 MINIO_PORT=19000 MINIO_CONSOLE_PORT=19001 docker compose up --build
 ```
 
-To run the optional Celery offline-scoring worker in the same compose stack:
+如果要在同一个 compose stack 中运行可选 Celery 离线评分 worker：
 
 ```bash
 OFFLINE_TASK_BACKEND=celery OFFLINE_TASK_EXECUTION=async docker compose --profile worker up --build
 ```
 
-The compose gateway uses PostgreSQL by default through
-`postgresql://shuihuo:shuihuo_local@postgres:5432/shuihuo_killer`, while the non-Docker local
-profile still defaults to SQLite for quick demos.
-The compose stack forwards the runtime integration knobs from `.env.example` into the relevant
-services, including gateway auth, LLM retry/rate-limit settings, ASR response mappings, probe
-trigger thresholds, external AIGC detector settings, Redis rate-limit settings, and Celery worker
-AIGC/LLM settings.
+compose gateway 默认通过 `postgresql://shuihuo:shuihuo_local@postgres:5432/shuihuo_killer` 使用 PostgreSQL；非 Docker 本地 profile 仍默认使用 SQLite，方便快速 demo。
 
-PostgreSQL initializes from `db/postgres/001_core_schema.sql`, which declares the core jobs,
-candidates, interviews, turns, probe-pattern embeddings, scores, AIGC results, reports, and consent
-tables from the spec. The schema also applies CHECK constraints for interview states, turn
-timestamps, question sources, score ranges, AIGC probability/similarity ranges, recommendations, and
-behavior-signal consent type. Interview status values must match their `started_at`/`ended_at`
-timestamps in shared models, the PostgreSQL core schema, and freshly initialized local SQLite
-schemas, and SQLite interview rows keep `signal_enabled` as a 0/1 boolean. Fresh local SQLite
-`qa_turns` tables also enforce the same turn-index, source, text, time
-range, and probe-target checks used by the PostgreSQL audit table. Fresh SQLite `aigc_results`
-tables enforce the same probability, template-similarity, matched-template, and flag bounds. Fresh
-SQLite `scores` tables enforce non-empty dimension arrays, score bounds, risk-note arrays, and
-recommendation values. Fresh SQLite job, candidate, and probe-pattern tables reject blank text where
-the PostgreSQL core schema does. Fresh SQLite consent tables enforce consent type, boolean grant
-values, and revocation timestamps. Fresh SQLite report tables reject blank HTML artifacts. Fresh
-SQLite JSON-backed columns reject invalid JSON text and wrong JSON shapes for object/vector fields.
-The runtime adapter translates the local repository parameter style and upserts for PostgreSQL.
-The default compose stack mounts only the core schema into Postgres initialization so Docker's plain
-PostgreSQL image remains runnable. Set `JD_VECTOR_BACKEND=pgvector` on PostgreSQL deployments with
-pgvector installed to apply `db/postgres/002_pgvector_probe_patterns.sql` at application startup and
-use `embedding_vector <=> query` nearest-neighbor retrieval for probe-pattern search.
+compose stack 会把 `.env.example` 中的运行时集成参数传入对应服务，包括 gateway 鉴权、LLM 重试/限流、ASR 响应映射、probe 触发阈值、外部 AIGC detector 设置、Redis rate-limit 设置，以及 Celery worker 的 AIGC/LLM 设置。
 
-Set `OBJECT_STORAGE_ENDPOINT`, `OBJECT_STORAGE_BUCKET`, `OBJECT_STORAGE_ACCESS_KEY`, and
-`OBJECT_STORAGE_SECRET_KEY` to upload report HTML/PDF artifacts to S3-compatible storage such as
-MinIO. Transcript JSON artifacts are uploaded through the same store. The gateway still writes a
-local copy first for development and auditability.
+PostgreSQL 从 `db/postgres/001_core_schema.sql` 初始化。该 schema 声明规格中的 jobs、candidates、interviews、turns、probe-pattern embeddings、scores、AIGC results、reports 和 consent 表，并对面试状态、turn 时间戳、question source、score 范围、AIGC 概率/相似度、recommendation 和行为信号 consent type 建立 CHECK 约束。
 
-Operational endpoints:
+interview status 必须与 `started_at`/`ended_at` 匹配；该规则同时存在于共享模型、PostgreSQL core schema 和新初始化的本地 SQLite schema 中。SQLite interview rows 将 `signal_enabled` 保存为 0/1 boolean。新 SQLite `qa_turns` 表也会执行与 PostgreSQL 审计表一致的 turn index、source、文本、时间范围和 probe target 检查。SQLite `aigc_results`、`scores`、job、candidate、probe-pattern、consent、report 和 JSON-backed 列也有对应边界校验。运行时 adapter 会把本仓库的参数风格和 upsert 语法转换为 PostgreSQL 可执行形式。
+
+默认 compose stack 只挂载 core schema，确保 Docker 官方 PostgreSQL 镜像可以直接运行。对于已安装 pgvector 的 PostgreSQL 部署，可设置 `JD_VECTOR_BACKEND=pgvector`，应用启动时会应用 `db/postgres/002_pgvector_probe_patterns.sql`，并使用 `embedding_vector <=> query` 做追问范式最近邻检索。
+
+设置 `OBJECT_STORAGE_ENDPOINT`、`OBJECT_STORAGE_BUCKET`、`OBJECT_STORAGE_ACCESS_KEY` 和 `OBJECT_STORAGE_SECRET_KEY` 后，报告 HTML/PDF artifact 会上传到 MinIO 等 S3 兼容存储。Transcript JSON artifact 也使用同一个 store。开发和审计仍会先保留本地副本。
+
+运维端点：
 
 ```bash
 curl -s http://127.0.0.1:8000/metrics
 RATE_LIMIT_ENABLED=true RATE_LIMIT_REQUESTS_PER_MINUTE=120 uvicorn services.gateway.app:app --port 8000
 ```
 
-Set `RATE_LIMIT_BACKEND=redis` and install `.[redis]` to share gateway rate-limit counters across
-processes through Redis. Local development uses the in-memory backend by default.
+设置 `RATE_LIMIT_BACKEND=redis` 并安装 `.[redis]` 后，可以通过 Redis 在多个进程间共享 gateway rate-limit 计数器。本地开发默认使用内存 backend。
 
-HTTP responses include `X-Request-ID` and W3C `traceparent`; clients may send the same headers to
-correlate API calls, structlog-rendered JSON logs, and Prometheus request metrics. Set
-`OTEL_EXPORTER_OTLP_ENDPOINT` and install the `.[otel]` extra when deploying behind an
-OpenTelemetry collector; Docker images include that extra and instrument the FastAPI gateway when
-the endpoint is configured. The metrics endpoint also exposes domain/task event counters such as
-`task.enqueued`, `task.completed`, `task.failed`, `task.worker_failed`, `interview.finished`, and
-`interview.reported` for the offline scoring path.
+HTTP 响应包含 `X-Request-ID` 和 W3C `traceparent`；客户端也可以传入这些 header，用于关联 API 调用、structlog JSON 日志和 Prometheus 请求指标。部署到 OpenTelemetry collector 后，可设置 `OTEL_EXPORTER_OTLP_ENDPOINT` 并安装 `.[otel]` extra；Docker 镜像已经包含该 extra，并会在 endpoint 配置后自动 instrument FastAPI gateway。`/metrics` 还暴露离线评分路径中的领域/任务事件计数，例如 `task.enqueued`、`task.completed`、`task.failed`、`task.worker_failed`、`interview.finished` 和 `interview.reported`。
 
-Check runtime configuration without exposing secrets:
+检查运行时配置且不泄露密钥：
 
 ```bash
 python scripts/check_llm.py
@@ -206,24 +153,15 @@ LLM_API_KEY=your-key python scripts/diagnose_llm_auth.py
 curl -s http://127.0.0.1:8000/api/config/status
 ```
 
-`/api/config/status` reports non-secret provider paths, response mapping paths, timeout values,
-OTLP exporter presence, and whether secrets are configured, but never returns API keys. Database
-URLs are returned with passwords redacted.
-Provider/backend selectors, numeric thresholds, and required companion URLs are validated when
-settings load, so unsupported or incomplete values fail fast during startup or smoke tests.
+`/api/config/status` 只返回非密钥 provider path、响应映射 path、timeout、OTLP exporter 是否存在，以及密钥是否已配置；不会返回 API key。数据库 URL 会隐藏密码。Provider/backend selector、数字阈值和必要 companion URL 会在 settings 加载时校验，配置不支持或不完整时会在启动或 smoke test 阶段尽早失败。
 
-When `GATEWAY_API_KEY` is set, include `X-API-Key` or a bearer token on API requests. WebSocket
-clients can pass the same key in headers or as `?api_key=...`.
+设置 `GATEWAY_API_KEY` 后，请在 API 请求中加入 `X-API-Key` 或 bearer token。WebSocket 客户端可以通过 header 或 `?api_key=...` 传入同一 key。
 
-If `check_llm.py` fails with a connection error, run `diagnose_llm_network.py`. It checks DNS, TCP,
-and TLS for the configured `LLM_BASE_URL` without printing your API key.
+如果 `check_llm.py` 报连接错误，运行 `diagnose_llm_network.py`。它会检查配置的 `LLM_BASE_URL` 的 DNS、TCP 和 TLS，不会打印 API key。
 
-For the default MiMo endpoint, `diagnose_llm_network.py` should report DNS, TCP, and TLS as OK before
-API-key or request-format issues are diagnosed. If `check_llm.py` returns `HTTP 401 Invalid API Key`,
-run `diagnose_llm_auth.py` to try common OpenAI-compatible auth header variants. If every variant
-returns 401, generate a fresh key and set it through `LLM_API_KEY` without committing it.
+对于默认 MiMo endpoint，`diagnose_llm_network.py` 应先报告 DNS、TCP、TLS 均 OK，再排查 API key 或请求格式问题。如果 `check_llm.py` 返回 `HTTP 401 Invalid API Key`，运行 `diagnose_llm_auth.py` 试探常见 OpenAI 兼容鉴权 header 变体。如果所有变体都返回 401，请重新生成 key，并通过 `LLM_API_KEY` 设置，不要提交到仓库。
 
-## Main API
+## 主要 API
 
 - `POST /api/jobs`
 - `POST /api/candidates`
@@ -245,94 +183,47 @@ returns 401, generate a fresh key and set it through `LLM_API_KEY` without commi
 - `GET /api/interviews/{id}/report.transcript.json`
 - `WS /ws/interview/{id}`
 
-WebSocket `audio_chunk` events may include `speaker`, `channel`/`audio_channel`/`track`,
-`is_final`, `start_ms`, `end_ms`, and `confidence`. If `speaker` is omitted, channels listed in
-`ASR_INTERVIEWER_CHANNELS` map to `interviewer`, and channels listed in `ASR_CANDIDATE_CHANNELS` map
-to `candidate`. Only final candidate segments trigger a probe. Downstream events include
-`transcript`, `probe`, `credibility`, optional `signal`, `report`, and async-mode `task_queued`.
-Repeated final ASR chunks
-with the same sequence are deduplicated and returned as `asr_warning` events instead of triggering
-duplicate probe generation. When ASR returns `unknown` speaker, the session manager first tries to
-resolve it from a previously observed local audio cluster, then falls back to short-gap continuity.
-If an `audio_chunk` includes a `session_id`, it must match the WebSocket interview id; mismatches are
-returned as `asr_warning` events and skipped.
-Invalid or empty `audio_chunk.audio` payloads are rejected with `asr_warning` instead of being
-converted into placeholder transcripts. Blank `text_turn.answer` values are rejected with an
-`error` event for the same reason. Binary frames, invalid JSON text frames, and non-object
-WebSocket JSON payloads are rejected with an `error` event while keeping the session open for later
-valid events. Premature `end` events that fail state guards also return an `error` event without
-closing the session. If audio metadata is provided, the gateway accepts only PCM/Opus-style
-formats, `sample_rate_hz=16000`, and `channels=1`; unsupported values are rejected before reaching
-ASR.
-Tune `PROBE_MIN_ANSWER_CHARS` and `PROBE_MIN_INTERVAL_MS` to control when candidate final segments
-are eligible for probe generation. `PROBE_REQUIRE_TOPIC_MATCH` and `PROBE_TOPIC_KEYWORDS` keep
-automatic probes focused on drill-down topics such as projects, technical decisions, metrics, and
-incidents. Send a WebSocket `manual_probe` event with an `answer` to model the interviewer clicking
-"ask a probe now"; manual probes bypass the automatic length, topic, and interval gates.
+WebSocket `audio_chunk` 事件可以包含 `speaker`、`channel`/`audio_channel`/`track`、`is_final`、`start_ms`、`end_ms` 和 `confidence`。如果省略 `speaker`，列在 `ASR_INTERVIEWER_CHANNELS` 中的 channel 会映射为 `interviewer`，列在 `ASR_CANDIDATE_CHANNELS` 中的 channel 会映射为 `candidate`。只有 final candidate segment 会触发追问。下行事件包括 `transcript`、`probe`、`credibility`、可选 `signal`、`report`，以及 async 模式下的 `task_queued`。
 
-Set `ASR_PROVIDER=http`, `ASR_BASE_URL`, `ASR_API_PATH`, and `ASR_API_KEY` to forward audio chunks to
-a cloud ASR endpoint. Response mapping is configurable with `ASR_TEXT_PATH`, `ASR_SPEAKER_PATH`,
-`ASR_START_MS_PATH`, `ASR_END_MS_PATH`, `ASR_IS_FINAL_PATH`, and `ASR_CONFIDENCE_PATH`. Finality
-strings such as `partial`, `interim`, and `provisional` are treated as non-final so provisional ASR
-output does not trigger probes. ASR timestamps are normalized to non-negative millisecond ranges
-with `end_ms >= start_ms`; the shared transcript, Q&A, and scoring evidence schemas reject invalid
-timestamp ranges at API boundaries as well. Interview contexts and records also reject `ended_at`
-values earlier than their `started_at` timestamps.
-If the ASR provider fails or returns an invalid transcript for one frame, the WebSocket emits
-`asr_warning` with `reason=asr_transcription_failed` and keeps the interview session open for later
-frames.
+同一 seq 的重复 final ASR chunk 会去重，并返回 `asr_warning`，不会重复生成追问。ASR 返回 `unknown` speaker 时，session manager 会先尝试从已观察到的本地音频簇解析，再回退到短间隔连续性。`audio_chunk` 如果包含 `session_id`，必须与 WebSocket interview id 一致；不一致时返回 `asr_warning` 并跳过。
 
-Set `SPEAKER_DIARIZATION_PROVIDER=http`, `SPEAKER_DIARIZATION_BASE_URL`,
-`SPEAKER_DIARIZATION_API_PATH`, and `SPEAKER_DIARIZATION_API_KEY` to resolve unknown speakers through
-a production voice-clustering service. The expected response speaker path defaults to
-`SPEAKER_DIARIZATION_SPEAKER_PATH=speaker`. Docker Compose forwards the same
-`SPEAKER_DIARIZATION_*` variables to the gateway, and the gateway refreshes the ASR session
-diarizer from runtime settings during startup.
+无效或空的 `audio_chunk.audio` 会返回 `asr_warning`，不会转换成占位 transcript。空白 `text_turn.answer` 会返回 `error`。二进制帧、无效 JSON 文本帧和非 object 的 WebSocket JSON payload 会返回 `error`，但保持会话打开。过早的 `end` 如果不满足状态守卫，也返回 `error` 且不关闭会话。提供音频元数据时，gateway 只接受 PCM/Opus 风格格式、`sample_rate_hz=16000` 和 `channels=1`；不支持的值会在进入 ASR 前被拒绝。
 
-Set `AIGC_DETECTOR_PROVIDER=http`, `AIGC_DETECTOR_BASE_URL`, `AIGC_DETECTOR_API_PATH`, and
-`AIGC_DETECTOR_API_KEY` to send each answer to an external AI-text detector. The local template
-similarity result and configured probability threshold remain part of the final flag decision; HTTP
-failures fall back to the deterministic local detector.
+通过 `PROBE_MIN_ANSWER_CHARS` 和 `PROBE_MIN_INTERVAL_MS` 控制 candidate final segment 何时有资格触发追问。`PROBE_REQUIRE_TOPIC_MATCH` 和 `PROBE_TOPIC_KEYWORDS` 用于让自动追问聚焦在项目、技术决策、指标、事故等可下钻主题。发送 WebSocket `manual_probe` 事件并带 `answer`，可模拟面试官点击“立即追问”；manual probe 会绕过自动长度、主题和间隔 gate。
 
-## One-Shot Offline Evaluation
+设置 `ASR_PROVIDER=http`、`ASR_BASE_URL`、`ASR_API_PATH` 和 `ASR_API_KEY` 后，音频 chunk 会转发给云 ASR endpoint。响应映射可通过 `ASR_TEXT_PATH`、`ASR_SPEAKER_PATH`、`ASR_START_MS_PATH`、`ASR_END_MS_PATH`、`ASR_IS_FINAL_PATH` 和 `ASR_CONFIDENCE_PATH` 配置。`partial`、`interim`、`provisional` 等 finality 字符串会被视为非 final，避免临时 ASR 输出触发追问。ASR 时间戳会归一化为非负毫秒区间，并满足 `end_ms >= start_ms`；共享 transcript、Q&A 和 scoring evidence schema 也会在 API 边界拒绝非法时间区间。Interview context 和 record 也拒绝早于 `started_at` 的 `ended_at`。
 
-Use this endpoint for the first demo path: paste JD and interview Q&A, then receive the structured
-report plus generated HTML/PDF paths.
+如果 ASR provider 对某一帧失败或返回非法 transcript，WebSocket 会发送 `asr_warning`，`reason=asr_transcription_failed`，并保持面试会话打开，后续帧仍可继续处理。
 
-In the local profile, `POST /api/interviews/{id}/end` publishes task events and runs the offline
-pipeline synchronously so demos still return the report immediately. The persisted interview state
-still follows the spec flow: the first turn write starts a created interview, then end advances
-`IN_PROGRESS -> FINISHED -> SCORING -> REPORTED`.
+设置 `SPEAKER_DIARIZATION_PROVIDER=http`、`SPEAKER_DIARIZATION_BASE_URL`、`SPEAKER_DIARIZATION_API_PATH` 和 `SPEAKER_DIARIZATION_API_KEY` 后，可通过生产声纹聚类服务解析 unknown speaker。响应 speaker path 默认是 `SPEAKER_DIARIZATION_SPEAKER_PATH=speaker`。Docker Compose 会把同一组 `SPEAKER_DIARIZATION_*` 变量传给 gateway，并在启动时用运行时 settings 刷新 ASR session diarizer。
 
-The offline scoring task uses `OFFLINE_TASK_BACKEND=local` by default. Set
-`OFFLINE_TASK_BACKEND=redis_stream` and install `.[redis]` to also publish task payloads to Redis
-Streams under `{REDIS_STREAM_PREFIX}:tasks:{task_name}` while retaining synchronous local execution.
-Set `OFFLINE_TASK_BACKEND=celery` and install `.[celery]` to publish the same
-`interview.offline_scoring` task through Celery using `CELERY_BROKER_URL` and
-`CELERY_RESULT_BACKEND`. The publisher and worker both use `CELERY_TASK_QUEUE`
-(`shuihuo-offline` by default), so custom deployments must set the same queue name on both sides.
+设置 `AIGC_DETECTOR_PROVIDER=http`、`AIGC_DETECTOR_BASE_URL`、`AIGC_DETECTOR_API_PATH` 和 `AIGC_DETECTOR_API_KEY` 后，每条回答会发送到外部 AI 文本 detector。本地模板相似度结果和配置的概率阈值仍会参与最终 flag 决策；HTTP 失败会回退到确定性本地 detector。
 
-Set `OFFLINE_TASK_EXECUTION=async` to make `POST /api/interviews/{id}/end` return a queued task
-instead of blocking for the report. Once queued, the interview advances to `SCORING` so repeated
-end requests cannot enqueue duplicate offline scoring tasks. The worker then consumes the Redis
-Stream and creates the report. `POST /api/offline/evaluate` remains synchronous for demos and smoke
-tests.
+## 一次性离线评估
 
-Run a Redis Streams consumer for offline scoring tasks with:
+第一个 demo 路径建议使用该 endpoint：粘贴 JD 和面试问答，返回结构化报告以及生成的 HTML/PDF 路径。
+
+本地 profile 下，`POST /api/interviews/{id}/end` 会发布任务事件，并同步运行离线 pipeline，所以 demo 仍会立即返回报告。持久化的面试状态仍遵循规格流转：第一条 turn 写入会启动 created interview，然后 end 触发 `IN_PROGRESS -> FINISHED -> SCORING -> REPORTED`。
+
+离线评分任务默认使用 `OFFLINE_TASK_BACKEND=local`。设置 `OFFLINE_TASK_BACKEND=redis_stream` 并安装 `.[redis]` 后，也会把任务 payload 发布到 Redis Streams，stream 名为 `{REDIS_STREAM_PREFIX}:tasks:{task_name}`，同时保留同步本地执行。设置 `OFFLINE_TASK_BACKEND=celery` 并安装 `.[celery]` 后，会通过 Celery 发布同一个 `interview.offline_scoring` 任务，使用 `CELERY_BROKER_URL` 和 `CELERY_RESULT_BACKEND`。publisher 和 worker 都使用 `CELERY_TASK_QUEUE`，默认值为 `shuihuo-offline`，自定义部署必须两侧一致。
+
+设置 `OFFLINE_TASK_EXECUTION=async` 后，`POST /api/interviews/{id}/end` 会返回 queued task，而不是阻塞等待报告。任务入队后，interview 会推进到 `SCORING`，重复 end 请求无法再次入队。worker 消费 Redis Stream 后生成报告。`POST /api/offline/evaluate` 为 demo 和 smoke test 保持同步执行。
+
+运行 Redis Streams 离线评分 worker：
 
 ```bash
 OFFLINE_TASK_BACKEND=redis_stream python scripts/run_offline_worker.py
 ```
 
-Use `--once` for a single poll cycle in deployment smoke tests.
-Redis Streams workers emit `task.worker_failed` for handler errors or malformed payloads and leave
-failed messages unacknowledged for retry or manual inspection.
+部署 smoke test 可以使用 `--once` 只轮询一次。Redis Streams worker 遇到 handler error 或 malformed payload 时，会发送 `task.worker_failed`，并保留失败消息未 ack，便于重试或人工检查。
 
-Run a Celery worker for offline scoring tasks with:
+运行 Celery worker：
 
 ```bash
 OFFLINE_TASK_BACKEND=celery celery -A services.offline_worker.celery_tasks:celery_app worker --loglevel=info
 ```
+
+示例请求：
 
 ```bash
 curl -s http://127.0.0.1:8000/api/offline/evaluate \
@@ -352,18 +243,8 @@ curl -s http://127.0.0.1:8000/api/offline/evaluate \
   }'
 ```
 
-## Scope Notes
+## 范围说明
 
-The real-time ASR and optional behavior signal modules are implemented behind interfaces with local
-stub engines. Production speaker clustering can replace the local audio-cluster diarizer through the
-HTTP diarization provider without changing the shared schemas.
+实时 ASR 和可选行为信号模块都通过接口实现，并带本地 stub engine。生产说话人聚类服务可以通过 HTTP diarization provider 替换本地音频簇 diarizer，不需要修改共享 schema。
 
-Behavior signals are disabled by default. `SIGNAL_ENABLED=true` must be set by an administrator
-before any interview can request `signal_enabled=true`, and the candidate must also grant
-`behavior_signal` consent through `POST /api/consents`; otherwise the API returns 403. Posting the
-same consent with `granted=false` revokes prior active behavior-signal consent and future
-signal-enabled interviews are rejected until both gates are satisfied again. Consent checks use
-database-parameterized booleans so the same flow works on SQLite and PostgreSQL. Shared consent
-records also reject revoked timestamps earlier than the grant timestamp before persistence. The
-realtime WebSocket path also re-checks active consent before emitting each optional `signal` event,
-so revoked consent suppresses further behavior-signal hints.
+行为信号默认关闭。必须由管理员设置 `SIGNAL_ENABLED=true`，面试才能请求 `signal_enabled=true`；候选人还必须通过 `POST /api/consents` 授权 `behavior_signal`，否则 API 返回 403。用同一 consent endpoint 发送 `granted=false` 会撤销之前的有效行为信号同意；之后的 signal-enabled interview 会被拒绝，直到管理员开关和候选人授权两个 gate 都满足。Consent 检查使用数据库参数化 boolean，使同一流程在 SQLite 和 PostgreSQL 上都可运行。共享 consent record 也会在持久化前拒绝早于授权时间的 revoked timestamp。实时 WebSocket 路径在发送每个可选 `signal` 事件前也会重新检查有效 consent，因此撤销同意后会停止输出行为信号提示。
