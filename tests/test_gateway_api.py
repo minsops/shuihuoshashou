@@ -1287,6 +1287,78 @@ def test_gateway_websocket_rejects_invalid_audio_base64(
     assert "cannot finish interview without candidate turns" in error["detail"]
 
 
+def test_gateway_websocket_rejects_invalid_audio_seq_without_closing(
+    tmp_path: Path, monkeypatch
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+    audio = base64.b64encode("我负责 FastAPI 编排和重试。".encode("utf-8")).decode("ascii")
+
+    with client.websocket_connect(f"/ws/interview/{interview['id']}") as websocket:
+        websocket.send_json(
+            {
+                "type": "audio_chunk",
+                "session_id": interview["id"],
+                "seq": "not-a-number",
+                "audio": audio,
+                "speaker": "candidate",
+            }
+        )
+        warning = websocket.receive_json()
+
+        websocket.send_json(
+            {
+                "type": "text_turn",
+                "seq": 1,
+                "answer": "我负责 FastAPI 项目里的接口编排、重试和 JSON 校验。",
+            }
+        )
+        transcript = websocket.receive_json()
+
+    assert warning["type"] == "asr_warning"
+    assert warning["payload"] == {"reason": "invalid_seq", "seq": 0}
+    assert transcript["type"] == "transcript"
+
+
+def test_gateway_websocket_rejects_invalid_text_turn_seq_without_closing(
+    tmp_path: Path, monkeypatch
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+
+    with client.websocket_connect(f"/ws/interview/{interview['id']}") as websocket:
+        websocket.send_json(
+            {
+                "type": "text_turn",
+                "seq": "not-a-number",
+                "answer": "我负责 FastAPI 项目里的接口编排、重试和 JSON 校验。",
+            }
+        )
+        error = websocket.receive_json()
+
+        websocket.send_json(
+            {
+                "type": "text_turn",
+                "seq": 1,
+                "answer": "我负责 FastAPI 项目里的接口编排、重试和 JSON 校验。",
+            }
+        )
+        transcript = websocket.receive_json()
+
+    assert error == {"type": "error", "detail": "invalid seq"}
+    assert transcript["type"] == "transcript"
+
+
 def test_gateway_websocket_rejects_unsupported_audio_metadata(
     tmp_path: Path, monkeypatch
 ) -> None:

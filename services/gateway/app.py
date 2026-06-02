@@ -375,6 +375,15 @@ def _valid_audio_b64(value: object) -> bool:
         return False
 
 
+def _event_seq(event: dict, default: int) -> int | None:
+    value = event.get("seq", default)
+    try:
+        seq = int(value)
+    except (TypeError, ValueError):
+        return None
+    return seq if seq >= 0 else None
+
+
 def _audio_contract_warning(event: dict) -> str | None:
     audio_format = _event_string(event, "format", "audio_format", "codec")
     if audio_format is not None and audio_format not in SUPPORTED_AUDIO_FORMATS:
@@ -637,7 +646,10 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
         while True:
             event = await websocket.receive_json()
             if event.get("type") == "audio_chunk":
-                seq = int(event.get("seq", 0))
+                seq = _event_seq(event, 0)
+                if seq is None:
+                    await _send_asr_warning(websocket, "invalid_seq", 0)
+                    continue
                 if _event_session_mismatch(interview_id, event):
                     await _send_asr_warning(websocket, "session_id_mismatch", seq)
                     continue
@@ -676,7 +688,10 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                 if should_probe(segment, record):
                     record = await _send_probe_for_segment(websocket, interview_id, record, segment)
             elif event.get("type") == "text_turn":
-                seq = int(event.get("seq", 1))
+                seq = _event_seq(event, 1)
+                if seq is None:
+                    await websocket.send_json({"type": "error", "detail": "invalid seq"})
+                    continue
                 text = str(event.get("answer", "")).strip()
                 if not text:
                     await websocket.send_json(

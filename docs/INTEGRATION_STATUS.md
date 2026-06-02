@@ -10,6 +10,8 @@ The local implementation is complete as a runnable MVP:
 - One-shot offline evaluation at `/api/offline/evaluate`.
 - WebSocket real-time text/audio-stub probe flow with speaker/finality/timestamp metadata and channel-based speaker mapping.
 - Invalid or empty WebSocket audio chunks are rejected with `asr_warning` before transcription.
+- WebSocket audio/text events with invalid sequence numbers return recoverable warning/error events
+  instead of terminating the realtime session.
 - WebSocket audio chunks with mismatched `session_id` values are rejected before ASR processing.
 - WebSocket text turns with blank answers are rejected before local ASR fallback can create placeholder
   transcripts.
