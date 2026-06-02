@@ -17,6 +17,7 @@ from libs.schemas import (
     EvidenceRef,
     FactClaim,
     InterviewCreate,
+    InterviewContext,
     InterviewScore,
     JobCreate,
     OfflineTaskAccepted,
@@ -26,6 +27,8 @@ from libs.schemas import (
     ProbeSuggestion,
     QATurn,
     Report,
+    ReportBuildRequest,
+    ScoringRequest,
     TranscriptSegment,
 )
 
@@ -207,6 +210,44 @@ def test_shared_contract_models_reject_blank_identifiers() -> None:
 def test_aigc_detect_request_requires_candidate_turns() -> None:
     with pytest.raises(ValidationError):
         AIGCDetectRequest(turns=[])
+
+
+def test_scoring_and_report_requests_require_aigc_results() -> None:
+    competency = CompetencyItem(name="项目真实性", description="验证项目经历", weight=1.0)
+    model = CompetencyModel(job_id="job-1", job_title="Backend", items=[competency])
+    turn = QATurn(turn_id="turn-1", question="q", answer="a")
+    context = InterviewContext(
+        session_id="session-1",
+        job_id="job-1",
+        candidate_id="candidate-1",
+        competency_model=model,
+        turns=[turn],
+    )
+    score = InterviewScore(
+        session_id="session-1",
+        dimensions=[
+            DimensionScore(
+                dimension="项目真实性",
+                score=80.0,
+                weight=1.0,
+                evidence=[
+                    EvidenceRef(
+                        turn_id="turn-1",
+                        quote_start_ms=0,
+                        quote_end_ms=0,
+                        excerpt="a",
+                    )
+                ],
+            )
+        ],
+        total_score=80.0,
+        recommendation="yes",
+    )
+
+    with pytest.raises(ValidationError):
+        ScoringRequest(context=context, aigc_results=[])
+    with pytest.raises(ValidationError):
+        ReportBuildRequest(context=context, score=score, aigc_results=[])
 
 
 def test_evidence_ref_rejects_invalid_quote_time_ranges() -> None:

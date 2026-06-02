@@ -463,7 +463,7 @@ def test_gateway_aigc_detect_rejects_empty_turns(tmp_path: Path, monkeypatch) ->
     assert "turns" in response.text
 
 
-def test_gateway_scoring_rejects_missing_aigc_coverage(tmp_path: Path, monkeypatch) -> None:
+def test_gateway_scoring_rejects_empty_aigc_results(tmp_path: Path, monkeypatch) -> None:
     client = _client(tmp_path, monkeypatch)
     job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
     candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
@@ -481,8 +481,8 @@ def test_gateway_scoring_rejects_missing_aigc_coverage(tmp_path: Path, monkeypat
         json={"context": interview["context"], "aigc_results": []},
     )
 
-    assert response.status_code == 409
-    assert "AIGC results must cover every transcript turn" in response.text
+    assert response.status_code == 422
+    assert "aigc_results" in response.text
 
 
 def test_gateway_report_build_rejects_mismatched_inputs(
@@ -623,8 +623,8 @@ def test_gateway_report_build_rejects_mismatched_inputs(
             "aigc_results": [],
         },
     )
-    assert missing_aigc.status_code == 409
-    assert "AIGC results must cover every transcript turn" in missing_aigc.text
+    assert missing_aigc.status_code == 422
+    assert "aigc_results" in missing_aigc.text
 
     duplicate_aigc = [aigc_results[0], aigc_results[0]]
     rejected_duplicate_aigc = client.post(

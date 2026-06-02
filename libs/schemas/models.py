@@ -426,13 +426,13 @@ class AIGCDetectRequest(BaseModel):
 
 class ScoringRequest(BaseModel):
     context: InterviewContext
-    aigc_results: list[AIGCResult] = Field(default_factory=list)
+    aigc_results: list[AIGCResult] = Field(min_length=1)
 
 
 class ReportBuildRequest(BaseModel):
     context: InterviewContext
     score: InterviewScore
-    aigc_results: list[AIGCResult] = Field(default_factory=list)
+    aigc_results: list[AIGCResult] = Field(min_length=1)
 
 
 class OfflineInterviewResult(BaseModel):

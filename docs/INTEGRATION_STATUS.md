@@ -60,7 +60,8 @@ The local implementation is complete as a runnable MVP:
 - Offline scoring requires at least one candidate turn, and each DimensionScore requires at least
   one EvidenceRef.
 - Scoring requires AIGC results to cover every transcript turn and rejects duplicate or unknown
-  AIGC turn ids before producing a score.
+  AIGC turn ids before producing a score; scoring/report build request schemas reject empty AIGC
+  result batches before entering service logic.
 - Scoring evidence is re-anchored to persisted turns so fabricated excerpts or out-of-range
   timestamps from LLM drafts do not enter reports.
 - Runtime probe prompts are kept under `prompts/` and loaded by services instead of being embedded in code.
