@@ -88,6 +88,8 @@ The local implementation is complete as a runnable MVP:
   fact table.
 - Consistency fact extraction treats explicit team/other-owner statements as team scope before
   generic lead wording, so "team-led" answers still conflict with solo-ownership claims.
+- Consistency flags require two distinct transcript turns so same-turn risk markers cannot masquerade
+  as front/back consistency conflicts.
 - Consistency checks flag conflicting metric claims when two answers share a responsibility or
   technology context.
 - Structured JSON and HTML/PDF reports include highlights, radar charts, AIGC risk highlights,

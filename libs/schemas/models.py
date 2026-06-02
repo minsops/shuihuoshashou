@@ -122,6 +122,12 @@ class ConsistencyFlag(BaseModel):
     def description_is_not_blank(cls, value: str) -> str:
         return _not_blank(value, "description")
 
+    @model_validator(mode="after")
+    def turn_ids_are_distinct(self) -> "ConsistencyFlag":
+        if self.turn_id_a == self.turn_id_b:
+            raise ValueError("consistency flag turn ids must be distinct")
+        return self
+
 
 class FactClaim(BaseModel):
     turn_id: str

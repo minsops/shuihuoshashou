@@ -47,6 +47,7 @@ as a local-first Python MVP:
   rendering dependencies are missing.
 - Interview context keeps an auditable fact-claim table for role, responsibility, technology, and
   metric statements used by consistency checks, including shared-context metric conflicts.
+- Consistency flags require two distinct transcript turns so risk highlights remain traceable.
 - Scoring uses the shared LLM JSON client for structured dimension drafts and recomputes final
   totals in Python for auditability; deterministic risk signals cap affected dimensions even when
   an LLM draft returns higher scores, and deterministic risk notes are preserved in reports.

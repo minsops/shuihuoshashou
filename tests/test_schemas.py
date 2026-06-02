@@ -172,6 +172,13 @@ def test_shared_contract_models_reject_blank_identifiers() -> None:
     with pytest.raises(ValidationError):
         ConsistencyFlag(turn_id_a=" ", turn_id_b="turn-2", description="矛盾", severity="high")
     with pytest.raises(ValidationError):
+        ConsistencyFlag(
+            turn_id_a="turn-1",
+            turn_id_b="turn-1",
+            description="同一回答不能构成前后一致性冲突",
+            severity="high",
+        )
+    with pytest.raises(ValidationError):
         FactClaim(turn_id=" ")
     with pytest.raises(ValidationError):
         QATurn(turn_id=" ", question="q", answer="a")

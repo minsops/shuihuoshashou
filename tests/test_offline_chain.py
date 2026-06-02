@@ -582,22 +582,28 @@ def test_fallback_score_can_build_report_with_risk_penalties(tmp_path: Path, mon
         answer_start_ms=100,
         answer_end_ms=1200,
     )
+    follow_up = QATurn(
+        question="再讲一次成果",
+        answer="我后来又说团队对这个接口优化降低了 20%。",
+        answer_start_ms=1300,
+        answer_end_ms=1900,
+    )
     ctx = InterviewContext(
         session_id="session-fallback-score",
         job_id=model.job_id,
         candidate_id="candidate-local",
         competency_model=model,
-        turns=[turn],
+        turns=[turn, follow_up],
         flags=[
             ConsistencyFlag(
                 turn_id_a=turn.turn_id,
-                turn_id_b=turn.turn_id,
+                turn_id_b=follow_up.turn_id,
                 description="候选人对同一职责或技术的成果数字描述不一致。",
                 severity="high",
             )
         ],
     )
-    aigc_results = _aigc_results_for(turn, flagged=True)
+    aigc_results = _aigc_results_for(turn, follow_up, flagged=True)
 
     score = fallback_score_interview(ctx, aigc_results)
     report, _ = build_report(ctx, score, aigc_results)
@@ -761,17 +767,23 @@ def test_report_deduplicates_risk_highlights(tmp_path: Path, monkeypatch) -> Non
         answer_start_ms=100,
         answer_end_ms=1200,
     )
+    follow_up = QATurn(
+        question="Describe the follow-up",
+        answer="Built another FastAPI retry incident review.",
+        answer_start_ms=1300,
+        answer_end_ms=1800,
+    )
     duplicate_note = "same risk note"
     ctx = InterviewContext(
         session_id="session-risk-dedupe",
         job_id=model.job_id,
         candidate_id="candidate-local",
         competency_model=model,
-        turns=[turn],
+        turns=[turn, follow_up],
         flags=[
             ConsistencyFlag(
                 turn_id_a=turn.turn_id,
-                turn_id_b=turn.turn_id,
+                turn_id_b=follow_up.turn_id,
                 description=duplicate_note,
                 severity="high",
             )
@@ -804,7 +816,13 @@ def test_report_deduplicates_risk_highlights(tmp_path: Path, monkeypatch) -> Non
             ai_generated_prob=0.1,
             template_similarity=0.1,
             flagged=False,
-        )
+        ),
+        AIGCResult(
+            turn_id=follow_up.turn_id,
+            ai_generated_prob=0.1,
+            template_similarity=0.1,
+            flagged=False,
+        ),
     ]
 
     _, html = build_report(ctx, score, aigc)
@@ -924,16 +942,22 @@ def test_score_interview_preserves_deterministic_consistency_risk(monkeypatch) -
         answer_start_ms=100,
         answer_end_ms=1200,
     )
+    follow_up = QATurn(
+        question="复盘成果",
+        answer="我后来又说团队负责 FastAPI 接口优化，延迟降低 20%。",
+        answer_start_ms=1300,
+        answer_end_ms=1900,
+    )
     ctx = InterviewContext(
         session_id="session-local",
         job_id=model.job_id,
         candidate_id="candidate-local",
         competency_model=model,
-        turns=[turn],
+        turns=[turn, follow_up],
         flags=[
             ConsistencyFlag(
                 turn_id_a=turn.turn_id,
-                turn_id_b=turn.turn_id,
+                turn_id_b=follow_up.turn_id,
                 description="候选人对同一职责或技术的成果数字描述不一致。",
                 severity="high",
             )
@@ -968,7 +992,7 @@ def test_score_interview_preserves_deterministic_consistency_risk(monkeypatch) -
 
     monkeypatch.setattr("services.scoring_service.service.get_llm_client", lambda: FakeClient())
 
-    score = score_interview(ctx, _aigc_results_for(turn))
+    score = score_interview(ctx, _aigc_results_for(turn, follow_up))
 
     by_dimension = {dimension.dimension: dimension for dimension in score.dimensions}
     assert by_dimension["项目真实性"].score == 69.6
@@ -985,17 +1009,23 @@ def test_score_interview_merges_deterministic_and_llm_risk_notes(monkeypatch) ->
         answer_start_ms=100,
         answer_end_ms=1200,
     )
+    follow_up = QATurn(
+        question="复盘成果",
+        answer="我后来又说团队负责 FastAPI 接口优化，延迟降低 20%。",
+        answer_start_ms=1300,
+        answer_end_ms=1900,
+    )
     deterministic_note = "候选人对同一职责或技术的成果数字描述不一致。"
     ctx = InterviewContext(
         session_id="session-local",
         job_id=model.job_id,
         candidate_id="candidate-local",
         competency_model=model,
-        turns=[turn],
+        turns=[turn, follow_up],
         flags=[
             ConsistencyFlag(
                 turn_id_a=turn.turn_id,
-                turn_id_b=turn.turn_id,
+                turn_id_b=follow_up.turn_id,
                 description=deterministic_note,
                 severity="high",
             )
@@ -1030,7 +1060,7 @@ def test_score_interview_merges_deterministic_and_llm_risk_notes(monkeypatch) ->
 
     monkeypatch.setattr("services.scoring_service.service.get_llm_client", lambda: FakeClient())
 
-    score = score_interview(ctx, _aigc_results_for(turn))
+    score = score_interview(ctx, _aigc_results_for(turn, follow_up))
 
     assert score.risk_notes == [
         deterministic_note,
