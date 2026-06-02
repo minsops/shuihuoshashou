@@ -351,6 +351,23 @@ class AIGCResult(BaseModel):
         return value
 
 
+def _validate_aigc_results_cover_turns(
+    context: "InterviewContext",
+    aigc_results: list[AIGCResult],
+) -> None:
+    expected = {turn.turn_id for turn in context.turns}
+    result_ids = [item.turn_id for item in aigc_results]
+    duplicates = {turn_id for turn_id in result_ids if result_ids.count(turn_id) > 1}
+    if duplicates:
+        raise ValueError("AIGC results must not contain duplicate turn_id values")
+    unknown = set(result_ids) - expected
+    if unknown:
+        raise ValueError(f"AIGC result references unknown turn_id: {sorted(unknown)[0]}")
+    missing = expected - set(result_ids)
+    if missing:
+        raise ValueError("AIGC results must cover every transcript turn")
+
+
 class BehaviorSignal(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -537,11 +554,21 @@ class ScoringRequest(BaseModel):
     context: InterviewContext
     aigc_results: list[AIGCResult] = Field(min_length=1)
 
+    @model_validator(mode="after")
+    def aigc_results_cover_context_turns(self) -> "ScoringRequest":
+        _validate_aigc_results_cover_turns(self.context, self.aigc_results)
+        return self
+
 
 class ReportBuildRequest(BaseModel):
     context: InterviewContext
     score: InterviewScore
     aigc_results: list[AIGCResult] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def aigc_results_cover_context_turns(self) -> "ReportBuildRequest":
+        _validate_aigc_results_cover_turns(self.context, self.aigc_results)
+        return self
 
 
 class OfflineInterviewResult(BaseModel):

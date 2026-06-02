@@ -667,7 +667,7 @@ def test_gateway_report_build_rejects_mismatched_inputs(
             "aigc_results": aigc_results,
         },
     )
-    assert rejected_flag.status_code == 409
+    assert rejected_flag.status_code == 422
     assert "consistency flag references unknown turn_id" in rejected_flag.text
 
     missing_aigc = client.post(
@@ -690,7 +690,7 @@ def test_gateway_report_build_rejects_mismatched_inputs(
             "aigc_results": duplicate_aigc,
         },
     )
-    assert rejected_duplicate_aigc.status_code == 409
+    assert rejected_duplicate_aigc.status_code == 422
     assert "AIGC results must not contain duplicate turn_id values" in rejected_duplicate_aigc.text
 
     threshold_bypass_aigc = [
@@ -723,7 +723,7 @@ def test_gateway_report_build_rejects_mismatched_inputs(
             "aigc_results": mismatched_aigc,
         },
     )
-    assert rejected_aigc.status_code == 409
+    assert rejected_aigc.status_code == 422
     assert "AIGC result references unknown turn_id" in rejected_aigc.text
 
 

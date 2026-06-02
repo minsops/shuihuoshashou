@@ -523,6 +523,61 @@ def test_scoring_and_report_requests_require_aigc_results() -> None:
         ReportBuildRequest(context=context, score=score, aigc_results=[])
 
 
+def test_scoring_and_report_requests_require_aigc_turn_coverage() -> None:
+    competency = CompetencyItem(name="项目真实性", description="验证项目经历", weight=1.0)
+    model = CompetencyModel(job_id="job-1", job_title="Backend", items=[competency])
+    first_turn = QATurn(turn_id="turn-1", question="q1", answer="a1")
+    second_turn = QATurn(turn_id="turn-2", question="q2", answer="a2")
+    context = InterviewContext(
+        session_id="session-1",
+        job_id="job-1",
+        candidate_id="candidate-1",
+        competency_model=model,
+        turns=[first_turn, second_turn],
+    )
+    score = InterviewScore(
+        session_id="session-1",
+        dimensions=[
+            DimensionScore(
+                dimension="项目真实性",
+                score=80.0,
+                weight=1.0,
+                evidence=[
+                    EvidenceRef(
+                        turn_id="turn-1",
+                        quote_start_ms=0,
+                        quote_end_ms=0,
+                        excerpt="a1",
+                    )
+                ],
+            )
+        ],
+        total_score=80.0,
+        recommendation="yes",
+    )
+    first_aigc = AIGCResult(turn_id="turn-1", ai_generated_prob=0.2, template_similarity=0.1)
+    second_aigc = AIGCResult(turn_id="turn-2", ai_generated_prob=0.3, template_similarity=0.1)
+    unknown_aigc = AIGCResult(turn_id="missing-turn", ai_generated_prob=0.2, template_similarity=0.1)
+
+    scoring_request = ScoringRequest(context=context, aigc_results=[first_aigc, second_aigc])
+    report_request = ReportBuildRequest(context=context, score=score, aigc_results=[first_aigc, second_aigc])
+
+    assert scoring_request.aigc_results[1].turn_id == "turn-2"
+    assert report_request.aigc_results[0].turn_id == "turn-1"
+    with pytest.raises(ValidationError):
+        ScoringRequest(context=context, aigc_results=[first_aigc])
+    with pytest.raises(ValidationError):
+        ScoringRequest(context=context, aigc_results=[first_aigc, first_aigc])
+    with pytest.raises(ValidationError):
+        ScoringRequest(context=context, aigc_results=[first_aigc, unknown_aigc])
+    with pytest.raises(ValidationError):
+        ReportBuildRequest(context=context, score=score, aigc_results=[first_aigc])
+    with pytest.raises(ValidationError):
+        ReportBuildRequest(context=context, score=score, aigc_results=[first_aigc, first_aigc])
+    with pytest.raises(ValidationError):
+        ReportBuildRequest(context=context, score=score, aigc_results=[first_aigc, unknown_aigc])
+
+
 def test_report_requires_aigc_results_and_summary() -> None:
     evidence = EvidenceRef(
         turn_id="turn-1",
