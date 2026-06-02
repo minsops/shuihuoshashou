@@ -221,7 +221,7 @@ def init_db() -> None:
                     status IN ('CREATED', 'IN_PROGRESS', 'FINISHED', 'SCORING', 'REPORTED')
                 ),
                 context TEXT NOT NULL CHECK (json_valid(context)),
-                signal_enabled INTEGER DEFAULT 0,
+                signal_enabled INTEGER NOT NULL DEFAULT 0 CHECK (signal_enabled IN (0, 1)),
                 created_at TEXT NOT NULL,
                 started_at TEXT,
                 ended_at TEXT,
@@ -313,7 +313,7 @@ def _ensure_sqlite_columns(conn: sqlite3.Connection) -> None:
         row["name"] for row in conn.execute("PRAGMA table_info(interviews)").fetchall()
     }
     interview_columns = {
-        "signal_enabled": "INTEGER DEFAULT 0",
+        "signal_enabled": "INTEGER NOT NULL DEFAULT 0 CHECK (signal_enabled IN (0, 1))",
     }
     for column, column_type in interview_columns.items():
         if column not in existing_interviews:

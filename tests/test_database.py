@@ -134,6 +134,26 @@ def test_sqlite_interviews_enforce_status_timestamp_contract(tmp_path, monkeypat
                         ended_at,
                     ),
                 )
+        for signal_enabled in (None, 2):
+            with pytest.raises(sqlite3.IntegrityError):
+                conn.execute(
+                    """
+                    INSERT INTO interviews
+                    (id, job_id, candidate_id, status, context, signal_enabled, created_at, started_at, ended_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        f"interview-bad-signal-{signal_enabled}",
+                        "job-1",
+                        "candidate-1",
+                        "IN_PROGRESS",
+                        "{}",
+                        signal_enabled,
+                        "2026-06-02T10:00:00+00:00",
+                        "2026-06-02T10:00:00+00:00",
+                        None,
+                    ),
+                )
 
 
 def test_sqlite_text_tables_enforce_nonblank_contract(tmp_path, monkeypatch) -> None:
@@ -581,6 +601,11 @@ def test_sqlite_init_migrates_realtime_columns_and_legacy_turns(
                 started_at TEXT,
                 ended_at TEXT
             );
+            INSERT INTO interviews
+            (id, job_id, candidate_id, status, context, created_at, started_at, ended_at)
+            VALUES
+            ('interview-legacy', 'job-1', 'candidate-1', 'CREATED', '{}',
+             '2026-06-02T10:00:00+00:00', NULL, NULL);
             CREATE TABLE qa_turns (
                 id TEXT PRIMARY KEY,
                 interview_id TEXT NOT NULL,
@@ -608,10 +633,15 @@ def test_sqlite_init_migrates_realtime_columns_and_legacy_turns(
         interview_columns = {
             row["name"] for row in conn.execute("PRAGMA table_info(interviews)").fetchall()
         }
+        interview_row = conn.execute(
+            "SELECT signal_enabled FROM interviews WHERE id = ?",
+            ("interview-legacy",),
+        ).fetchone()
         turn_columns = {row["name"] for row in conn.execute("PRAGMA table_info(qa_turns)").fetchall()}
     turns = list_turns("interview-1")
 
     assert "signal_enabled" in interview_columns
+    assert interview_row["signal_enabled"] == 0
     assert "payload" in turn_columns
     assert turns[0].turn_id == "turn-1"
     assert turns[0].answer_start_ms == 10

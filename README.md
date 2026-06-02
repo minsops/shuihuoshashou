@@ -138,7 +138,8 @@ tables from the spec. The schema also applies CHECK constraints for interview st
 timestamps, question sources, score ranges, AIGC probability/similarity ranges, recommendations, and
 behavior-signal consent type. Interview status values must match their `started_at`/`ended_at`
 timestamps in shared models, the PostgreSQL core schema, and freshly initialized local SQLite
-schemas. Fresh local SQLite `qa_turns` tables also enforce the same turn-index, source, text, time
+schemas, and SQLite interview rows keep `signal_enabled` as a 0/1 boolean. Fresh local SQLite
+`qa_turns` tables also enforce the same turn-index, source, text, time
 range, and probe-target checks used by the PostgreSQL audit table. Fresh SQLite `aigc_results`
 tables enforce the same probability, template-similarity, matched-template, and flag bounds. Fresh
 SQLite `scores` tables enforce non-empty dimension arrays, score bounds, risk-note arrays, and
