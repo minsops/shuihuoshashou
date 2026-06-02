@@ -245,7 +245,8 @@ a cloud ASR endpoint. Response mapping is configurable with `ASR_TEXT_PATH`, `AS
 strings such as `partial`, `interim`, and `provisional` are treated as non-final so provisional ASR
 output does not trigger probes. ASR timestamps are normalized to non-negative millisecond ranges
 with `end_ms >= start_ms`; the shared transcript, Q&A, and scoring evidence schemas reject invalid
-timestamp ranges at API boundaries as well.
+timestamp ranges at API boundaries as well. Interview contexts and records also reject `ended_at`
+values earlier than their `started_at` timestamps.
 If the ASR provider fails or returns an invalid transcript for one frame, the WebSocket emits
 `asr_warning` with `reason=asr_transcription_failed` and keeps the interview session open for later
 frames.

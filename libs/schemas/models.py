@@ -206,6 +206,17 @@ class InterviewContext(BaseModel):
             raise ValueError("interview context turns must not contain duplicate turn_id values")
         return self
 
+    @model_validator(mode="after")
+    def ended_at_is_not_before_started_at(self) -> "InterviewContext":
+        if self.ended_at is not None:
+            try:
+                ended_before_started = self.ended_at < self.started_at
+            except TypeError as exc:
+                raise ValueError("interview context ended_at must be comparable to started_at") from exc
+            if ended_before_started:
+                raise ValueError("interview context ended_at must be greater than or equal to started_at")
+        return self
+
 
 class ProbeRequest(BaseModel):
     job_id: str
@@ -458,6 +469,17 @@ class InterviewRecord(BaseModel):
     @classmethod
     def identifiers_are_not_blank(cls, value: str, info: ValidationInfo) -> str:
         return _not_blank(value, info.field_name)
+
+    @model_validator(mode="after")
+    def ended_at_is_not_before_started_at(self) -> "InterviewRecord":
+        if self.started_at is not None and self.ended_at is not None:
+            try:
+                ended_before_started = self.ended_at < self.started_at
+            except TypeError as exc:
+                raise ValueError("interview ended_at must be comparable to started_at") from exc
+            if ended_before_started:
+                raise ValueError("interview ended_at must be greater than or equal to started_at")
+        return self
 
 
 class OfflineInterviewInput(BaseModel):

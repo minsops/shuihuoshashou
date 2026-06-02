@@ -21,6 +21,7 @@ from libs.schemas import (
     FactClaim,
     InterviewCreate,
     InterviewContext,
+    InterviewRecord,
     InterviewScore,
     JobCreate,
     OfflineTaskAccepted,
@@ -280,6 +281,47 @@ def test_interview_context_rejects_duplicate_turn_ids() -> None:
             candidate_id="candidate-1",
             competency_model=model,
             turns=[turn, turn],
+        )
+
+
+def test_interview_timestamps_must_be_monotonic() -> None:
+    started_at = datetime(2026, 6, 2, 10, 0, tzinfo=UTC)
+    competency = CompetencyItem(name="项目真实性", description="验证项目经历", weight=1.0)
+    model = CompetencyModel(job_id="job-1", job_title="Backend", items=[competency])
+    context = InterviewContext(
+        session_id="session-1",
+        job_id="job-1",
+        candidate_id="candidate-1",
+        competency_model=model,
+        started_at=started_at,
+        ended_at=started_at,
+    )
+    record = InterviewRecord(
+        job_id="job-1",
+        candidate_id="candidate-1",
+        context=context,
+        started_at=started_at,
+        ended_at=started_at,
+    )
+
+    assert context.ended_at == started_at
+    assert record.ended_at == started_at
+    with pytest.raises(ValidationError):
+        InterviewContext(
+            session_id="session-1",
+            job_id="job-1",
+            candidate_id="candidate-1",
+            competency_model=model,
+            started_at=started_at,
+            ended_at=started_at - timedelta(seconds=1),
+        )
+    with pytest.raises(ValidationError):
+        InterviewRecord(
+            job_id="job-1",
+            candidate_id="candidate-1",
+            context=context,
+            started_at=started_at,
+            ended_at=started_at - timedelta(seconds=1),
         )
 
 
