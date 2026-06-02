@@ -197,6 +197,109 @@ def test_sqlite_text_tables_enforce_nonblank_contract(tmp_path, monkeypatch) -> 
                 conn.execute(statement, params)
 
 
+def test_sqlite_json_columns_enforce_valid_json(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'json-contract.db'}")
+    get_settings.cache_clear()
+    init_db()
+
+    invalid_statements = [
+        (
+            "INSERT INTO jobs (id, title, jd_text, competency_model, created_at) VALUES (?, ?, ?, ?, ?)",
+            ("job-invalid-json", "Backend", "Python", "not-json", "2026-06-02T10:00:00+00:00"),
+        ),
+        (
+            """
+            INSERT INTO interviews
+            (id, job_id, candidate_id, status, context, signal_enabled, created_at, started_at, ended_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "interview-invalid-json",
+                "job-1",
+                "candidate-1",
+                "CREATED",
+                "not-json",
+                0,
+                "2026-06-02T10:00:00+00:00",
+                None,
+                None,
+            ),
+        ),
+        (
+            """
+            INSERT INTO qa_turns
+            (id, interview_id, turn_index, question, question_source, answer,
+             answer_start_ms, answer_end_ms, probe_target, payload)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "turn-invalid-json",
+                "interview-1",
+                0,
+                "q",
+                "interviewer",
+                "a",
+                0,
+                10,
+                None,
+                "not-json",
+            ),
+        ),
+        (
+            "INSERT INTO probe_patterns (id, job_id, competency, pattern, embedding, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                "pattern-invalid-json",
+                "job-1",
+                "项目真实性",
+                "请追问本人负责部分。",
+                "not-json",
+                "2026-06-02T10:00:00+00:00",
+            ),
+        ),
+        (
+            """
+            INSERT INTO scores
+            (interview_id, dimensions, total_score, risk_notes, recommendation, payload)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "score-invalid-payload",
+                '[{"dimension":"项目真实性"}]',
+                80.0,
+                "[]",
+                "yes",
+                "not-json",
+            ),
+        ),
+        (
+            """
+            INSERT INTO aigc_results
+            (id, interview_id, turn_id, ai_generated_prob, template_similarity,
+             matched_template, flagged, payload)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "aigc-invalid-payload",
+                "interview-1",
+                "turn-1",
+                0.2,
+                0.4,
+                None,
+                0,
+                "not-json",
+            ),
+        ),
+        (
+            "INSERT INTO reports (interview_id, payload, html) VALUES (?, ?, ?)",
+            ("report-invalid-json", "not-json", "<html>报告</html>"),
+        ),
+    ]
+    with connect() as conn:
+        for statement, params in invalid_statements:
+            with pytest.raises(sqlite3.IntegrityError):
+                conn.execute(statement, params)
+
+
 def test_sqlite_consents_enforce_core_contract(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'consent-contract.db'}")
     get_settings.cache_clear()

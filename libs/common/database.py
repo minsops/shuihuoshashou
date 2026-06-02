@@ -204,7 +204,7 @@ def init_db() -> None:
                 id TEXT PRIMARY KEY,
                 title TEXT NOT NULL CHECK (trim(title) <> ''),
                 jd_text TEXT CHECK (jd_text IS NULL OR trim(jd_text) <> ''),
-                competency_model TEXT NOT NULL,
+                competency_model TEXT NOT NULL CHECK (json_valid(competency_model)),
                 created_at TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS candidates (
@@ -220,7 +220,7 @@ def init_db() -> None:
                 status TEXT NOT NULL CHECK (
                     status IN ('CREATED', 'IN_PROGRESS', 'FINISHED', 'SCORING', 'REPORTED')
                 ),
-                context TEXT NOT NULL,
+                context TEXT NOT NULL CHECK (json_valid(context)),
                 signal_enabled INTEGER DEFAULT 0,
                 created_at TEXT NOT NULL,
                 started_at TEXT,
@@ -246,7 +246,7 @@ def init_db() -> None:
                 answer_start_ms INTEGER NOT NULL CHECK (answer_start_ms >= 0),
                 answer_end_ms INTEGER NOT NULL CHECK (answer_end_ms >= answer_start_ms),
                 probe_target TEXT CHECK (probe_target IS NULL OR trim(probe_target) <> ''),
-                payload TEXT NOT NULL,
+                payload TEXT NOT NULL CHECK (json_valid(payload)),
                 UNIQUE (interview_id, turn_index)
             );
             CREATE TABLE IF NOT EXISTS probe_patterns (
@@ -254,7 +254,7 @@ def init_db() -> None:
                 job_id TEXT NOT NULL,
                 competency TEXT NOT NULL CHECK (trim(competency) <> ''),
                 pattern TEXT NOT NULL CHECK (trim(pattern) <> ''),
-                embedding TEXT NOT NULL,
+                embedding TEXT NOT NULL CHECK (json_valid(embedding)),
                 created_at TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS scores (
@@ -271,7 +271,7 @@ def init_db() -> None:
                 recommendation TEXT NOT NULL CHECK (
                     recommendation IN ('strong_yes', 'yes', 'hold', 'no')
                 ),
-                payload TEXT NOT NULL
+                payload TEXT NOT NULL CHECK (json_valid(payload))
             );
             CREATE TABLE IF NOT EXISTS aigc_results (
                 id TEXT PRIMARY KEY,
@@ -287,11 +287,11 @@ def init_db() -> None:
                     matched_template IS NULL OR trim(matched_template) <> ''
                 ),
                 flagged INTEGER NOT NULL DEFAULT 0 CHECK (flagged IN (0, 1)),
-                payload TEXT NOT NULL
+                payload TEXT NOT NULL CHECK (json_valid(payload))
             );
             CREATE TABLE IF NOT EXISTS reports (
                 interview_id TEXT PRIMARY KEY,
-                payload TEXT NOT NULL,
+                payload TEXT NOT NULL CHECK (json_valid(payload)),
                 html TEXT NOT NULL CHECK (trim(html) <> '')
             );
             CREATE TABLE IF NOT EXISTS consents (
@@ -356,7 +356,7 @@ def _ensure_sqlite_columns(conn: sqlite3.Connection) -> None:
             job_id TEXT NOT NULL,
             competency TEXT NOT NULL CHECK (trim(competency) <> ''),
             pattern TEXT NOT NULL CHECK (trim(pattern) <> ''),
-            embedding TEXT NOT NULL,
+            embedding TEXT NOT NULL CHECK (json_valid(embedding)),
             created_at TEXT NOT NULL
         )
         """
