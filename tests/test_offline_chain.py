@@ -216,12 +216,19 @@ def test_interview_cannot_finish_without_candidate_turns(tmp_path: Path, monkeyp
     candidate = create_candidate(CandidateCreate(name="Grace"))
     interview = create_interview(InterviewCreate(job_id=job.id, candidate_id=candidate.id))
 
+    with pytest.raises(ValueError, match="cannot finish interview from status CREATED"):
+        finish_interview(interview.id)
+    with pytest.raises(ValueError, match="cannot finish interview from status CREATED"):
+        end_interview(interview.id)
+    assert get_interview(interview.id).status == InterviewStatus.created
+
+    start_interview(interview.id)
     with pytest.raises(ValueError, match="cannot finish interview without candidate turns"):
         finish_interview(interview.id)
     with pytest.raises(ValueError, match="cannot finish interview without candidate turns"):
         end_interview(interview.id)
 
-    assert get_interview(interview.id).status == InterviewStatus.created
+    assert get_interview(interview.id).status == InterviewStatus.in_progress
 
 
 def test_scoring_requires_candidate_turn_evidence() -> None:
