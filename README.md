@@ -47,7 +47,7 @@ as a local-first Python MVP:
   metric statements used by consistency checks, including shared-context metric conflicts.
 - Scoring uses the shared LLM JSON client for structured dimension drafts and recomputes final
   totals in Python for auditability; deterministic risk signals cap affected dimensions even when
-  an LLM draft returns higher scores.
+  an LLM draft returns higher scores, and deterministic risk notes are preserved in reports.
 - Scoring schemas require at least one evidence reference per dimension.
 - AIGC checks combine a local answer-template corpus with optional HTTP detector integration.
 

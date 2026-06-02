@@ -171,9 +171,18 @@ def _normalize_score(
         session_id=ctx.session_id,
         dimensions=normalized_dimensions,
         total_score=total,
-        risk_notes=draft.risk_notes or fallback.risk_notes,
+        risk_notes=_merge_risk_notes(fallback.risk_notes, draft.risk_notes),
         recommendation=_recommendation(total),
     )
+
+
+def _merge_risk_notes(fallback_notes: list[str], draft_notes: list[str]) -> list[str]:
+    merged: list[str] = []
+    for note in [*fallback_notes, *draft_notes]:
+        clean = note.strip()
+        if clean and clean not in merged:
+            merged.append(clean)
+    return merged
 
 
 def _normalize_dimension_score(

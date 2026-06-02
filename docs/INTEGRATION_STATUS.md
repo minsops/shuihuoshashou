@@ -64,6 +64,8 @@ The local implementation is complete as a runnable MVP:
   and recomputes final totals in Python.
 - Scoring caps project-authenticity and padding-risk dimensions with deterministic consistency/AIGC
   penalties so LLM drafts cannot erase risk signals.
+- Scoring merges deterministic and LLM-provided risk notes with de-duplication so report risk
+  highlights keep consistency/AIGC findings.
 - Offline scoring requires at least one candidate turn, and each DimensionScore requires at least
   one EvidenceRef.
 - Scoring requires AIGC results to cover every transcript turn and rejects duplicate or unknown
