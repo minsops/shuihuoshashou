@@ -21,6 +21,7 @@ AI 实时深挖面试官助手与反注水面试评估系统。
 - 转写片段进入编排前会拒绝空 session id 或空文本。
 - 支持从 JD 和面试问答到追问、评分、AIGC 检测、报告的端到端离线 demo。
 - 本地 demo UI 同时包含离线评估和实时 WebSocket 追问面板。
+- 实时 WebSocket 面板支持浏览器麦克风采集，并以 16k PCM `audio_chunk` 发送给后端 ASR。
 - 面试问答会同时写入 interview context 和 `qa_turns` 审计表。
 - 面试问答、评分证据摘录等共享 schema 边界会拒绝空文本。
 - AI 追问生成的问答必须带非空 `probe_target`，保证报告 transcript 保留追问目的。
@@ -184,6 +185,8 @@ curl -s http://127.0.0.1:8000/api/config/status
 - `WS /ws/interview/{id}`
 
 WebSocket `audio_chunk` 事件可以包含 `speaker`、`channel`/`audio_channel`/`track`、`is_final`、`start_ms`、`end_ms` 和 `confidence`。如果省略 `speaker`，列在 `ASR_INTERVIEWER_CHANNELS` 中的 channel 会映射为 `interviewer`，列在 `ASR_CANDIDATE_CHANNELS` 中的 channel 会映射为 `candidate`。只有 final candidate segment 会触发追问。下行事件包括 `transcript`、`probe`、`credibility`、可选 `signal`、`report`，以及 async 模式下的 `task_queued`。
+
+网页实时面板的“开始麦克风”按钮会请求浏览器麦克风权限，把候选人语音降采样为 16k 单声道 PCM16，并通过同一个 `audio_chunk` 协议发送。默认 `ASR_PROVIDER=stub` 只能验证链路；要获得真实转写，需要配置 `ASR_PROVIDER=http` 和可用的云 ASR endpoint。
 
 同一 seq 的重复 final ASR chunk 会去重，并返回 `asr_warning`，不会重复生成追问。ASR 返回 `unknown` speaker 时，session manager 会先尝试从已观察到的本地音频簇解析，再回退到短间隔连续性。`audio_chunk` 如果包含 `session_id`，必须与 WebSocket interview id 一致；不一致时返回 `asr_warning` 并跳过。
 

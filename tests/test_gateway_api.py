@@ -215,6 +215,10 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "实时追问" in response.text
     assert "/ws/interview/" in response.text
     assert "asr_warning" in response.text
+    assert "开始麦克风" in response.text
+    assert "停止麦克风" in response.text
+    assert "audio_chunk" in response.text
+    assert "pcm16" in response.text
 
 
 def test_gateway_config_status_hides_secrets(tmp_path: Path, monkeypatch) -> None:

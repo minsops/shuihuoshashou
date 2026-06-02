@@ -121,7 +121,15 @@
       .toolbar {
         display: flex;
         flex-wrap: wrap;
+        align-items: center;
         gap: 8px;
+      }
+
+      .toolbar .status {
+        min-height: 38px;
+        display: inline-flex;
+        align-items: center;
+        font-size: 13px;
       }
 
       .full-width {
@@ -330,8 +338,11 @@
             <div class="toolbar">
               <button type="submit" id="liveConnect">开始</button>
               <button class="secondary" type="button" id="sendTurn" disabled>发送回答</button>
+              <button class="secondary" type="button" id="startMic" disabled>开始麦克风</button>
+              <button class="secondary" type="button" id="stopMic" disabled>停止麦克风</button>
               <button class="secondary" type="button" id="manualProbe" disabled>手动追问</button>
               <button class="secondary" type="button" id="endLive" disabled>结束</button>
+              <span class="muted status" id="micStatus">麦克风未开启</span>
             </div>
           </form>
           <div class="feed" id="liveFeed">
@@ -350,11 +361,23 @@
       const liveStatus = document.querySelector("#liveStatus");
       const liveConnectButton = document.querySelector("#liveConnect");
       const sendTurnButton = document.querySelector("#sendTurn");
+      const startMicButton = document.querySelector("#startMic");
+      const stopMicButton = document.querySelector("#stopMic");
       const manualProbeButton = document.querySelector("#manualProbe");
       const endLiveButton = document.querySelector("#endLive");
+      const micStatus = document.querySelector("#micStatus");
       let liveSocket = null;
       let liveInterviewId = "";
       let liveSeq = 1;
+      let micStream = null;
+      let micContext = null;
+      let micSource = null;
+      let micProcessor = null;
+      let micSamples = [];
+      let micSentSamples = 0;
+      let micRecording = false;
+      const micSampleRate = 16000;
+      const micChunkSamples = micSampleRate;
 
       function escapeHtml(value) {
         return String(value)
@@ -470,6 +493,8 @@
         liveStatus.textContent = connected ? `已连接 ${liveInterviewId}` : "未连接";
         liveConnectButton.disabled = connected;
         sendTurnButton.disabled = !connected;
+        startMicButton.disabled = !connected || micRecording;
+        stopMicButton.disabled = !connected || !micRecording;
         manualProbeButton.disabled = !connected;
         endLiveButton.disabled = !connected;
       }
@@ -482,6 +507,7 @@
           appendLiveEvent("连接", "实时通道已打开。");
         });
         liveSocket.addEventListener("close", () => {
+          stopMicCapture();
           setLiveConnected(false);
           appendLiveEvent("连接", "实时通道已关闭。");
         });
@@ -512,6 +538,7 @@
         } else if (message.type === "asr_warning") {
           appendLiveEvent("ASR", escapeHtml(message.payload.reason), "risk");
         } else if (message.type === "report") {
+          stopMicCapture();
           const id = message.payload.interview_id;
           appendLiveEvent(
             "报告",
@@ -539,6 +566,137 @@
         );
       }
 
+      function downsampleBuffer(buffer, inputRate, outputRate) {
+        if (inputRate === outputRate) return buffer;
+        const ratio = inputRate / outputRate;
+        const length = Math.floor(buffer.length / ratio);
+        const result = new Float32Array(length);
+        for (let index = 0; index < length; index += 1) {
+          const sourceIndex = index * ratio;
+          const before = Math.floor(sourceIndex);
+          const after = Math.min(before + 1, buffer.length - 1);
+          const weight = sourceIndex - before;
+          result[index] = buffer[before] * (1 - weight) + buffer[after] * weight;
+        }
+        return result;
+      }
+
+      function samplesToBase64Pcm16(samples) {
+        const buffer = new ArrayBuffer(samples.length * 2);
+        const view = new DataView(buffer);
+        for (let index = 0; index < samples.length; index += 1) {
+          const sample = Math.max(-1, Math.min(1, samples[index]));
+          view.setInt16(index * 2, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+        }
+        const bytes = new Uint8Array(buffer);
+        let binary = "";
+        for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+          const chunk = bytes.subarray(offset, offset + 0x8000);
+          binary += String.fromCharCode(...chunk);
+        }
+        return btoa(binary);
+      }
+
+      function appendMicSamples(samples) {
+        for (let index = 0; index < samples.length; index += 1) {
+          micSamples.push(samples[index]);
+        }
+        while (micSamples.length >= micChunkSamples) {
+          sendMicSamples(micSamples.splice(0, micChunkSamples));
+        }
+      }
+
+      function sendMicSamples(samples) {
+        if (!liveSocket || liveSocket.readyState !== WebSocket.OPEN || samples.length === 0) return;
+        const startMs = Math.round((micSentSamples / micSampleRate) * 1000);
+        micSentSamples += samples.length;
+        const endMs = Math.round((micSentSamples / micSampleRate) * 1000);
+        liveSocket.send(
+          JSON.stringify({
+            type: "audio_chunk",
+            session_id: liveInterviewId,
+            seq: liveSeq++,
+            audio: samplesToBase64Pcm16(samples),
+            speaker: "candidate",
+            format: "pcm16",
+            sample_rate_hz: micSampleRate,
+            channels: 1,
+            start_ms: startMs,
+            end_ms: endMs,
+            is_final: true,
+            confidence: 0.95,
+          })
+        );
+      }
+
+      async function startMicCapture() {
+        if (micRecording || !liveSocket || liveSocket.readyState !== WebSocket.OPEN) return;
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          appendLiveEvent("麦克风", "当前浏览器不支持麦克风采集。", "risk");
+          return;
+        }
+        try {
+          micStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              channelCount: 1,
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+            },
+          });
+          micContext = new AudioContext();
+          micSource = micContext.createMediaStreamSource(micStream);
+          micProcessor = micContext.createScriptProcessor(4096, 1, 1);
+          micSamples = [];
+          micSentSamples = 0;
+          micRecording = true;
+          micProcessor.onaudioprocess = (event) => {
+            const input = event.inputBuffer.getChannelData(0);
+            const output = event.outputBuffer.getChannelData(0);
+            output.fill(0);
+            appendMicSamples(downsampleBuffer(input, micContext.sampleRate, micSampleRate));
+          };
+          micSource.connect(micProcessor);
+          micProcessor.connect(micContext.destination);
+          micStatus.textContent = "麦克风采集中";
+          appendLiveEvent(
+            "麦克风",
+            "已开始发送 16k PCM 音频。若仍使用本地 stub ASR，只能验证链路；真实转写需配置 ASR_PROVIDER=http。"
+          );
+          setLiveConnected(true);
+        } catch (error) {
+          micStatus.textContent = "麦克风未开启";
+          appendLiveEvent("麦克风", escapeHtml(error), "risk");
+          stopMicCapture();
+        }
+      }
+
+      function stopMicCapture() {
+        if (!micRecording && !micStream && !micContext) return;
+        if (micSamples.length > 0) {
+          sendMicSamples(micSamples.splice(0, micSamples.length));
+        }
+        micRecording = false;
+        if (micProcessor) {
+          micProcessor.disconnect();
+          micProcessor.onaudioprocess = null;
+        }
+        if (micSource) micSource.disconnect();
+        if (micStream) {
+          micStream.getTracks().forEach((track) => track.stop());
+        }
+        if (micContext && micContext.state !== "closed") {
+          micContext.close().catch(() => {});
+        }
+        micStream = null;
+        micContext = null;
+        micSource = null;
+        micProcessor = null;
+        micSamples = [];
+        micStatus.textContent = "麦克风未开启";
+        setLiveConnected(Boolean(liveSocket && liveSocket.readyState === WebSocket.OPEN));
+      }
+
       document.querySelector("#addTurn").addEventListener("click", () => addTurn());
       document.querySelector("#loadSample").addEventListener("click", loadSample);
       liveForm.addEventListener("submit", async (event) => {
@@ -556,8 +714,11 @@
         }
       });
       sendTurnButton.addEventListener("click", () => sendLiveTurn(false));
+      startMicButton.addEventListener("click", () => startMicCapture());
+      stopMicButton.addEventListener("click", () => stopMicCapture());
       manualProbeButton.addEventListener("click", () => sendLiveTurn(true));
       endLiveButton.addEventListener("click", () => {
+        stopMicCapture();
         if (liveSocket && liveSocket.readyState === WebSocket.OPEN) {
           liveSocket.send(JSON.stringify({ type: "end" }));
         }
