@@ -32,8 +32,11 @@ def test_settings_accepts_declared_production_backends() -> None:
     settings = Settings(
         llm_provider="openai_compatible",
         asr_provider="http",
+        asr_base_url="https://asr.example.com",
         speaker_diarization_provider="http",
+        speaker_diarization_base_url="https://diarize.example.com",
         aigc_detector_provider="http",
+        aigc_detector_base_url="https://aigc.example.com",
         rate_limit_backend="redis",
         offline_task_backend="celery",
         offline_task_execution="async",
@@ -48,3 +51,27 @@ def test_settings_accepts_declared_production_backends() -> None:
     assert settings.offline_task_backend == "celery"
     assert settings.offline_task_execution == "async"
     assert settings.jd_vector_backend == "pgvector"
+
+
+def test_settings_rejects_missing_provider_dependencies() -> None:
+    cases = [
+        {"asr_provider": "http", "asr_base_url": ""},
+        {
+            "speaker_diarization_provider": "http",
+            "speaker_diarization_base_url": "",
+        },
+        {"aigc_detector_provider": "http", "aigc_detector_base_url": ""},
+        {"rate_limit_backend": "redis", "redis_url": ""},
+        {"offline_task_backend": "redis_stream", "redis_url": ""},
+        {"offline_task_backend": "celery", "celery_broker_url": ""},
+        {"offline_task_backend": "celery", "celery_result_backend": ""},
+        {
+            "object_storage_endpoint": "http://minio:9000",
+            "object_storage_access_key": "access",
+            "object_storage_secret_key": "",
+        },
+    ]
+
+    for kwargs in cases:
+        with pytest.raises(ValidationError):
+            Settings(**kwargs)

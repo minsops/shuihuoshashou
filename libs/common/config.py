@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -87,6 +87,36 @@ class Settings(BaseSettings):
     report_dir: Path = Field(default=Path("data/reports"))
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    @model_validator(mode="after")
+    def runtime_dependencies_are_configured(self) -> "Settings":
+        if self.asr_provider == "http" and not self.asr_base_url.strip():
+            raise ValueError("ASR_PROVIDER=http requires ASR_BASE_URL")
+        if (
+            self.speaker_diarization_provider == "http"
+            and not self.speaker_diarization_base_url.strip()
+        ):
+            raise ValueError(
+                "SPEAKER_DIARIZATION_PROVIDER=http requires SPEAKER_DIARIZATION_BASE_URL"
+            )
+        if self.aigc_detector_provider == "http" and not self.aigc_detector_base_url.strip():
+            raise ValueError("AIGC_DETECTOR_PROVIDER=http requires AIGC_DETECTOR_BASE_URL")
+        if self.rate_limit_backend == "redis" and not self.redis_url.strip():
+            raise ValueError("RATE_LIMIT_BACKEND=redis requires REDIS_URL")
+        if self.offline_task_backend == "redis_stream" and not self.redis_url.strip():
+            raise ValueError("OFFLINE_TASK_BACKEND=redis_stream requires REDIS_URL")
+        if self.offline_task_backend == "celery":
+            if not self.celery_broker_url.strip():
+                raise ValueError("OFFLINE_TASK_BACKEND=celery requires CELERY_BROKER_URL")
+            if not self.celery_result_backend.strip():
+                raise ValueError("OFFLINE_TASK_BACKEND=celery requires CELERY_RESULT_BACKEND")
+        if self.object_storage_endpoint and bool(self.object_storage_access_key) != bool(
+            self.object_storage_secret_key
+        ):
+            raise ValueError(
+                "OBJECT_STORAGE_ACCESS_KEY and OBJECT_STORAGE_SECRET_KEY must be configured together"
+            )
+        return self
 
 
 @lru_cache

@@ -103,8 +103,9 @@ The local implementation is complete as a runnable MVP:
 - Safe runtime config and LLM smoke-test scripts.
 - Runtime config status exposes non-secret provider paths, response mapping paths, and timeouts for deployment diagnostics.
 - Runtime config status redacts database URL passwords.
-- Runtime settings validate supported provider/backend enum values and numeric threshold bounds at
-  load time, so misspelled deployment knobs fail fast instead of silently falling back.
+- Runtime settings validate supported provider/backend enum values, numeric threshold bounds, and
+  required provider/backend dependency URLs at load time, so misspelled or incomplete deployment
+  knobs fail fast instead of silently falling back.
 - Prometheus-style `/metrics` endpoint for local HTTP request counters and duration sums.
 - `/metrics` also exposes domain/task event counters, including offline scoring success and
   failure events.
