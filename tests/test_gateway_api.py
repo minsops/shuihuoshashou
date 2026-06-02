@@ -454,6 +454,15 @@ def test_gateway_exposes_internal_aigc_scoring_and_report_contracts(
     assert Path(report_payload["pdf_path"]).read_bytes().startswith(b"%PDF")
 
 
+def test_gateway_aigc_detect_rejects_empty_turns(tmp_path: Path, monkeypatch) -> None:
+    client = _client(tmp_path, monkeypatch)
+
+    response = client.post("/api/aigc/detect", json={"turns": []})
+
+    assert response.status_code == 422
+    assert "turns" in response.text
+
+
 def test_gateway_report_build_rejects_mismatched_inputs(
     tmp_path: Path, monkeypatch
 ) -> None:

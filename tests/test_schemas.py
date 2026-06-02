@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from libs.schemas import (
+    AIGCDetectRequest,
     AIGCResult,
     BehaviorSignal,
     CandidateCreate,
@@ -201,6 +202,11 @@ def test_shared_contract_models_reject_blank_identifiers() -> None:
             consistency_flags=[],
             summary="报告摘要",
         )
+
+
+def test_aigc_detect_request_requires_candidate_turns() -> None:
+    with pytest.raises(ValidationError):
+        AIGCDetectRequest(turns=[])
 
 
 def test_evidence_ref_rejects_invalid_quote_time_ranges() -> None:

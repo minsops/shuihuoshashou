@@ -421,7 +421,7 @@ class OfflineInterviewInput(BaseModel):
 
 
 class AIGCDetectRequest(BaseModel):
-    turns: list[QATurn]
+    turns: list[QATurn] = Field(min_length=1)
 
 
 class ScoringRequest(BaseModel):
