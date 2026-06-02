@@ -207,6 +207,19 @@ class InterviewContext(BaseModel):
         return self
 
     @model_validator(mode="after")
+    def fact_claims_and_flags_reference_known_turns(self) -> "InterviewContext":
+        turn_ids = {turn.turn_id for turn in self.turns}
+        for claim in self.fact_claims:
+            if claim.turn_id not in turn_ids:
+                raise ValueError(f"fact claim references unknown turn_id: {claim.turn_id}")
+        for flag in self.flags:
+            if flag.turn_id_a not in turn_ids:
+                raise ValueError(f"consistency flag references unknown turn_id: {flag.turn_id_a}")
+            if flag.turn_id_b not in turn_ids:
+                raise ValueError(f"consistency flag references unknown turn_id: {flag.turn_id_b}")
+        return self
+
+    @model_validator(mode="after")
     def ended_at_is_not_before_started_at(self) -> "InterviewContext":
         if self.ended_at is not None:
             try:

@@ -292,6 +292,74 @@ def test_interview_context_rejects_duplicate_turn_ids() -> None:
         )
 
 
+def test_interview_context_rejects_unknown_fact_claim_or_flag_turns() -> None:
+    competency = CompetencyItem(name="项目真实性", description="验证项目经历", weight=1.0)
+    model = CompetencyModel(job_id="job-1", job_title="Backend", items=[competency])
+    first_turn = QATurn(turn_id="turn-1", question="q1", answer="a1")
+    second_turn = QATurn(turn_id="turn-2", question="q2", answer="a2")
+
+    context = InterviewContext(
+        session_id="session-1",
+        job_id="job-1",
+        candidate_id="candidate-1",
+        competency_model=model,
+        turns=[first_turn, second_turn],
+        fact_claims=[FactClaim(turn_id="turn-1", technologies=["FastAPI"])],
+        flags=[
+            ConsistencyFlag(
+                turn_id_a="turn-1",
+                turn_id_b="turn-2",
+                description="前后指标不一致",
+                severity="high",
+            )
+        ],
+    )
+
+    assert context.fact_claims[0].turn_id == "turn-1"
+    assert context.flags[0].turn_id_b == "turn-2"
+    with pytest.raises(ValidationError):
+        InterviewContext(
+            session_id="session-1",
+            job_id="job-1",
+            candidate_id="candidate-1",
+            competency_model=model,
+            turns=[first_turn],
+            fact_claims=[FactClaim(turn_id="missing-turn", technologies=["FastAPI"])],
+        )
+    with pytest.raises(ValidationError):
+        InterviewContext(
+            session_id="session-1",
+            job_id="job-1",
+            candidate_id="candidate-1",
+            competency_model=model,
+            turns=[first_turn, second_turn],
+            flags=[
+                ConsistencyFlag(
+                    turn_id_a="missing-turn",
+                    turn_id_b="turn-2",
+                    description="前后指标不一致",
+                    severity="high",
+                )
+            ],
+        )
+    with pytest.raises(ValidationError):
+        InterviewContext(
+            session_id="session-1",
+            job_id="job-1",
+            candidate_id="candidate-1",
+            competency_model=model,
+            turns=[first_turn, second_turn],
+            flags=[
+                ConsistencyFlag(
+                    turn_id_a="turn-1",
+                    turn_id_b="missing-turn",
+                    description="前后指标不一致",
+                    severity="high",
+                )
+            ],
+        )
+
+
 def test_interview_timestamps_must_be_monotonic() -> None:
     started_at = datetime(2026, 6, 2, 10, 0, tzinfo=UTC)
     competency = CompetencyItem(name="项目真实性", description="验证项目经历", weight=1.0)
