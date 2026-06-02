@@ -66,6 +66,7 @@ as a local-first Python MVP:
 - AIGC checks combine a local answer-template corpus with optional HTTP detector integration.
 - AIGC detection requests reject empty turn batches and duplicate turn ids before scoring/reporting.
 - AIGC matched template names reject blank text when a template hit is recorded.
+- Offline evaluation inputs reject duplicate turn ids before building the local demo chain.
 - Interview turn writes reject duplicate turn ids so evidence, AIGC, and report references stay unambiguous.
 - Job and interview records reject nested context or competency-model identifiers that do not match
   their parent records.

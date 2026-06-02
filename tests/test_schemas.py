@@ -26,6 +26,7 @@ from libs.schemas import (
     InterviewStatus,
     JobCreate,
     JobRecord,
+    OfflineInterviewInput,
     OfflineTaskAccepted,
     ProbePatternHit,
     ProbeResponse,
@@ -267,6 +268,25 @@ def test_aigc_detect_request_requires_candidate_turns() -> None:
         AIGCDetectRequest(turns=[])
     with pytest.raises(ValidationError):
         AIGCDetectRequest(turns=[turn, turn])
+
+
+def test_offline_interview_input_rejects_duplicate_turn_ids() -> None:
+    turn = QATurn(turn_id="turn-1", question="q", answer="a")
+    payload = OfflineInterviewInput(
+        job_title="Backend",
+        jd_text="Python FastAPI",
+        candidate_name="Candidate",
+        turns=[turn],
+    )
+
+    assert payload.turns[0].turn_id == "turn-1"
+    with pytest.raises(ValidationError):
+        OfflineInterviewInput(
+            job_title="Backend",
+            jd_text="Python FastAPI",
+            candidate_name="Candidate",
+            turns=[turn, turn],
+        )
 
 
 def test_interview_context_rejects_duplicate_turn_ids() -> None:

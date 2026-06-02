@@ -552,6 +552,13 @@ class OfflineInterviewInput(BaseModel):
     def text_fields_are_not_blank(cls, value: str) -> str:
         return _not_blank(value, "offline input text")
 
+    @model_validator(mode="after")
+    def turn_ids_are_unique(self) -> "OfflineInterviewInput":
+        turn_ids = [turn.turn_id for turn in self.turns]
+        if len(turn_ids) != len(set(turn_ids)):
+            raise ValueError("offline interview turns must not contain duplicate turn_id values")
+        return self
+
 
 class AIGCDetectRequest(BaseModel):
     turns: list[QATurn] = Field(min_length=1)
