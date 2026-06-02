@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import json
 from contextlib import asynccontextmanager
 from pathlib import Path
 from time import perf_counter
@@ -674,7 +675,13 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
     try:
         record = start_interview(interview_id)
         while True:
-            event = await websocket.receive_json()
+            try:
+                event = await websocket.receive_json()
+            except json.JSONDecodeError:
+                await websocket.send_json(
+                    {"type": "error", "detail": "event payload must be valid JSON"}
+                )
+                continue
             if not isinstance(event, dict):
                 await websocket.send_json(
                     {"type": "error", "detail": "event payload must be an object"}

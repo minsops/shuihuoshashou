@@ -1197,6 +1197,34 @@ def test_gateway_websocket_rejects_non_object_event_without_closing(
     assert transcript["type"] == "transcript"
 
 
+def test_gateway_websocket_rejects_invalid_json_without_closing(
+    tmp_path: Path, monkeypatch
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+
+    with client.websocket_connect(f"/ws/interview/{interview['id']}") as websocket:
+        websocket.send_text("not-json")
+        error = websocket.receive_json()
+
+        websocket.send_json(
+            {
+                "type": "text_turn",
+                "seq": 1,
+                "answer": "我负责 FastAPI 实时通道里的 JSON 解析和恢复策略。",
+            }
+        )
+        transcript = websocket.receive_json()
+
+    assert error == {"type": "error", "detail": "event payload must be valid JSON"}
+    assert transcript["type"] == "transcript"
+
+
 def test_gateway_websocket_keeps_session_after_asr_failure(
     tmp_path: Path, monkeypatch
 ) -> None:
