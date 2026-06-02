@@ -10,7 +10,7 @@ from jinja2 import Template
 
 from libs.common.config import get_settings
 from libs.common.storage import get_artifact_store
-from libs.schemas import AIGCResult, InterviewContext, InterviewScore, Report
+from libs.schemas import AIGCResult, ConsistencyFlag, InterviewContext, InterviewScore, Report
 
 
 REPORT_TEMPLATE = Template(
@@ -70,8 +70,7 @@ REPORT_TEMPLATE = Template(
       </section>
       <section>
         <h2>风险点</h2>
-        {% for note in score.risk_notes %}<p class="risk">{{ note }}</p>{% endfor %}
-        {% for flag in flags %}<p class="risk">{{ flag.description }}</p>{% endfor %}
+        {% for note in risk_highlights %}<p class="risk">{{ note }}</p>{% endfor %}
       </section>
       <section>
         <h2>AIGC 察重</h2>
@@ -154,6 +153,15 @@ def _radar_chart_uri(score: InterviewScore) -> str:
 
     encoded = base64.b64encode(image.getvalue()).decode("ascii")
     return f"data:image/png;base64,{encoded}"
+
+
+def _risk_highlights(score: InterviewScore, flags: list[ConsistencyFlag]) -> list[str]:
+    highlights: list[str] = []
+    for note in [*score.risk_notes, *(flag.description for flag in flags)]:
+        clean = note.strip()
+        if clean and clean not in highlights:
+            highlights.append(clean)
+    return highlights
 
 
 def _write_pdf(html: str, pdf_path: Path, fallback_lines: list[str]) -> None:
@@ -249,7 +257,7 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
         summary=summary,
         strengths=_strengths(score),
         aigc_results=aigc,
-        flags=ctx.flags,
+        risk_highlights=_risk_highlights(score, ctx.flags),
         transcript=ctx.turns,
         radar_chart_uri=_radar_chart_uri(score),
     )
@@ -335,12 +343,11 @@ def _fallback_pdf_lines(
             f"evidence={evidence}"
         )
     lines.append("Risk notes:")
-    if score.risk_notes:
-        lines.extend(f"- {note}" for note in score.risk_notes)
+    risk_highlights = _risk_highlights(score, ctx.flags)
+    if risk_highlights:
+        lines.extend(f"- {note}" for note in risk_highlights)
     else:
         lines.append("- None")
-    for flag in ctx.flags:
-        lines.append(f"- Consistency {flag.severity}: {flag.description}")
     lines.append("AIGC checks:")
     for result in aigc:
         lines.append(

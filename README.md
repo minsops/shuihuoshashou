@@ -34,7 +34,7 @@ as a local-first Python MVP:
   and normalized to keep the required scoring dimensions and weights present.
 - Report artifacts write local files by default and upload to S3-compatible storage when credentials are configured.
 - Reports include structured scores, radar charts, highlights, AIGC checks, consistency flags,
-  risk highlights, recommendations, and full interview transcripts.
+  de-duplicated risk highlights, recommendations, and full interview transcripts.
 - Report building rejects mismatched score sessions, dimension names/weights, totals,
   recommendations, evidence turn ids, out-of-range evidence timestamps, non-transcript evidence
   excerpts, incomplete/duplicate AIGC coverage, unknown AIGC turn ids, or unflagged AIGC results

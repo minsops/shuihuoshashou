@@ -556,6 +556,73 @@ def test_report_pdf_fallback_contains_auditable_summary(tmp_path: Path, monkeypa
     assert b"Built FastAPI retry logic and JSON" in pdf_bytes
 
 
+def test_report_deduplicates_risk_highlights(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("REPORT_DIR", str(tmp_path / "reports"))
+    get_settings.cache_clear()
+    competency = CompetencyItem(
+        name="Backend Depth",
+        description="Backend implementation depth",
+        weight=1.0,
+    )
+    model = CompetencyModel(job_id="job-local", job_title="Backend", items=[competency])
+    turn = QATurn(
+        question="Describe the API project",
+        answer="Built FastAPI retry logic and JSON validation.",
+        answer_start_ms=100,
+        answer_end_ms=1200,
+    )
+    duplicate_note = "same risk note"
+    ctx = InterviewContext(
+        session_id="session-risk-dedupe",
+        job_id=model.job_id,
+        candidate_id="candidate-local",
+        competency_model=model,
+        turns=[turn],
+        flags=[
+            ConsistencyFlag(
+                turn_id_a=turn.turn_id,
+                turn_id_b=turn.turn_id,
+                description=duplicate_note,
+                severity="high",
+            )
+        ],
+    )
+    score = InterviewScore(
+        session_id=ctx.session_id,
+        dimensions=[
+            DimensionScore(
+                dimension=competency.name,
+                score=80.0,
+                weight=competency.weight,
+                evidence=[
+                    EvidenceRef(
+                        turn_id=turn.turn_id,
+                        quote_start_ms=turn.answer_start_ms,
+                        quote_end_ms=turn.answer_end_ms,
+                        excerpt=turn.answer,
+                    )
+                ],
+            )
+        ],
+        total_score=80.0,
+        risk_notes=[duplicate_note, "llm risk note"],
+        recommendation="yes",
+    )
+    aigc = [
+        AIGCResult(
+            turn_id=turn.turn_id,
+            ai_generated_prob=0.1,
+            template_similarity=0.1,
+            flagged=False,
+        )
+    ]
+
+    _, html = build_report(ctx, score, aigc)
+
+    assert html.count(duplicate_note) == 1
+    assert html.count("llm risk note") == 1
+
+
 def test_score_interview_normalizes_evidence_to_real_turns(monkeypatch) -> None:
     model = generate_competency_model("job-local", "Backend", "Python FastAPI")
     turn = QATurn(

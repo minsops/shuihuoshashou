@@ -87,6 +87,7 @@ The local implementation is complete as a runnable MVP:
   technology context.
 - Structured JSON and HTML/PDF reports include highlights, radar charts, AIGC risk highlights,
   recommendation, and the full interview transcript.
+- HTML/PDF report risk highlights merge score risk notes and consistency flags with de-duplication.
 - PDF generation falls back to an auditable text PDF with score, recommendation, dimension evidence,
   risk, AIGC, and transcript summary if WeasyPrint's native rendering stack is unavailable.
 - Report input validation rejects score/session mismatches, dimension or weight mismatches,
