@@ -139,7 +139,8 @@ timestamps, question sources, score ranges, AIGC probability/similarity ranges, 
 behavior-signal consent type. Interview status values must match their `started_at`/`ended_at`
 timestamps in shared models, the PostgreSQL core schema, and freshly initialized local SQLite
 schemas. Fresh local SQLite `qa_turns` tables also enforce the same turn-index, source, text, time
-range, and probe-target checks used by the PostgreSQL audit table.
+range, and probe-target checks used by the PostgreSQL audit table. Fresh SQLite `aigc_results`
+tables enforce the same probability, template-similarity, matched-template, and flag bounds.
 The runtime adapter translates the local repository parameter style and upserts for PostgreSQL.
 The default compose stack mounts only the core schema into Postgres initialization so Docker's plain
 PostgreSQL image remains runnable. Set `JD_VECTOR_BACKEND=pgvector` on PostgreSQL deployments with

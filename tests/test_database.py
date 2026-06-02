@@ -190,6 +190,54 @@ def test_sqlite_qa_turns_enforce_core_contract(tmp_path, monkeypatch) -> None:
             insert_turn(*row)
 
 
+def test_sqlite_aigc_results_enforce_core_contract(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'aigc-contract.db'}")
+    get_settings.cache_clear()
+    init_db()
+
+    def insert_aigc(
+        result_id: str,
+        ai_generated_prob: float,
+        template_similarity: float,
+        matched_template: str | None,
+        flagged: int | None = 0,
+    ) -> None:
+        with connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO aigc_results
+                (id, interview_id, turn_id, ai_generated_prob, template_similarity,
+                 matched_template, flagged, payload)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    result_id,
+                    "interview-1",
+                    "turn-1",
+                    ai_generated_prob,
+                    template_similarity,
+                    matched_template,
+                    flagged,
+                    "{}",
+                ),
+            )
+
+    insert_aigc("aigc-valid", 0.2, 0.4, None)
+
+    invalid_rows = [
+        ("aigc-negative-prob", -0.1, 0.4, None, 0),
+        ("aigc-high-prob", 1.1, 0.4, None, 0),
+        ("aigc-negative-template", 0.2, -0.1, None, 0),
+        ("aigc-high-template", 0.2, 1.1, None, 0),
+        ("aigc-blank-template", 0.2, 0.4, " ", 0),
+        ("aigc-bad-flag", 0.2, 0.4, None, 2),
+        ("aigc-null-flag", 0.2, 0.4, None, None),
+    ]
+    for row in invalid_rows:
+        with pytest.raises(sqlite3.IntegrityError):
+            insert_aigc(*row)
+
+
 def test_loads_accepts_postgres_json_values() -> None:
     payload = {"score": 88}
 

@@ -269,10 +269,16 @@ def init_db() -> None:
                 id TEXT PRIMARY KEY,
                 interview_id TEXT NOT NULL,
                 turn_id TEXT NOT NULL,
-                ai_generated_prob REAL,
-                template_similarity REAL,
-                matched_template TEXT,
-                flagged INTEGER,
+                ai_generated_prob REAL NOT NULL CHECK (
+                    ai_generated_prob >= 0 AND ai_generated_prob <= 1
+                ),
+                template_similarity REAL NOT NULL CHECK (
+                    template_similarity >= 0 AND template_similarity <= 1
+                ),
+                matched_template TEXT CHECK (
+                    matched_template IS NULL OR trim(matched_template) <> ''
+                ),
+                flagged INTEGER NOT NULL DEFAULT 0 CHECK (flagged IN (0, 1)),
                 payload TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS reports (
