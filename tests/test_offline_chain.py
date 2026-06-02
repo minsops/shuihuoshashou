@@ -59,7 +59,7 @@ from services.jd_kb_service.service import (
 from libs.common.prompts import load_prompt
 from services.probe_service.service import fallback_probe, generate_probe
 from services.report_service.service import build_report
-from services.scoring_service.service import score_interview
+from services.scoring_service.service import fallback_score_interview, score_interview
 
 
 @pytest.fixture(autouse=True)
@@ -547,6 +547,40 @@ def test_score_interview_uses_prompt_and_recomputes_total(monkeypatch) -> None:
     assert score.recommendation == "yes"
     assert all(dimension.weight != 999.0 for dimension in score.dimensions)
     assert score.risk_notes == ["LLM draft risk"]
+
+
+def test_fallback_score_can_build_report_with_risk_penalties(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("REPORT_DIR", str(tmp_path / "reports"))
+    get_settings.cache_clear()
+    model = generate_competency_model("job-local", "Backend", "Python FastAPI")
+    turn = QATurn(
+        question="讲项目",
+        answer="我负责 FastAPI 接口优化，延迟降低 30%。",
+        answer_start_ms=100,
+        answer_end_ms=1200,
+    )
+    ctx = InterviewContext(
+        session_id="session-fallback-score",
+        job_id=model.job_id,
+        candidate_id="candidate-local",
+        competency_model=model,
+        turns=[turn],
+        flags=[
+            ConsistencyFlag(
+                turn_id_a=turn.turn_id,
+                turn_id_b=turn.turn_id,
+                description="候选人对同一职责或技术的成果数字描述不一致。",
+                severity="high",
+            )
+        ],
+    )
+    aigc_results = _aigc_results_for(turn, flagged=True)
+
+    score = fallback_score_interview(ctx, aigc_results)
+    report, _ = build_report(ctx, score, aigc_results)
+
+    assert report.score.total_score == score.total_score
+    assert report.score.risk_notes
 
 
 def test_report_pdf_fallback_contains_auditable_summary(tmp_path: Path, monkeypatch) -> None:

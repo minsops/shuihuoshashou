@@ -57,11 +57,7 @@ def fallback_score_interview(
             )
         )
 
-    positive = [d for d in dimensions if d.weight > 0]
-    weight_sum = sum(d.weight for d in positive) or 1.0
-    total = sum(d.score * d.weight for d in positive) / weight_sum
-    total -= risk_penalty * 0.35
-    total = round(max(0.0, min(100.0, total)), 2)
+    total = _compute_total_score(dimensions)
     if total >= 88:
         recommendation = "strong_yes"
     elif total >= 75:
