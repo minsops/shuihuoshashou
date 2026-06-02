@@ -383,6 +383,11 @@ def _validate_report_inputs(
     turns_by_id = {turn.turn_id: turn for turn in ctx.turns}
     if not turns_by_id:
         raise ValueError("report requires at least one transcript turn")
+    for flag in ctx.flags:
+        if flag.turn_id_a not in turns_by_id:
+            raise ValueError(f"consistency flag references unknown turn_id: {flag.turn_id_a}")
+        if flag.turn_id_b not in turns_by_id:
+            raise ValueError(f"consistency flag references unknown turn_id: {flag.turn_id_b}")
     for dimension in score.dimensions:
         for evidence in dimension.evidence:
             turn = turns_by_id.get(evidence.turn_id)

@@ -91,9 +91,10 @@ The local implementation is complete as a runnable MVP:
 - PDF generation falls back to an auditable text PDF with score, recommendation, dimension evidence,
   risk, AIGC, and transcript summary if WeasyPrint's native rendering stack is unavailable.
 - Report input validation rejects score/session mismatches, dimension or weight mismatches,
-  inconsistent totals/recommendations, unknown EvidenceRef/AIGC turn ids, out-of-range evidence
-  timestamps, evidence excerpts not present in the transcript answer, and incomplete or duplicate
-  AIGC coverage; unflagged AIGC results above configured thresholds are also rejected.
+  inconsistent totals/recommendations, unknown EvidenceRef/ConsistencyFlag/AIGC turn ids,
+  out-of-range evidence timestamps, evidence excerpts not present in the transcript answer, and
+  incomplete or duplicate AIGC coverage; unflagged AIGC results above configured thresholds are
+  also rejected.
 - Report artifacts support local `file://` storage and SigV4 uploads to S3-compatible storage for
   structured report JSON, HTML, PDF, and transcript JSON outputs.
 - Gateway exposes report JSON, HTML, PDF, and transcript JSON artifact endpoints.

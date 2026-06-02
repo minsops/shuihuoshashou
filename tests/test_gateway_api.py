@@ -615,6 +615,26 @@ def test_gateway_report_build_rejects_mismatched_inputs(
     assert rejected_evidence_excerpt.status_code == 409
     assert "score evidence excerpt is not in turn answer" in rejected_evidence_excerpt.text
 
+    mismatched_flag_context = json.loads(json.dumps(interview["context"]))
+    mismatched_flag_context["flags"] = [
+        {
+            "turn_id_a": "missing-turn",
+            "turn_id_b": turns[0]["turn_id"],
+            "description": "无法追溯的一致性标记",
+            "severity": "high",
+        }
+    ]
+    rejected_flag = client.post(
+        "/api/report/build",
+        json={
+            "context": mismatched_flag_context,
+            "score": score,
+            "aigc_results": aigc_results,
+        },
+    )
+    assert rejected_flag.status_code == 409
+    assert "consistency flag references unknown turn_id" in rejected_flag.text
+
     missing_aigc = client.post(
         "/api/report/build",
         json={
