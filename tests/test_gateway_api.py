@@ -1088,6 +1088,43 @@ def test_gateway_websocket_text_turn_probe_flow(tmp_path: Path, monkeypatch) -> 
         assert credibility["type"] == "credibility"
 
 
+def test_gateway_websocket_end_error_does_not_close_session(
+    tmp_path: Path, monkeypatch
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+
+    with client.websocket_connect(f"/ws/interview/{interview['id']}") as websocket:
+        websocket.send_json({"type": "end"})
+        early_end = websocket.receive_json()
+
+        websocket.send_json(
+            {
+                "type": "text_turn",
+                "seq": 1,
+                "answer": "我负责 FastAPI 网关的实时通道、重试和异常输入处理。",
+            }
+        )
+        transcript = websocket.receive_json()
+        probe = websocket.receive_json()
+        credibility = websocket.receive_json()
+
+        websocket.send_json({"type": "end"})
+        report = websocket.receive_json()
+
+    assert early_end["type"] == "error"
+    assert "cannot finish interview without candidate turns" in early_end["detail"]
+    assert transcript["type"] == "transcript"
+    assert probe["type"] == "probe"
+    assert credibility["type"] == "credibility"
+    assert report["type"] == "report"
+
+
 def test_gateway_websocket_rejects_blank_text_turn(tmp_path: Path, monkeypatch) -> None:
     client = _client(tmp_path, monkeypatch)
     job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()

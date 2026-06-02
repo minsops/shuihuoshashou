@@ -769,7 +769,11 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                     continue
                 record = await _send_probe_for_segment(websocket, interview_id, record, segment)
             elif event.get("type") == "end":
-                result = end_interview(interview_id)
+                try:
+                    result = end_interview(interview_id)
+                except (KeyError, ValueError) as exc:
+                    await websocket.send_json({"type": "error", "detail": str(exc)})
+                    continue
                 event_type = "task_queued" if isinstance(result, OfflineTaskAccepted) else "report"
                 await websocket.send_json({"type": event_type, "payload": result.model_dump(mode="json")})
                 asr_session_manager.close(interview_id)

@@ -215,9 +215,10 @@ returned as `asr_warning` events and skipped.
 Invalid or empty `audio_chunk.audio` payloads are rejected with `asr_warning` instead of being
 converted into placeholder transcripts. Blank `text_turn.answer` values are rejected with an
 `error` event for the same reason. Non-object WebSocket JSON payloads are rejected with an `error`
-event while keeping the session open for later valid events. If audio metadata is provided, the gateway accepts only
-PCM/Opus-style formats, `sample_rate_hz=16000`, and `channels=1`; unsupported values are rejected
-before reaching ASR.
+event while keeping the session open for later valid events. Premature `end` events that fail state
+guards also return an `error` event without closing the session. If audio metadata is provided, the
+gateway accepts only PCM/Opus-style formats, `sample_rate_hz=16000`, and `channels=1`; unsupported
+values are rejected before reaching ASR.
 Tune `PROBE_MIN_ANSWER_CHARS` and `PROBE_MIN_INTERVAL_MS` to control when candidate final segments
 are eligible for probe generation. `PROBE_REQUIRE_TOPIC_MATCH` and `PROBE_TOPIC_KEYWORDS` keep
 automatic probes focused on drill-down topics such as projects, technical decisions, metrics, and
