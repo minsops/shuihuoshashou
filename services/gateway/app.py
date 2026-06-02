@@ -476,7 +476,12 @@ def api_add_turn(interview_id: str, turn: QATurn):
 
 @app.post("/api/probe")
 async def api_probe(payload: ProbeRequest):
-    return await generate_probe(payload)
+    try:
+        return await generate_probe(payload)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @app.post("/api/aigc/detect")

@@ -303,6 +303,27 @@ def test_gateway_job_probe_pattern_search(tmp_path: Path, monkeypatch) -> None:
     assert any("LLM" in item["pattern"] or "FastAPI" in item["pattern"] for item in payload)
 
 
+def test_gateway_probe_returns_404_for_unknown_job_id(tmp_path: Path, monkeypatch) -> None:
+    client = _client(tmp_path, monkeypatch)
+    job = client.post(
+        "/api/jobs",
+        json={"title": "LLM Backend", "jd_text": "Python FastAPI LLM 可靠性"},
+    ).json()
+
+    response = client.post(
+        "/api/probe",
+        json={
+            "job_id": "missing-job",
+            "competency_model": job["competency_model"],
+            "recent_turns": [],
+            "latest_answer": "我主要负责 FastAPI 编排、重试和 JSON 校验。",
+        },
+    )
+
+    assert response.status_code == 404
+    assert "job not found" in response.text
+
+
 def test_gateway_exposes_internal_aigc_scoring_and_report_contracts(
     tmp_path: Path, monkeypatch
 ) -> None:
