@@ -1104,6 +1104,34 @@ def test_gateway_websocket_rejects_blank_text_turn(tmp_path: Path, monkeypatch) 
     assert error == {"type": "error", "detail": "text_turn requires answer"}
 
 
+def test_gateway_websocket_rejects_unknown_event_type_without_closing(
+    tmp_path: Path, monkeypatch
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+
+    with client.websocket_connect(f"/ws/interview/{interview['id']}") as websocket:
+        websocket.send_json({"type": "unknown_event", "seq": 1})
+        error = websocket.receive_json()
+
+        websocket.send_json(
+            {
+                "type": "text_turn",
+                "seq": 1,
+                "answer": "我负责 FastAPI 项目里的接口编排、重试和 JSON 校验。",
+            }
+        )
+        transcript = websocket.receive_json()
+
+    assert error == {"type": "error", "detail": "unsupported event type"}
+    assert transcript["type"] == "transcript"
+
+
 def test_gateway_websocket_keeps_session_after_asr_failure(
     tmp_path: Path, monkeypatch
 ) -> None:

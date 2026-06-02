@@ -769,6 +769,8 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                 await websocket.send_json({"type": event_type, "payload": result.model_dump(mode="json")})
                 asr_session_manager.close(interview_id)
                 break
+            else:
+                await websocket.send_json({"type": "error", "detail": "unsupported event type"})
     except WebSocketDisconnect:
         asr_session_manager.close(interview_id)
         return
