@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
 from pydantic import ValidationError
 
@@ -9,6 +11,7 @@ from libs.schemas import (
     BehaviorSignal,
     CandidateCreate,
     ConsentCreate,
+    ConsentRecord,
     ConsistencyFlag,
     CredibilitySignal,
     CompetencyItem,
@@ -273,6 +276,25 @@ def test_interview_context_rejects_duplicate_turn_ids() -> None:
             candidate_id="candidate-1",
             competency_model=model,
             turns=[turn, turn],
+        )
+
+
+def test_consent_record_rejects_revocation_before_grant() -> None:
+    granted_at = datetime(2026, 6, 2, 10, 0, tzinfo=UTC)
+    record = ConsentRecord(
+        candidate_id="candidate-1",
+        granted=True,
+        granted_at=granted_at,
+        revoked_at=granted_at,
+    )
+
+    assert record.revoked_at == granted_at
+    with pytest.raises(ValidationError):
+        ConsentRecord(
+            candidate_id="candidate-1",
+            granted=True,
+            granted_at=granted_at,
+            revoked_at=granted_at - timedelta(seconds=1),
         )
 
 

@@ -420,6 +420,17 @@ class ConsentRecord(BaseModel):
     def identifiers_are_not_blank(cls, value: str, info: ValidationInfo) -> str:
         return _not_blank(value, info.field_name)
 
+    @model_validator(mode="after")
+    def revocation_time_is_not_before_grant(self) -> "ConsentRecord":
+        if self.revoked_at is not None:
+            try:
+                revoked_before_granted = self.revoked_at < self.granted_at
+            except TypeError as exc:
+                raise ValueError("revoked_at must be comparable to granted_at") from exc
+            if revoked_before_granted:
+                raise ValueError("revoked_at must be greater than or equal to granted_at")
+        return self
+
 
 class InterviewCreate(BaseModel):
     job_id: str
