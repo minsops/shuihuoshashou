@@ -20,6 +20,8 @@ The local implementation is complete as a runnable MVP:
 - Configurable HTTP cloud ASR adapter behind the `ASREngine` interface.
 - HTTP ASR responses normalize string finality flags, treat provisional labels as non-final, clamp
   confidence values, and enforce non-negative monotonic timestamp ranges.
+- ASR provider failures or invalid provider responses are downgraded to per-frame WebSocket
+  `asr_warning` events so later audio frames can continue in the same interview session.
 - Shared TranscriptSegment, QATurn, and EvidenceRef schemas reject negative or inverted timestamp ranges.
 - Shared TranscriptSegment schemas also reject blank `session_id` and transcript text so empty ASR
   output cannot enter orchestration.

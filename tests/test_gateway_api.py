@@ -12,6 +12,7 @@ from libs.common.config import get_settings
 from libs.common.events import event_bus
 from libs.common.observability import metrics_registry, reset_rate_limiters
 from libs.common.tasks import task_queue
+from libs.schemas import TranscriptSegment
 from services.asr_service.service import asr_session_manager
 from services.gateway.app import app
 
@@ -943,6 +944,83 @@ def test_gateway_websocket_rejects_blank_text_turn(tmp_path: Path, monkeypatch) 
         error = websocket.receive_json()
 
     assert error == {"type": "error", "detail": "text_turn requires answer"}
+
+
+def test_gateway_websocket_keeps_session_after_asr_failure(
+    tmp_path: Path, monkeypatch
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+
+    class FlakyASREngine:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def transcribe_chunk(
+            self,
+            session_id,
+            seq,
+            audio_b64,
+            *,
+            speaker=None,
+            start_ms=None,
+            end_ms=None,
+            is_final=True,
+            confidence=None,
+        ):
+            self.calls += 1
+            if self.calls == 1:
+                raise RuntimeError("upstream ASR unavailable")
+            return TranscriptSegment(
+                session_id=session_id,
+                speaker=speaker or "candidate",
+                text="我负责 FastAPI 项目里的接口编排、异常重试和 JSON 校验。",
+                start_ms=0,
+                end_ms=1000,
+                is_final=is_final,
+                confidence=0.8 if confidence is None else confidence,
+            )
+
+    engine = FlakyASREngine()
+    monkeypatch.setattr("services.gateway.app.get_asr_engine", lambda: engine)
+    audio = base64.b64encode(b"audio").decode("ascii")
+
+    with client.websocket_connect(f"/ws/interview/{interview['id']}") as websocket:
+        websocket.send_json(
+            {
+                "type": "audio_chunk",
+                "session_id": interview["id"],
+                "seq": 1,
+                "audio": audio,
+            }
+        )
+        warning = websocket.receive_json()
+        assert warning == {
+            "type": "asr_warning",
+            "payload": {"reason": "asr_transcription_failed", "seq": 1},
+        }
+
+        websocket.send_json(
+            {
+                "type": "audio_chunk",
+                "session_id": interview["id"],
+                "seq": 2,
+                "audio": audio,
+            }
+        )
+        transcript = websocket.receive_json()
+        probe = websocket.receive_json()
+        credibility = websocket.receive_json()
+
+    assert transcript["type"] == "transcript"
+    assert transcript["payload"]["text"] == "我负责 FastAPI 项目里的接口编排、异常重试和 JSON 校验。"
+    assert probe["type"] == "probe"
+    assert credibility["type"] == "credibility"
 
 
 def test_gateway_websocket_manual_probe_bypasses_auto_gates(

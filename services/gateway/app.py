@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from time import perf_counter
 
+import httpx
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from starlette.datastructures import Headers
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
@@ -35,7 +36,12 @@ from libs.schemas import (
     TranscriptSegment,
 )
 from services.aigc_detect_service.service import detect_interview
-from services.asr_service.service import asr_session_manager, configure_asr_runtime, get_asr_engine
+from services.asr_service.service import (
+    ASREngine,
+    asr_session_manager,
+    configure_asr_runtime,
+    get_asr_engine,
+)
 from services.interview_orchestrator.service import (
     add_turn,
     create_candidate,
@@ -273,6 +279,45 @@ def _manual_probe_segment(interview_id: str, event: dict) -> TranscriptSegment:
         is_final=True,
         confidence=float(event.get("confidence", 1.0) or 1.0),
     )
+
+
+async def _send_asr_warning(websocket: WebSocket, reason: str, seq: int) -> None:
+    await websocket.send_json({"type": "asr_warning", "payload": {"reason": reason, "seq": seq}})
+
+
+async def _transcribe_or_warn(
+    websocket: WebSocket,
+    engine: ASREngine,
+    *,
+    seq: int,
+    session_id: str,
+    audio_b64: str,
+    speaker: str | None = None,
+    start_ms: object = None,
+    end_ms: object = None,
+    is_final: bool = True,
+    confidence: object = None,
+) -> TranscriptSegment | None:
+    try:
+        return await engine.transcribe_chunk(
+            session_id=session_id,
+            seq=seq,
+            audio_b64=audio_b64,
+            speaker=speaker,
+            start_ms=start_ms,
+            end_ms=end_ms,
+            is_final=is_final,
+            confidence=confidence,
+        )
+    except (httpx.HTTPError, KeyError, RuntimeError, TypeError, ValueError) as exc:
+        log_event(
+            "asr.transcription.failed",
+            seq=seq,
+            session_id=session_id,
+            error_type=type(exc).__name__,
+        )
+        await _send_asr_warning(websocket, "asr_transcription_failed", seq)
+        return None
 
 
 def _event_speaker(event: dict) -> str | None:
@@ -566,23 +611,19 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
             if event.get("type") == "audio_chunk":
                 seq = int(event.get("seq", 0))
                 if _event_session_mismatch(interview_id, event):
-                    await websocket.send_json(
-                        {"type": "asr_warning", "payload": {"reason": "session_id_mismatch", "seq": seq}}
-                    )
+                    await _send_asr_warning(websocket, "session_id_mismatch", seq)
                     continue
                 audio_b64 = event.get("audio", "")
                 if not _valid_audio_b64(audio_b64):
-                    await websocket.send_json(
-                        {"type": "asr_warning", "payload": {"reason": "invalid_audio_base64", "seq": seq}}
-                    )
+                    await _send_asr_warning(websocket, "invalid_audio_base64", seq)
                     continue
                 contract_warning = _audio_contract_warning(event)
                 if contract_warning is not None:
-                    await websocket.send_json(
-                        {"type": "asr_warning", "payload": {"reason": contract_warning, "seq": seq}}
-                    )
+                    await _send_asr_warning(websocket, contract_warning, seq)
                     continue
-                segment = await engine.transcribe_chunk(
+                segment = await _transcribe_or_warn(
+                    websocket,
+                    engine,
                     session_id=interview_id,
                     seq=seq,
                     audio_b64=audio_b64,
@@ -592,15 +633,15 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                     is_final=_event_bool(event, "is_final", True),
                     confidence=event.get("confidence"),
                 )
+                if segment is None:
+                    continue
                 decision = asr_session_manager.accept_segment(
                     seq,
                     segment,
                     audio_b64=audio_b64,
                 )
                 if not decision.accepted or decision.segment is None:
-                    await websocket.send_json(
-                        {"type": "asr_warning", "payload": {"reason": decision.reason, "seq": seq}}
-                    )
+                    await _send_asr_warning(websocket, decision.reason, seq)
                     continue
                 segment = decision.segment
                 await websocket.send_json({"type": "transcript", "payload": segment.model_dump()})
@@ -615,21 +656,23 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                     )
                     continue
                 encoded = base64.b64encode(text.encode("utf-8")).decode("ascii")
-                segment = await engine.transcribe_chunk(
-                    interview_id,
-                    seq,
-                    encoded,
+                segment = await _transcribe_or_warn(
+                    websocket,
+                    engine,
+                    session_id=interview_id,
+                    seq=seq,
+                    audio_b64=encoded,
                     speaker=_event_speaker(event) or "candidate",
                     start_ms=event.get("start_ms"),
                     end_ms=event.get("end_ms"),
                     is_final=_event_bool(event, "is_final", True),
                     confidence=event.get("confidence"),
                 )
+                if segment is None:
+                    continue
                 decision = asr_session_manager.accept_segment(seq, segment, audio_b64=encoded)
                 if not decision.accepted or decision.segment is None:
-                    await websocket.send_json(
-                        {"type": "asr_warning", "payload": {"reason": decision.reason, "seq": seq}}
-                    )
+                    await _send_asr_warning(websocket, decision.reason, seq)
                     continue
                 segment = decision.segment
                 await websocket.send_json({"type": "transcript", "payload": segment.model_dump()})

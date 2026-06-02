@@ -227,6 +227,9 @@ strings such as `partial`, `interim`, and `provisional` are treated as non-final
 output does not trigger probes. ASR timestamps are normalized to non-negative millisecond ranges
 with `end_ms >= start_ms`; the shared transcript, Q&A, and scoring evidence schemas reject invalid
 timestamp ranges at API boundaries as well.
+If the ASR provider fails or returns an invalid transcript for one frame, the WebSocket emits
+`asr_warning` with `reason=asr_transcription_failed` and keeps the interview session open for later
+frames.
 
 Set `SPEAKER_DIARIZATION_PROVIDER=http`, `SPEAKER_DIARIZATION_BASE_URL`,
 `SPEAKER_DIARIZATION_API_PATH`, and `SPEAKER_DIARIZATION_API_KEY` to resolve unknown speakers through
