@@ -139,7 +139,7 @@ def test_gateway_report_pdf_returns_404_when_artifact_missing(
     assert "report pdf not found" in missing.text
 
 
-def test_gateway_report_transcript_returns_404_when_artifact_missing(
+def test_gateway_report_transcript_falls_back_to_persisted_payload_when_artifact_missing(
     tmp_path: Path, monkeypatch
 ) -> None:
     client = _client(tmp_path, monkeypatch)
@@ -156,10 +156,14 @@ def test_gateway_report_transcript_returns_404_when_artifact_missing(
     report = client.post(f"/api/interviews/{interview['id']}/end").json()
     Path(report["transcript_path"]).unlink()
 
-    missing = client.get(f"/api/interviews/{interview['id']}/report.transcript.json")
+    response = client.get(f"/api/interviews/{interview['id']}/report.transcript.json")
 
-    assert missing.status_code == 404
-    assert "report transcript not found" in missing.text
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/json")
+    assert response.headers["content-disposition"] == (
+        f'attachment; filename="{interview["id"]}.transcript.json"'
+    )
+    assert response.json() == report["transcript"]
 
 
 def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:

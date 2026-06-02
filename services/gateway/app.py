@@ -590,12 +590,20 @@ def api_report_transcript(interview_id: str):
     try:
         report, _ = get_report(interview_id)
         transcript_path = report.get("transcript_path")
-        if not transcript_path or not Path(transcript_path).exists():
+        if transcript_path and Path(transcript_path).exists():
+            return FileResponse(
+                transcript_path,
+                media_type="application/json",
+                filename=f"{interview_id}.transcript.json",
+            )
+        transcript = report.get("transcript")
+        if transcript is None:
             raise KeyError(f"report transcript not found: {interview_id}")
-        return FileResponse(
-            transcript_path,
-            media_type="application/json",
-            filename=f"{interview_id}.transcript.json",
+        return JSONResponse(
+            transcript,
+            headers={
+                "content-disposition": f'attachment; filename="{interview_id}.transcript.json"'
+            },
         )
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
