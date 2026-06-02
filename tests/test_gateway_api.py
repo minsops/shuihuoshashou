@@ -805,6 +805,22 @@ def test_gateway_rejects_duplicate_turn_ids(tmp_path: Path, monkeypatch) -> None
     assert "duplicate turn_id" in rejected.text
     assert first.json()["context"]["turns"][0]["answer"] == "我写了 FastAPI 编排。"
 
+    other_interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+    rejected_cross_interview = client.post(
+        f"/api/interviews/{other_interview['id']}/turns",
+        json={
+            "turn_id": "turn-duplicate",
+            "question": "另一个面试",
+            "answer": "复用同一个 turn id。",
+        },
+    )
+
+    assert rejected_cross_interview.status_code == 409
+    assert "turn_id already exists" in rejected_cross_interview.text
+
 
 def test_gateway_websocket_reports_state_errors(tmp_path: Path, monkeypatch) -> None:
     client = _client(tmp_path, monkeypatch)

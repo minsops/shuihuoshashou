@@ -214,6 +214,13 @@ def add_turn(interview_id: str, turn: QATurn) -> InterviewRecord:
         raise ValueError(f"cannot add turn to interview in status {record.status.value}")
     if any(existing_turn.turn_id == turn.turn_id for existing_turn in record.context.turns):
         raise ValueError("interview context turns must not contain duplicate turn_id values")
+    with connect() as conn:
+        existing = conn.execute(
+            "SELECT interview_id FROM qa_turns WHERE id = ?",
+            (turn.turn_id,),
+        ).fetchone()
+    if existing is not None:
+        raise ValueError("turn_id already exists")
     record.context.turns.append(turn)
     if len(record.context.fact_claims) != len(record.context.turns) - 1:
         record.context.fact_claims = [

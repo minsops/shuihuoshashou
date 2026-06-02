@@ -84,7 +84,8 @@ The local implementation is complete as a runnable MVP:
 - AIGC detection requests reject empty turn batches and duplicate turn ids so the offline
   scoring/report pipeline does not start from a no-op or ambiguous detection result.
 - Interview context persists extracted fact claims for role, responsibility, technology, and metric
-  statements, rejects duplicate turn ids, and consistency checks run against that fact table.
+  statements, rejects duplicate turn ids at write time, and consistency checks run against that
+  fact table.
 - Consistency fact extraction treats explicit team/other-owner statements as team scope before
   generic lead wording, so "team-led" answers still conflict with solo-ownership claims.
 - Consistency checks flag conflicting metric claims when two answers share a responsibility or
