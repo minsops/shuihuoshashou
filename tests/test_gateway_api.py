@@ -1201,6 +1201,60 @@ def test_gateway_websocket_manual_probe_bypasses_auto_gates(
         assert credibility["type"] == "credibility"
 
 
+def test_gateway_websocket_manual_probe_rejects_invalid_metadata_without_closing(
+    tmp_path: Path, monkeypatch
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+
+    with client.websocket_connect(f"/ws/interview/{interview['id']}") as websocket:
+        websocket.send_json(
+            {
+                "type": "manual_probe",
+                "answer": "我负责 FastAPI 编排。",
+                "start_ms": "bad",
+            }
+        )
+        bad_start = websocket.receive_json()
+
+        websocket.send_json(
+            {
+                "type": "manual_probe",
+                "answer": "我负责 FastAPI 编排。",
+                "confidence": 2,
+            }
+        )
+        bad_confidence = websocket.receive_json()
+
+        websocket.send_json(
+            {
+                "type": "manual_probe",
+                "answer": "我负责 FastAPI 编排、异常重试和 JSON 校验。",
+                "start_ms": 0,
+                "end_ms": 1000,
+                "confidence": 0.9,
+            }
+        )
+        probe = websocket.receive_json()
+        credibility = websocket.receive_json()
+
+    assert bad_start == {
+        "type": "error",
+        "detail": "manual_probe start_ms must be a non-negative integer",
+    }
+    assert bad_confidence == {
+        "type": "error",
+        "detail": "manual_probe confidence must be between 0 and 1",
+    }
+    assert probe["type"] == "probe"
+    assert credibility["type"] == "credibility"
+
+
 def test_gateway_websocket_ignores_non_final_and_interviewer_segments(
     tmp_path: Path, monkeypatch
 ) -> None:

@@ -272,15 +272,45 @@ async def _send_probe_for_segment(websocket: WebSocket, interview_id: str, recor
 
 def _manual_probe_segment(interview_id: str, event: dict) -> TranscriptSegment:
     text = str(event.get("answer") or event.get("latest_answer") or "").strip()
+    start_ms = _manual_probe_int(event, "start_ms", 0)
+    end_ms = _manual_probe_int(event, "end_ms", start_ms)
+    if end_ms < start_ms:
+        raise ValueError("manual_probe end_ms must be greater than or equal to start_ms")
     return TranscriptSegment(
         session_id=interview_id,
         speaker="candidate",
         text=text,
-        start_ms=int(event.get("start_ms", 0) or 0),
-        end_ms=int(event.get("end_ms", event.get("start_ms", 0) or 0) or 0),
+        start_ms=start_ms,
+        end_ms=end_ms,
         is_final=True,
-        confidence=float(event.get("confidence", 1.0) or 1.0),
+        confidence=_manual_probe_confidence(event),
     )
+
+
+def _manual_probe_int(event: dict, key: str, default: int) -> int:
+    value = event.get(key)
+    if value is None or value == "":
+        return default
+    try:
+        parsed = int(float(value))
+    except (TypeError, ValueError):
+        raise ValueError(f"manual_probe {key} must be a non-negative integer") from None
+    if parsed < 0:
+        raise ValueError(f"manual_probe {key} must be a non-negative integer")
+    return parsed
+
+
+def _manual_probe_confidence(event: dict) -> float:
+    value = event.get("confidence")
+    if value is None or value == "":
+        return 1.0
+    try:
+        confidence = float(value)
+    except (TypeError, ValueError):
+        raise ValueError("manual_probe confidence must be a number") from None
+    if not 0.0 <= confidence <= 1.0:
+        raise ValueError("manual_probe confidence must be between 0 and 1")
+    return confidence
 
 
 async def _send_asr_warning(websocket: WebSocket, reason: str, seq: int) -> None:
@@ -727,7 +757,11 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                         {"type": "error", "detail": "manual_probe requires answer"}
                     )
                     continue
-                segment = _manual_probe_segment(interview_id, event)
+                try:
+                    segment = _manual_probe_segment(interview_id, event)
+                except ValueError as exc:
+                    await websocket.send_json({"type": "error", "detail": str(exc)})
+                    continue
                 record = await _send_probe_for_segment(websocket, interview_id, record, segment)
             elif event.get("type") == "end":
                 result = end_interview(interview_id)
