@@ -212,6 +212,8 @@ def add_turn(interview_id: str, turn: QATurn) -> InterviewRecord:
     record = get_interview(interview_id)
     if record.status not in {InterviewStatus.created, InterviewStatus.in_progress}:
         raise ValueError(f"cannot add turn to interview in status {record.status.value}")
+    if any(existing_turn.turn_id == turn.turn_id for existing_turn in record.context.turns):
+        raise ValueError("interview context turns must not contain duplicate turn_id values")
     record.context.turns.append(turn)
     if len(record.context.fact_claims) != len(record.context.turns) - 1:
         record.context.fact_claims = [

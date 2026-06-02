@@ -774,6 +774,38 @@ def test_gateway_rejects_turns_after_report(tmp_path: Path, monkeypatch) -> None
     assert "cannot add turn" in rejected.text
 
 
+def test_gateway_rejects_duplicate_turn_ids(tmp_path: Path, monkeypatch) -> None:
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+    first = client.post(
+        f"/api/interviews/{interview['id']}/turns",
+        json={
+            "turn_id": "turn-duplicate",
+            "question": "讲项目",
+            "answer": "我写了 FastAPI 编排。",
+        },
+    )
+
+    rejected = client.post(
+        f"/api/interviews/{interview['id']}/turns",
+        json={
+            "turn_id": "turn-duplicate",
+            "question": "补充",
+            "answer": "我又写了一段不同回答。",
+        },
+    )
+
+    assert first.status_code == 200
+    assert rejected.status_code == 409
+    assert "duplicate turn_id" in rejected.text
+    assert first.json()["context"]["turns"][0]["answer"] == "我写了 FastAPI 编排。"
+
+
 def test_gateway_websocket_reports_state_errors(tmp_path: Path, monkeypatch) -> None:
     client = _client(tmp_path, monkeypatch)
     job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
