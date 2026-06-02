@@ -138,6 +138,7 @@ def _normalize_score(
 ) -> InterviewScore:
     turns_by_id = {turn.turn_id: turn for turn in ctx.turns}
     fallback_by_dimension = {dimension.dimension: dimension for dimension in fallback.dimensions}
+    deterministic_risk_present = bool(fallback.risk_notes)
     normalized_dimensions: list[DimensionScore] = []
     for item in ctx.competency_model.items:
         draft_dimension = next(
@@ -150,10 +151,16 @@ def _normalize_score(
         evidence = _normalize_evidence_refs(draft_dimension.evidence, turns_by_id)
         if not evidence:
             evidence = fallback_by_dimension[item.name].evidence
+        fallback_dimension = fallback_by_dimension[item.name]
         normalized_dimensions.append(
             DimensionScore(
                 dimension=item.name,
-                score=round(max(0.0, min(100.0, draft_dimension.score)), 2),
+                score=_normalize_dimension_score(
+                    item.name,
+                    draft_dimension,
+                    fallback_dimension,
+                    deterministic_risk_present=deterministic_risk_present,
+                ),
                 weight=item.weight,
                 evidence=evidence,
             )
@@ -167,6 +174,19 @@ def _normalize_score(
         risk_notes=draft.risk_notes or fallback.risk_notes,
         recommendation=_recommendation(total),
     )
+
+
+def _normalize_dimension_score(
+    dimension_name: str,
+    draft_dimension: DimensionScore,
+    fallback_dimension: DimensionScore,
+    *,
+    deterministic_risk_present: bool,
+) -> float:
+    score = round(max(0.0, min(100.0, draft_dimension.score)), 2)
+    if deterministic_risk_present and dimension_name in {"项目真实性", "注水风险"}:
+        score = min(score, fallback_dimension.score)
+    return score
 
 
 def _normalize_evidence_refs(

@@ -17,6 +17,7 @@ from libs.schemas import (
     CompetencyItem,
     CompetencyModel,
     ConsentCreate,
+    ConsistencyFlag,
     DimensionScore,
     EvidenceRef,
     InterviewCreate,
@@ -608,6 +609,120 @@ def test_score_interview_normalizes_evidence_to_real_turns(monkeypatch) -> None:
         assert ref.excerpt == turn.answer
         assert ref.quote_start_ms == turn.answer_start_ms
         assert ref.quote_end_ms == turn.answer_end_ms
+
+
+def test_score_interview_preserves_deterministic_consistency_risk(monkeypatch) -> None:
+    model = generate_competency_model("job-local", "Backend", "Python FastAPI")
+    turn = QATurn(
+        question="讲项目",
+        answer="我负责 FastAPI 接口优化，延迟降低 30%。",
+        answer_start_ms=100,
+        answer_end_ms=1200,
+    )
+    ctx = InterviewContext(
+        session_id="session-local",
+        job_id=model.job_id,
+        candidate_id="candidate-local",
+        competency_model=model,
+        turns=[turn],
+        flags=[
+            ConsistencyFlag(
+                turn_id_a=turn.turn_id,
+                turn_id_b=turn.turn_id,
+                description="候选人对同一职责或技术的成果数字描述不一致。",
+                severity="high",
+            )
+        ],
+    )
+    draft = InterviewScore(
+        session_id=ctx.session_id,
+        dimensions=[
+            DimensionScore(
+                dimension=item.name,
+                score=99.0,
+                weight=item.weight,
+                evidence=[
+                    EvidenceRef(
+                        turn_id=turn.turn_id,
+                        quote_start_ms=turn.answer_start_ms,
+                        quote_end_ms=turn.answer_end_ms,
+                        excerpt=turn.answer,
+                    )
+                ],
+            )
+            for item in model.items
+        ],
+        total_score=99.0,
+        risk_notes=[],
+        recommendation="strong_yes",
+    )
+
+    class FakeClient:
+        def complete_json_sync(self, messages, schema, fallback):
+            return draft
+
+    monkeypatch.setattr("services.scoring_service.service.get_llm_client", lambda: FakeClient())
+
+    score = score_interview(ctx, _aigc_results_for(turn))
+
+    by_dimension = {dimension.dimension: dimension for dimension in score.dimensions}
+    assert by_dimension["项目真实性"].score == 69.6
+    assert by_dimension["注水风险"].score == 64.0
+    assert score.total_score < 99.0
+    assert score.risk_notes == ["候选人对同一职责或技术的成果数字描述不一致。"]
+
+
+def test_score_interview_preserves_deterministic_aigc_risk(monkeypatch) -> None:
+    model = generate_competency_model("job-local", "Backend", "Python FastAPI")
+    turn = QATurn(
+        question="讲项目",
+        answer="我负责 FastAPI 接口优化，延迟降低 30%。",
+        answer_start_ms=100,
+        answer_end_ms=1200,
+    )
+    ctx = InterviewContext(
+        session_id="session-local",
+        job_id=model.job_id,
+        candidate_id="candidate-local",
+        competency_model=model,
+        turns=[turn],
+    )
+    draft = InterviewScore(
+        session_id=ctx.session_id,
+        dimensions=[
+            DimensionScore(
+                dimension=item.name,
+                score=99.0,
+                weight=item.weight,
+                evidence=[
+                    EvidenceRef(
+                        turn_id=turn.turn_id,
+                        quote_start_ms=turn.answer_start_ms,
+                        quote_end_ms=turn.answer_end_ms,
+                        excerpt=turn.answer,
+                    )
+                ],
+            )
+            for item in model.items
+        ],
+        total_score=99.0,
+        risk_notes=[],
+        recommendation="strong_yes",
+    )
+
+    class FakeClient:
+        def complete_json_sync(self, messages, schema, fallback):
+            return draft
+
+    monkeypatch.setattr("services.scoring_service.service.get_llm_client", lambda: FakeClient())
+
+    score = score_interview(ctx, _aigc_results_for(turn, flagged=True))
+
+    by_dimension = {dimension.dimension: dimension for dimension in score.dimensions}
+    assert by_dimension["项目真实性"].score == 73.8
+    assert by_dimension["注水风险"].score == 82.0
+    assert score.total_score < 99.0
+    assert score.risk_notes == ["部分回答疑似模板化或 AI 生成，需要人工复核。"]
 
 
 def test_competency_generation_uses_prompt_and_overrides_ids(monkeypatch) -> None:
