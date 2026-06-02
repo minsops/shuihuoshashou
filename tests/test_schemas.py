@@ -411,6 +411,7 @@ def test_interview_timestamps_must_be_monotonic() -> None:
         ended_at=started_at,
     )
     record = InterviewRecord(
+        id="session-1",
         job_id="job-1",
         candidate_id="candidate-1",
         status=InterviewStatus.finished,
@@ -432,6 +433,7 @@ def test_interview_timestamps_must_be_monotonic() -> None:
         )
     with pytest.raises(ValidationError):
         InterviewRecord(
+            id="session-1",
             job_id="job-1",
             candidate_id="candidate-1",
             status=InterviewStatus.finished,
@@ -454,6 +456,7 @@ def test_interview_record_status_requires_matching_timestamps() -> None:
     )
 
     in_progress = InterviewRecord(
+        id="session-1",
         job_id="job-1",
         candidate_id="candidate-1",
         status=InterviewStatus.in_progress,
@@ -461,6 +464,7 @@ def test_interview_record_status_requires_matching_timestamps() -> None:
         started_at=started_at,
     )
     reported = InterviewRecord(
+        id="session-1",
         job_id="job-1",
         candidate_id="candidate-1",
         status=InterviewStatus.reported,
@@ -473,6 +477,7 @@ def test_interview_record_status_requires_matching_timestamps() -> None:
     assert reported.ended_at == ended_at
     with pytest.raises(ValidationError):
         InterviewRecord(
+            id="session-1",
             job_id="job-1",
             candidate_id="candidate-1",
             context=context,
@@ -480,6 +485,7 @@ def test_interview_record_status_requires_matching_timestamps() -> None:
         )
     with pytest.raises(ValidationError):
         InterviewRecord(
+            id="session-1",
             job_id="job-1",
             candidate_id="candidate-1",
             status=InterviewStatus.in_progress,
@@ -487,6 +493,7 @@ def test_interview_record_status_requires_matching_timestamps() -> None:
         )
     with pytest.raises(ValidationError):
         InterviewRecord(
+            id="session-1",
             job_id="job-1",
             candidate_id="candidate-1",
             status=InterviewStatus.in_progress,
@@ -496,6 +503,7 @@ def test_interview_record_status_requires_matching_timestamps() -> None:
         )
     with pytest.raises(ValidationError):
         InterviewRecord(
+            id="session-1",
             job_id="job-1",
             candidate_id="candidate-1",
             status=InterviewStatus.finished,
@@ -515,16 +523,24 @@ def test_record_models_reject_mismatched_nested_identifiers() -> None:
     )
 
     job = JobRecord(id="job-1", title="Backend", jd_text="Python FastAPI", competency_model=model)
-    interview = InterviewRecord(job_id="job-1", candidate_id="candidate-1", context=context)
+    interview = InterviewRecord(
+        id="session-1",
+        job_id="job-1",
+        candidate_id="candidate-1",
+        context=context,
+    )
 
     assert job.competency_model.job_id == job.id
+    assert interview.context.session_id == interview.id
     assert interview.context.candidate_id == interview.candidate_id
     with pytest.raises(ValidationError):
         JobRecord(id="job-2", title="Backend", jd_text="Python FastAPI", competency_model=model)
     with pytest.raises(ValidationError):
-        InterviewRecord(job_id="job-2", candidate_id="candidate-1", context=context)
+        InterviewRecord(id="session-2", job_id="job-1", candidate_id="candidate-1", context=context)
     with pytest.raises(ValidationError):
-        InterviewRecord(job_id="job-1", candidate_id="candidate-2", context=context)
+        InterviewRecord(id="session-1", job_id="job-2", candidate_id="candidate-1", context=context)
+    with pytest.raises(ValidationError):
+        InterviewRecord(id="session-1", job_id="job-1", candidate_id="candidate-2", context=context)
 
 
 def test_consent_record_rejects_revocation_before_grant() -> None:

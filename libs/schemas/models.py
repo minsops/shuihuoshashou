@@ -529,6 +529,8 @@ class InterviewRecord(BaseModel):
 
     @model_validator(mode="after")
     def context_identifiers_match_record(self) -> "InterviewRecord":
+        if self.context.session_id != self.id:
+            raise ValueError("interview context session_id must match interview id")
         if self.context.job_id != self.job_id:
             raise ValueError("interview context job_id must match interview job_id")
         if self.context.candidate_id != self.candidate_id:

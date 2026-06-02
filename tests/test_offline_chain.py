@@ -1469,6 +1469,7 @@ def test_should_probe_uses_configurable_thresholds(monkeypatch) -> None:
     get_settings.cache_clear()
     model = generate_competency_model("job-local", "Backend", "Python 服务端岗位")
     record = InterviewRecord(
+        id="session-local",
         job_id=model.job_id,
         candidate_id="candidate-local",
         context=InterviewContext(
@@ -1503,6 +1504,7 @@ def test_should_probe_requires_drill_down_topic_by_default(monkeypatch) -> None:
     get_settings.cache_clear()
     model = generate_competency_model("job-local", "Backend", "Python 服务端岗位")
     record = InterviewRecord(
+        id="session-local",
         job_id=model.job_id,
         candidate_id="candidate-local",
         context=InterviewContext(

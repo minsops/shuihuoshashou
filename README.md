@@ -72,7 +72,7 @@ as a local-first Python MVP:
 - Offline evaluation inputs reject duplicate turn ids before building the local demo chain.
 - Interview turn writes reject duplicate turn ids so evidence, AIGC, and report references stay unambiguous.
 - Job and interview records reject nested context or competency-model identifiers that do not match
-  their parent records.
+  their parent records, including interview session ids.
 
 ## Important Secret Handling
 
