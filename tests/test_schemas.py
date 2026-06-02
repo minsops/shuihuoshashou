@@ -23,6 +23,7 @@ from libs.schemas import (
     InterviewContext,
     InterviewRecord,
     InterviewScore,
+    InterviewStatus,
     JobCreate,
     OfflineTaskAccepted,
     ProbePatternHit,
@@ -299,6 +300,7 @@ def test_interview_timestamps_must_be_monotonic() -> None:
     record = InterviewRecord(
         job_id="job-1",
         candidate_id="candidate-1",
+        status=InterviewStatus.finished,
         context=context,
         started_at=started_at,
         ended_at=started_at,
@@ -319,9 +321,73 @@ def test_interview_timestamps_must_be_monotonic() -> None:
         InterviewRecord(
             job_id="job-1",
             candidate_id="candidate-1",
+            status=InterviewStatus.finished,
             context=context,
             started_at=started_at,
             ended_at=started_at - timedelta(seconds=1),
+        )
+
+
+def test_interview_record_status_requires_matching_timestamps() -> None:
+    started_at = datetime(2026, 6, 2, 10, 0, tzinfo=UTC)
+    ended_at = started_at + timedelta(minutes=30)
+    competency = CompetencyItem(name="项目真实性", description="验证项目经历", weight=1.0)
+    model = CompetencyModel(job_id="job-1", job_title="Backend", items=[competency])
+    context = InterviewContext(
+        session_id="session-1",
+        job_id="job-1",
+        candidate_id="candidate-1",
+        competency_model=model,
+    )
+
+    in_progress = InterviewRecord(
+        job_id="job-1",
+        candidate_id="candidate-1",
+        status=InterviewStatus.in_progress,
+        context=context,
+        started_at=started_at,
+    )
+    reported = InterviewRecord(
+        job_id="job-1",
+        candidate_id="candidate-1",
+        status=InterviewStatus.reported,
+        context=context,
+        started_at=started_at,
+        ended_at=ended_at,
+    )
+
+    assert in_progress.ended_at is None
+    assert reported.ended_at == ended_at
+    with pytest.raises(ValidationError):
+        InterviewRecord(
+            job_id="job-1",
+            candidate_id="candidate-1",
+            context=context,
+            started_at=started_at,
+        )
+    with pytest.raises(ValidationError):
+        InterviewRecord(
+            job_id="job-1",
+            candidate_id="candidate-1",
+            status=InterviewStatus.in_progress,
+            context=context,
+        )
+    with pytest.raises(ValidationError):
+        InterviewRecord(
+            job_id="job-1",
+            candidate_id="candidate-1",
+            status=InterviewStatus.in_progress,
+            context=context,
+            started_at=started_at,
+            ended_at=ended_at,
+        )
+    with pytest.raises(ValidationError):
+        InterviewRecord(
+            job_id="job-1",
+            candidate_id="candidate-1",
+            status=InterviewStatus.finished,
+            context=context,
+            started_at=started_at,
         )
 
 

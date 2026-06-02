@@ -165,5 +165,8 @@ def test_postgres_schema_enforces_core_contract_invariants() -> None:
         "template_similarity >= 0 AND template_similarity <= 1",
         "consent_type IN ('behavior_signal')",
         "revoked_at IS NULL OR revoked_at >= granted_at",
+        "status = 'CREATED' AND started_at IS NULL AND ended_at IS NULL",
+        "status = 'IN_PROGRESS' AND started_at IS NOT NULL AND ended_at IS NULL",
+        "status IN ('FINISHED', 'SCORING', 'REPORTED')",
     ]:
         assert constraint in schema

@@ -25,7 +25,16 @@ CREATE TABLE IF NOT EXISTS interviews (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     started_at TIMESTAMPTZ,
     ended_at TIMESTAMPTZ,
-    CHECK (ended_at IS NULL OR started_at IS NULL OR ended_at >= started_at)
+    CHECK (ended_at IS NULL OR started_at IS NULL OR ended_at >= started_at),
+    CHECK (
+        (status = 'CREATED' AND started_at IS NULL AND ended_at IS NULL)
+        OR (status = 'IN_PROGRESS' AND started_at IS NOT NULL AND ended_at IS NULL)
+        OR (
+            status IN ('FINISHED', 'SCORING', 'REPORTED')
+            AND started_at IS NOT NULL
+            AND ended_at IS NOT NULL
+        )
+    )
 );
 
 CREATE TABLE IF NOT EXISTS qa_turns (

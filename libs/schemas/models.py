@@ -481,6 +481,20 @@ class InterviewRecord(BaseModel):
                 raise ValueError("interview ended_at must be greater than or equal to started_at")
         return self
 
+    @model_validator(mode="after")
+    def timestamps_match_status(self) -> "InterviewRecord":
+        if self.status == InterviewStatus.created:
+            if self.started_at is not None or self.ended_at is not None:
+                raise ValueError("CREATED interviews must not have started_at or ended_at")
+        elif self.status == InterviewStatus.in_progress:
+            if self.started_at is None:
+                raise ValueError("IN_PROGRESS interviews must include started_at")
+            if self.ended_at is not None:
+                raise ValueError("IN_PROGRESS interviews must not include ended_at")
+        elif self.started_at is None or self.ended_at is None:
+            raise ValueError(f"{self.status.value} interviews must include started_at and ended_at")
+        return self
+
 
 class OfflineInterviewInput(BaseModel):
     job_title: str
