@@ -157,6 +157,14 @@ class QATurn(BaseModel):
             raise ValueError("answer_end_ms must be greater than or equal to answer_start_ms")
         return self
 
+    @model_validator(mode="after")
+    def probe_target_matches_question_source(self) -> "QATurn":
+        if self.probe_target is not None and not self.probe_target.strip():
+            raise ValueError("probe_target must not be blank")
+        if self.question_source == "ai_probe" and not self.probe_target:
+            raise ValueError("ai_probe turns must include probe_target")
+        return self
+
     @field_validator("turn_id")
     @classmethod
     def turn_id_is_not_blank(cls, value: str) -> str:

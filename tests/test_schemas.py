@@ -109,10 +109,22 @@ def test_qa_turn_rejects_invalid_answer_time_ranges() -> None:
 
 
 def test_qa_turn_rejects_blank_question_or_answer() -> None:
+    probe_turn = QATurn(
+        question="追问",
+        question_source="ai_probe",
+        answer="回答",
+        probe_target="验证项目真实性",
+    )
+
+    assert probe_turn.probe_target == "验证项目真实性"
     with pytest.raises(ValidationError):
         QATurn(question=" ", answer="a")
     with pytest.raises(ValidationError):
         QATurn(question="q", answer=" ")
+    with pytest.raises(ValidationError):
+        QATurn(question="q", answer="a", probe_target=" ")
+    with pytest.raises(ValidationError):
+        QATurn(question="q", question_source="ai_probe", answer="a")
 
 
 def test_job_candidate_and_competency_payloads_reject_blank_required_text() -> None:
