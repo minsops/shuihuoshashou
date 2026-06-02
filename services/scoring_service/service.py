@@ -27,6 +27,7 @@ def fallback_score_interview(
     aigc_results: list[AIGCResult],
 ) -> InterviewScore:
     _ensure_scoreable_context(ctx)
+    _ensure_aigc_coverage(ctx, aigc_results)
     risk_penalty = 0.0
     risk_notes: list[str] = []
     if ctx.flags:
@@ -80,6 +81,7 @@ def fallback_score_interview(
 
 def score_interview(ctx: InterviewContext, aigc_results: list[AIGCResult]) -> InterviewScore:
     _ensure_scoreable_context(ctx)
+    _ensure_aigc_coverage(ctx, aigc_results)
     fallback = fallback_score_interview(ctx, aigc_results)
     messages = [
         LLMMessage(role="system", content=load_prompt("scoring_system.md")),
@@ -112,6 +114,21 @@ def _scoring_payload(ctx: InterviewContext, aigc_results: list[AIGCResult]) -> s
 def _ensure_scoreable_context(ctx: InterviewContext) -> None:
     if not ctx.turns:
         raise ValueError("cannot score interview without candidate turns")
+
+
+def _ensure_aigc_coverage(ctx: InterviewContext, aigc_results: list[AIGCResult]) -> None:
+    turn_ids = [turn.turn_id for turn in ctx.turns]
+    expected = set(turn_ids)
+    result_ids = [item.turn_id for item in aigc_results]
+    duplicates = {turn_id for turn_id in result_ids if result_ids.count(turn_id) > 1}
+    if duplicates:
+        raise ValueError("AIGC results must not contain duplicate turn_id values")
+    unknown = set(result_ids) - expected
+    if unknown:
+        raise ValueError(f"AIGC result references unknown turn_id: {sorted(unknown)[0]}")
+    missing = expected - set(result_ids)
+    if missing:
+        raise ValueError("AIGC results must cover every transcript turn")
 
 
 def _normalize_score(

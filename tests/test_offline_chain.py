@@ -64,6 +64,18 @@ def clear_settings_cache_between_tests():
     get_settings.cache_clear()
 
 
+def _aigc_results_for(*turns: QATurn, flagged: bool = False) -> list[AIGCResult]:
+    return [
+        AIGCResult(
+            turn_id=turn.turn_id,
+            ai_generated_prob=0.7 if flagged else 0.2,
+            template_similarity=0.5 if flagged else 0.1,
+            flagged=flagged,
+        )
+        for turn in turns
+    ]
+
+
 def test_offline_interview_chain(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'test.db'}")
     monkeypatch.setenv("REPORT_DIR", str(tmp_path / "reports"))
@@ -204,6 +216,28 @@ def test_scoring_requires_candidate_turn_evidence() -> None:
 
     with pytest.raises(ValueError, match="cannot score interview without candidate turns"):
         score_interview(ctx, [])
+
+
+def test_scoring_requires_aigc_results_for_every_turn() -> None:
+    model = generate_competency_model("job-local", "Backend", "Python FastAPI")
+    turn = QATurn(question="讲项目", answer="我写了 FastAPI 编排。")
+    ctx = InterviewContext(
+        session_id="session-local",
+        job_id=model.job_id,
+        candidate_id="candidate-local",
+        competency_model=model,
+        turns=[turn],
+    )
+
+    with pytest.raises(ValueError, match="AIGC results must cover every transcript turn"):
+        score_interview(ctx, [])
+    with pytest.raises(ValueError, match="AIGC results must not contain duplicate"):
+        score_interview(ctx, [*_aigc_results_for(turn), *_aigc_results_for(turn)])
+    with pytest.raises(ValueError, match="AIGC result references unknown turn_id"):
+        score_interview(
+            ctx,
+            [AIGCResult(turn_id="missing-turn", ai_generated_prob=0.2, template_similarity=0.1)],
+        )
 
 
 def test_interview_requires_existing_candidate(tmp_path: Path, monkeypatch) -> None:
@@ -440,7 +474,7 @@ def test_score_interview_uses_prompt_and_recomputes_total(monkeypatch) -> None:
 
     monkeypatch.setattr("services.scoring_service.service.get_llm_client", lambda: FakeClient())
 
-    score = score_interview(ctx, [])
+    score = score_interview(ctx, _aigc_results_for(turn))
 
     assert sent_messages[0].role == "system"
     assert sent_messages[0].content == load_prompt("scoring_system.md")
@@ -566,7 +600,7 @@ def test_score_interview_normalizes_evidence_to_real_turns(monkeypatch) -> None:
 
     monkeypatch.setattr("services.scoring_service.service.get_llm_client", lambda: FakeClient())
 
-    score = score_interview(ctx, [])
+    score = score_interview(ctx, _aigc_results_for(turn))
 
     for dimension in score.dimensions:
         assert dimension.evidence

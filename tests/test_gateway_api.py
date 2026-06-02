@@ -463,6 +463,28 @@ def test_gateway_aigc_detect_rejects_empty_turns(tmp_path: Path, monkeypatch) ->
     assert "turns" in response.text
 
 
+def test_gateway_scoring_rejects_missing_aigc_coverage(tmp_path: Path, monkeypatch) -> None:
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+    interview = client.post(
+        f"/api/interviews/{interview['id']}/turns",
+        json={"question": "讲项目", "answer": "我写了 FastAPI 编排。"},
+    ).json()
+
+    response = client.post(
+        "/api/scoring/score",
+        json={"context": interview["context"], "aigc_results": []},
+    )
+
+    assert response.status_code == 409
+    assert "AIGC results must cover every transcript turn" in response.text
+
+
 def test_gateway_report_build_rejects_mismatched_inputs(
     tmp_path: Path, monkeypatch
 ) -> None:
