@@ -217,12 +217,24 @@ def init_db() -> None:
                 id TEXT PRIMARY KEY,
                 job_id TEXT NOT NULL,
                 candidate_id TEXT NOT NULL,
-                status TEXT NOT NULL,
+                status TEXT NOT NULL CHECK (
+                    status IN ('CREATED', 'IN_PROGRESS', 'FINISHED', 'SCORING', 'REPORTED')
+                ),
                 context TEXT NOT NULL,
                 signal_enabled INTEGER DEFAULT 0,
                 created_at TEXT NOT NULL,
                 started_at TEXT,
-                ended_at TEXT
+                ended_at TEXT,
+                CHECK (ended_at IS NULL OR started_at IS NULL OR ended_at >= started_at),
+                CHECK (
+                    (status = 'CREATED' AND started_at IS NULL AND ended_at IS NULL)
+                    OR (status = 'IN_PROGRESS' AND started_at IS NOT NULL AND ended_at IS NULL)
+                    OR (
+                        status IN ('FINISHED', 'SCORING', 'REPORTED')
+                        AND started_at IS NOT NULL
+                        AND ended_at IS NOT NULL
+                    )
+                )
             );
             CREATE TABLE IF NOT EXISTS qa_turns (
                 id TEXT PRIMARY KEY,

@@ -137,7 +137,8 @@ candidates, interviews, turns, probe-pattern embeddings, scores, AIGC results, r
 tables from the spec. The schema also applies CHECK constraints for interview states, turn
 timestamps, question sources, score ranges, AIGC probability/similarity ranges, recommendations, and
 behavior-signal consent type. Interview status values must match their `started_at`/`ended_at`
-timestamps in both shared models and the PostgreSQL core schema.
+timestamps in shared models, the PostgreSQL core schema, and freshly initialized local SQLite
+schemas.
 The runtime adapter translates the local repository parameter style and upserts for PostgreSQL.
 The default compose stack mounts only the core schema into Postgres initialization so Docker's plain
 PostgreSQL image remains runnable. Set `JD_VECTOR_BACKEND=pgvector` on PostgreSQL deployments with

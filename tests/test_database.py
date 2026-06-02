@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import builtins
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -80,6 +81,59 @@ def test_consent_queries_use_parameterized_boolean_comparison() -> None:
 
     assert "granted = 1" not in source
     assert "granted = ?" in source
+
+
+def test_sqlite_interviews_enforce_status_timestamp_contract(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'state-contract.db'}")
+    get_settings.cache_clear()
+    init_db()
+
+    with connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO interviews
+            (id, job_id, candidate_id, status, context, signal_enabled, created_at, started_at, ended_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "interview-valid",
+                "job-1",
+                "candidate-1",
+                "IN_PROGRESS",
+                "{}",
+                0,
+                "2026-06-02T10:00:00+00:00",
+                "2026-06-02T10:00:00+00:00",
+                None,
+            ),
+        )
+        invalid_rows = [
+            ("interview-bad-status", "ARCHIVED", None, None),
+            ("interview-created-started", "CREATED", "2026-06-02T10:00:00+00:00", None),
+            ("interview-progress-ended", "IN_PROGRESS", "2026-06-02T10:00:00+00:00", "2026-06-02T10:30:00+00:00"),
+            ("interview-finished-open", "FINISHED", "2026-06-02T10:00:00+00:00", None),
+            ("interview-backwards", "FINISHED", "2026-06-02T10:30:00+00:00", "2026-06-02T10:00:00+00:00"),
+        ]
+        for interview_id, status, started_at, ended_at in invalid_rows:
+            with pytest.raises(sqlite3.IntegrityError):
+                conn.execute(
+                    """
+                    INSERT INTO interviews
+                    (id, job_id, candidate_id, status, context, signal_enabled, created_at, started_at, ended_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        interview_id,
+                        "job-1",
+                        "candidate-1",
+                        status,
+                        "{}",
+                        0,
+                        "2026-06-02T10:00:00+00:00",
+                        started_at,
+                        ended_at,
+                    ),
+                )
 
 
 def test_loads_accepts_postgres_json_values() -> None:
