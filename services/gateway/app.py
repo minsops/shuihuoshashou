@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
 from contextlib import asynccontextmanager
@@ -426,6 +427,23 @@ def _event_bool(event: dict, key: str, default: bool) -> bool:
     return bool(value)
 
 
+def _event_timestamp_bounds(event: dict, seq: int) -> tuple[int, int]:
+    start_ms = _event_int(event, "start_ms")
+    end_ms = _event_int(event, "end_ms")
+    start = max(0, start_ms if start_ms is not None else seq * 1000)
+    end = end_ms if end_ms is not None else start + 900
+    return start, max(start, end)
+
+
+def _event_confidence(event: dict, default: float) -> float:
+    value = event.get("confidence", default)
+    try:
+        confidence = float(value)
+    except (TypeError, ValueError):
+        return default
+    return max(0.0, min(1.0, confidence))
+
+
 def _valid_audio_b64(value: object) -> bool:
     if not isinstance(value, str) or not value.strip():
         return False
@@ -701,6 +719,52 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
         return
     await websocket.accept()
     engine = get_asr_engine()
+    aliyun_session = None
+    aliyun_reader_task: asyncio.Task[None] | None = None
+    aliyun_result_seq = 1
+
+    async def ensure_aliyun_session():
+        nonlocal aliyun_session, aliyun_reader_task
+        if settings.asr_provider != "aliyun_ws":
+            return None
+        if aliyun_session is not None and not getattr(aliyun_session, "finished", False):
+            return aliyun_session
+        try:
+            aliyun_session = await engine.get_or_create_session(interview_id)  # type: ignore[attr-defined]
+        except Exception:
+            await _send_asr_warning(websocket, "aliyun_asr_connect_failed", 0)
+            return None
+        aliyun_reader_task = asyncio.create_task(_aliyun_result_reader())
+        return aliyun_session
+
+    async def _aliyun_result_reader() -> None:
+        nonlocal record, aliyun_result_seq
+        if aliyun_session is None:
+            return
+        while True:
+            item = await aliyun_session.result_queue.get()
+            if item is None:
+                if aliyun_session.error_reason:
+                    await _send_asr_warning(websocket, aliyun_session.error_reason, aliyun_result_seq)
+                return
+            seq = aliyun_result_seq
+            aliyun_result_seq += 1
+            decision = asr_session_manager.accept_segment(seq, item)
+            if not decision.accepted or decision.segment is None:
+                await _send_asr_warning(websocket, decision.reason, seq)
+                continue
+            segment = decision.segment
+            await websocket.send_json({"type": "transcript", "payload": segment.model_dump()})
+            if should_probe(segment, record):
+                record = await _send_probe_for_segment(
+                    websocket,
+                    interview_id,
+                    record,
+                    segment,
+                    question="实时语音片段",
+                    question_source="interviewer",
+                )
+
     try:
         record = start_interview(interview_id)
         while True:
@@ -736,6 +800,15 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                 contract_warning = _audio_contract_warning(event)
                 if contract_warning is not None:
                     await _send_asr_warning(websocket, contract_warning, seq)
+                    continue
+                if settings.asr_provider == "aliyun_ws":
+                    session = await ensure_aliyun_session()
+                    if session is None:
+                        continue
+                    try:
+                        await session.send_audio(base64.b64decode(audio_b64))
+                    except Exception:
+                        await _send_asr_warning(websocket, "aliyun_asr_disconnected", seq)
                     continue
                 segment = await _transcribe_or_warn(
                     websocket,
@@ -783,20 +856,32 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                     )
                     continue
                 encoded = base64.b64encode(text.encode("utf-8")).decode("ascii")
-                segment = await _transcribe_or_warn(
-                    websocket,
-                    engine,
-                    session_id=interview_id,
-                    seq=seq,
-                    audio_b64=encoded,
-                    speaker=_event_speaker(event) or "candidate",
-                    start_ms=event.get("start_ms"),
-                    end_ms=event.get("end_ms"),
-                    is_final=_event_bool(event, "is_final", True),
-                    confidence=event.get("confidence"),
-                )
-                if segment is None:
-                    continue
+                if settings.asr_provider == "aliyun_ws":
+                    start_ms, end_ms = _event_timestamp_bounds(event, seq)
+                    segment = TranscriptSegment(
+                        session_id=interview_id,
+                        speaker=_event_speaker(event) or "candidate",
+                        text=text,
+                        start_ms=start_ms,
+                        end_ms=end_ms,
+                        is_final=_event_bool(event, "is_final", True),
+                        confidence=_event_confidence(event, 1.0),
+                    )
+                else:
+                    segment = await _transcribe_or_warn(
+                        websocket,
+                        engine,
+                        session_id=interview_id,
+                        seq=seq,
+                        audio_b64=encoded,
+                        speaker=_event_speaker(event) or "candidate",
+                        start_ms=event.get("start_ms"),
+                        end_ms=event.get("end_ms"),
+                        is_final=_event_bool(event, "is_final", True),
+                        confidence=event.get("confidence"),
+                    )
+                    if segment is None:
+                        continue
                 decision = asr_session_manager.accept_segment(seq, segment, audio_b64=encoded)
                 if not decision.accepted or decision.segment is None:
                     await _send_asr_warning(websocket, decision.reason, seq)
@@ -835,7 +920,11 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                 )
             elif event.get("type") == "end":
                 try:
-                    result = end_interview(interview_id)
+                    if aliyun_session is not None:
+                        await aliyun_session.close()
+                    if aliyun_reader_task is not None:
+                        await aliyun_reader_task
+                    result = await asyncio.to_thread(end_interview, interview_id)
                 except (KeyError, ValueError) as exc:
                     await websocket.send_json({"type": "error", "detail": str(exc)})
                     continue
@@ -846,11 +935,17 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
             else:
                 await websocket.send_json({"type": "error", "detail": "unsupported event type"})
     except WebSocketDisconnect:
+        if aliyun_session is not None:
+            await aliyun_session.close()
         asr_session_manager.close(interview_id)
         return
     except KeyError as exc:
+        if aliyun_session is not None:
+            await aliyun_session.close()
         asr_session_manager.close(interview_id)
         await websocket.send_json({"type": "error", "detail": str(exc)})
     except ValueError as exc:
+        if aliyun_session is not None:
+            await aliyun_session.close()
         asr_session_manager.close(interview_id)
         await websocket.send_json({"type": "error", "detail": str(exc)})

@@ -35,6 +35,12 @@ class RuntimeStatus(BaseModel):
     asr_confidence_path: str
     asr_timeout_seconds: int
     asr_channel_diarization_configured: bool
+    aliyun_asr_api_key_configured: bool
+    aliyun_asr_model: str
+    aliyun_asr_endpoint_configured: bool
+    aliyun_asr_sample_rate: int
+    aliyun_asr_format: str
+    aliyun_asr_language_hints_configured: bool
     probe_min_answer_chars: int
     probe_min_interval_ms: int
     probe_require_topic_match: bool
@@ -104,6 +110,12 @@ def get_runtime_status() -> RuntimeStatus:
         asr_channel_diarization_configured=bool(
             settings.asr_interviewer_channels and settings.asr_candidate_channels
         ),
+        aliyun_asr_api_key_configured=bool(settings.aliyun_asr_api_key),
+        aliyun_asr_model=settings.aliyun_asr_model,
+        aliyun_asr_endpoint_configured=bool(settings.aliyun_asr_endpoint),
+        aliyun_asr_sample_rate=settings.aliyun_asr_sample_rate,
+        aliyun_asr_format=settings.aliyun_asr_format,
+        aliyun_asr_language_hints_configured=bool(settings.aliyun_asr_language_hints.strip()),
         probe_min_answer_chars=settings.probe_min_answer_chars,
         probe_min_interval_ms=settings.probe_min_interval_ms,
         probe_require_topic_match=settings.probe_require_topic_match,

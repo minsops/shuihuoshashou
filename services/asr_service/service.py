@@ -433,6 +433,10 @@ def _audio_fingerprint(audio_b64: str | None) -> str | None:
 
 def get_asr_engine() -> ASREngine:
     settings = get_settings()
+    if settings.asr_provider == "aliyun_ws":
+        from services.asr_service.aliyun_engine import AliyunWSASREngine
+
+        return AliyunWSASREngine()
     if settings.asr_provider == "http":
         return HTTPASREngine()
     return StubASREngine()

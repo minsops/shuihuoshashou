@@ -53,9 +53,19 @@ def test_settings_accepts_declared_production_backends() -> None:
     assert settings.jd_vector_backend == "pgvector"
 
 
+def test_settings_accepts_aliyun_ws_asr_provider() -> None:
+    settings = Settings(asr_provider="aliyun_ws", aliyun_asr_api_key="dashscope-secret")
+
+    assert settings.asr_provider == "aliyun_ws"
+    assert settings.aliyun_asr_model == "paraformer-realtime-v2"
+    assert settings.aliyun_asr_sample_rate == 16000
+    assert settings.aliyun_asr_format == "pcm"
+
+
 def test_settings_rejects_missing_provider_dependencies() -> None:
     cases = [
         {"asr_provider": "http", "asr_base_url": ""},
+        {"asr_provider": "aliyun_ws", "aliyun_asr_api_key": ""},
         {
             "speaker_diarization_provider": "http",
             "speaker_diarization_base_url": "",

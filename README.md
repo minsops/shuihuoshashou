@@ -186,7 +186,7 @@ curl -s http://127.0.0.1:8000/api/config/status
 
 WebSocket `audio_chunk` 事件可以包含 `speaker`、`channel`/`audio_channel`/`track`、`is_final`、`start_ms`、`end_ms` 和 `confidence`。如果省略 `speaker`，列在 `ASR_INTERVIEWER_CHANNELS` 中的 channel 会映射为 `interviewer`，列在 `ASR_CANDIDATE_CHANNELS` 中的 channel 会映射为 `candidate`。只有 final candidate segment 会触发追问。下行事件包括 `transcript`、`probe`、`credibility`、可选 `signal`、`report`，以及 async 模式下的 `task_queued`。
 
-网页实时面板的“开始麦克风”按钮会请求浏览器麦克风权限，把候选人语音降采样为 16k 单声道 PCM16，并通过同一个 `audio_chunk` 协议发送。默认 `ASR_PROVIDER=stub` 只能验证链路；要获得真实转写，需要配置 `ASR_PROVIDER=http` 和可用的云 ASR endpoint。
+网页实时面板的“开始麦克风”按钮会请求浏览器麦克风权限，把候选人语音降采样为 16k 单声道 PCM16，并通过同一个 `audio_chunk` 协议发送。默认 `ASR_PROVIDER=stub` 只能验证链路；要获得真实转写，可配置 `ASR_PROVIDER=http` 对接普通 HTTP ASR endpoint，或配置 `ASR_PROVIDER=aliyun_ws` 对接阿里云 Paraformer 实时 WebSocket ASR。
 
 同一 seq 的重复 final ASR chunk 会去重，并返回 `asr_warning`，不会重复生成追问。ASR 返回 `unknown` speaker 时，session manager 会先尝试从已观察到的本地音频簇解析，再回退到短间隔连续性。`audio_chunk` 如果包含 `session_id`，必须与 WebSocket interview id 一致；不一致时返回 `asr_warning` 并跳过。
 
@@ -195,6 +195,12 @@ WebSocket `audio_chunk` 事件可以包含 `speaker`、`channel`/`audio_channel`
 通过 `PROBE_MIN_ANSWER_CHARS` 和 `PROBE_MIN_INTERVAL_MS` 控制 candidate final segment 何时有资格触发追问。`PROBE_REQUIRE_TOPIC_MATCH` 和 `PROBE_TOPIC_KEYWORDS` 用于让自动追问聚焦在项目、技术决策、指标、事故等可下钻主题。发送 WebSocket `manual_probe` 事件并带 `answer`，可模拟面试官点击“立即追问”；manual probe 会绕过自动长度、主题和间隔 gate。
 
 设置 `ASR_PROVIDER=http`、`ASR_BASE_URL`、`ASR_API_PATH` 和 `ASR_API_KEY` 后，音频 chunk 会转发给云 ASR endpoint。响应映射可通过 `ASR_TEXT_PATH`、`ASR_SPEAKER_PATH`、`ASR_START_MS_PATH`、`ASR_END_MS_PATH`、`ASR_IS_FINAL_PATH` 和 `ASR_CONFIDENCE_PATH` 配置。`partial`、`interim`、`provisional` 等 finality 字符串会被视为非 final，避免临时 ASR 输出触发追问。ASR 时间戳会归一化为非负毫秒区间，并满足 `end_ms >= start_ms`；共享 transcript、Q&A 和 scoring evidence schema 也会在 API 边界拒绝非法时间区间。Interview context 和 record 也拒绝早于 `started_at` 的 `ended_at`。
+
+设置 `ASR_PROVIDER=aliyun_ws` 和 `ALIYUN_ASR_API_KEY` 后，gateway 会为每场面试建立一个阿里云 DashScope Paraformer 实时 ASR WebSocket 会话。浏览器音频帧会以二进制 PCM 持续发送，阿里云 `result-generated` 事件会异步转换为 `transcript` 下行事件。默认模型为 `ALIYUN_ASR_MODEL=paraformer-realtime-v2`，endpoint 为 `wss://dashscope.aliyuncs.com/api-ws/v1/inference`。Paraformer 实时接口不返回说话人分离结果，因此 `speaker=unknown` 会继续走本地声纹/短间隔连续性解析。真实 key 冒烟检查：
+
+```bash
+ALIYUN_ASR_API_KEY=your-dashscope-key python scripts/check_aliyun_asr.py --pcm-path /path/to/sample_16k_mono.pcm
+```
 
 如果 ASR provider 对某一帧失败或返回非法 transcript，WebSocket 会发送 `asr_warning`，`reason=asr_transcription_failed`，并保持面试会话打开，后续帧仍可继续处理。
 

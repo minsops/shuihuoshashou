@@ -248,6 +248,12 @@ def test_gateway_config_status_hides_secrets(tmp_path: Path, monkeypatch) -> Non
     assert payload["asr_confidence_path"] == "confidence"
     assert payload["asr_timeout_seconds"] == 30
     assert payload["asr_channel_diarization_configured"] is True
+    assert payload["aliyun_asr_api_key_configured"] is False
+    assert payload["aliyun_asr_model"] == "paraformer-realtime-v2"
+    assert payload["aliyun_asr_endpoint_configured"] is True
+    assert payload["aliyun_asr_sample_rate"] == 16000
+    assert payload["aliyun_asr_format"] == "pcm"
+    assert payload["aliyun_asr_language_hints_configured"] is True
     assert payload["probe_min_answer_chars"] == 20
     assert payload["probe_min_interval_ms"] == 1000
     assert payload["probe_require_topic_match"] is True
@@ -1208,6 +1214,37 @@ def test_gateway_websocket_text_turn_probe_flow(tmp_path: Path, monkeypatch) -> 
         )
         assert report["payload"]["transcript"][0]["question_source"] == "ai_probe"
         assert report["payload"]["transcript"][0]["probe_target"] == "验证项目真实性"
+
+
+def test_gateway_text_turn_works_with_aliyun_ws_provider(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("ASR_PROVIDER", "aliyun_ws")
+    monkeypatch.setenv("ALIYUN_ASR_API_KEY", "dashscope-secret")
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+
+    with client.websocket_connect(f"/ws/interview/{interview['id']}") as websocket:
+        websocket.send_json(
+            {
+                "type": "text_turn",
+                "seq": 1,
+                "question": "请说明你在 FastAPI 网关里亲自负责的模块。",
+                "answer": "我主要负责优化，做了很多事情，效果比较好。",
+            }
+        )
+        transcript = websocket.receive_json()
+        probe = websocket.receive_json()
+        credibility = websocket.receive_json()
+
+        assert transcript["type"] == "transcript"
+        assert transcript["payload"]["text"] == "我主要负责优化，做了很多事情，效果比较好。"
+        assert transcript["payload"]["speaker"] == "candidate"
+        assert probe["type"] == "probe"
+        assert credibility["type"] == "credibility"
 
 
 def test_gateway_websocket_end_error_does_not_close_session(

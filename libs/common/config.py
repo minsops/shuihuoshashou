@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     llm_max_retries: int = Field(default=1, ge=0)
     llm_rate_limit_enabled: bool = False
     llm_rate_limit_requests_per_minute: int = Field(default=60, ge=0)
-    asr_provider: Literal["stub", "http"] = "stub"
+    asr_provider: Literal["stub", "http", "aliyun_ws"] = "stub"
     asr_base_url: str = ""
     asr_api_path: str = "/transcribe"
     asr_api_key: str = ""
@@ -40,6 +40,12 @@ class Settings(BaseSettings):
     asr_timeout_seconds: int = Field(default=30, gt=0)
     asr_interviewer_channels: str = "0,left,interviewer"
     asr_candidate_channels: str = "1,right,candidate"
+    aliyun_asr_api_key: str = ""
+    aliyun_asr_model: str = "paraformer-realtime-v2"
+    aliyun_asr_sample_rate: int = Field(default=16000, gt=0)
+    aliyun_asr_format: str = "pcm"
+    aliyun_asr_language_hints: str = "zh,en"
+    aliyun_asr_endpoint: str = "wss://dashscope.aliyuncs.com/api-ws/v1/inference"
     probe_min_answer_chars: int = Field(default=20, ge=0)
     probe_min_interval_ms: int = Field(default=1000, ge=0)
     probe_require_topic_match: bool = True
@@ -92,6 +98,8 @@ class Settings(BaseSettings):
     def runtime_dependencies_are_configured(self) -> "Settings":
         if self.asr_provider == "http" and not self.asr_base_url.strip():
             raise ValueError("ASR_PROVIDER=http requires ASR_BASE_URL")
+        if self.asr_provider == "aliyun_ws" and not self.aliyun_asr_api_key.strip():
+            raise ValueError("ASR_PROVIDER=aliyun_ws requires ALIYUN_ASR_API_KEY")
         if (
             self.speaker_diarization_provider == "http"
             and not self.speaker_diarization_base_url.strip()
