@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from libs.common.config import Settings
+from scripts.create_aliyun_nls_token import create_token_from_env
 from services.asr_service.nls_engine import AliyunNLSSession
 
 DEFAULT_PCM_PATH = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "sample_16k_mono.pcm"
@@ -19,8 +20,15 @@ async def _run(pcm_path: Path, *, allow_empty_result: bool = False) -> int:
         print("ALIYUN_NLS_APP_KEY is required.", file=sys.stderr)
         return 2
     if not token:
-        print("ALIYUN_NLS_TOKEN is required.", file=sys.stderr)
-        return 2
+        created_token = create_token_from_env()
+        if created_token is None:
+            print(
+                "ALIYUN_NLS_TOKEN is required, or set ALIYUN_AK_ID and ALIYUN_AK_SECRET "
+                "to create one automatically.",
+                file=sys.stderr,
+            )
+            return 2
+        token = created_token.id
     if not pcm_path.exists():
         print(f"PCM file not found: {pcm_path}", file=sys.stderr)
         return 2

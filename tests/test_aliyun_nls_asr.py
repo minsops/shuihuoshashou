@@ -3,10 +3,13 @@ from __future__ import annotations
 import asyncio
 import json
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 from libs.common.config import Settings
 from libs.schemas import TranscriptSegment
+from scripts import create_aliyun_nls_token
 from scripts import check_aliyun_nls_asr
+from scripts.create_aliyun_nls_token import AliyunNLSToken
 from services.asr_service.nls_engine import AliyunNLSSession
 
 
@@ -186,3 +189,100 @@ def test_check_aliyun_nls_asr_smoke_script_requires_token(
     exit_code = asyncio.run(check_aliyun_nls_asr._run(pcm_path))
 
     assert exit_code == 2
+
+
+def test_check_aliyun_nls_asr_smoke_script_can_create_token_from_ak(
+    tmp_path: Path, monkeypatch
+) -> None:
+    pcm_path = tmp_path / "sample.pcm"
+    pcm_path.write_bytes(b"\x00" * 3200)
+    monkeypatch.setenv("ALIYUN_NLS_APP_KEY", "nls-app-key")
+    monkeypatch.setenv("ALIYUN_NLS_TOKEN", "")
+    monkeypatch.setenv("ALIYUN_AK_ID", "ak-id")
+    monkeypatch.setenv("ALIYUN_AK_SECRET", "ak-secret")
+    monkeypatch.setattr(
+        check_aliyun_nls_asr,
+        "create_token_from_env",
+        lambda: AliyunNLSToken(id="created-token", expire_time=1700000000),
+    )
+
+    class FakeSmokeSession:
+        instances: list["FakeSmokeSession"] = []
+
+        def __init__(self, session_id: str, *, settings: Settings) -> None:
+            self.session_id = session_id
+            self.settings = settings
+            self.result_queue: asyncio.Queue[TranscriptSegment | None] = asyncio.Queue()
+            FakeSmokeSession.instances.append(self)
+
+        async def connect(self) -> None:
+            return None
+
+        async def send_audio(self, pcm_bytes: bytes) -> None:
+            return None
+
+        async def close(self) -> None:
+            await self.result_queue.put(
+                TranscriptSegment(
+                    session_id=self.session_id,
+                    speaker="unknown",
+                    text="自动 Token 测试",
+                    start_ms=0,
+                    end_ms=1000,
+                    is_final=True,
+                    confidence=0.92,
+                )
+            )
+
+    monkeypatch.setattr(check_aliyun_nls_asr, "AliyunNLSSession", FakeSmokeSession)
+
+    exit_code = asyncio.run(check_aliyun_nls_asr._run(pcm_path))
+
+    assert exit_code == 0
+    assert FakeSmokeSession.instances[0].settings.aliyun_nls_token == "created-token"
+
+
+def test_create_aliyun_nls_token_builds_signed_request(monkeypatch) -> None:
+    calls: dict[str, str | float] = {}
+
+    class FakeResponse:
+        def __enter__(self) -> "FakeResponse":
+            return self
+
+        def __exit__(self, *args) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return json.dumps(
+                {
+                    "Token": {
+                        "Id": "nls-token-id",
+                        "ExpireTime": 1700000000,
+                        "UserId": "123",
+                    }
+                }
+            ).encode("utf-8")
+
+    def fake_urlopen(url: str, *, timeout: float) -> FakeResponse:
+        calls["url"] = url
+        calls["timeout"] = timeout
+        return FakeResponse()
+
+    monkeypatch.setattr(create_aliyun_nls_token, "urlopen", fake_urlopen)
+
+    token = create_aliyun_nls_token.create_token(
+        "ak-id",
+        "ak-secret",
+        endpoint="https://example.aliyun.com/",
+        timeout=3,
+    )
+
+    assert token.id == "nls-token-id"
+    assert token.expire_time == 1700000000
+    assert calls["timeout"] == 3
+    query = parse_qs(urlparse(str(calls["url"])).query)
+    assert query["Action"] == ["CreateToken"]
+    assert query["Version"] == ["2019-02-28"]
+    assert query["RegionId"] == ["cn-shanghai"]
+    assert query["SignatureMethod"] == ["HMAC-SHA1"]
+    assert "Signature" in query
