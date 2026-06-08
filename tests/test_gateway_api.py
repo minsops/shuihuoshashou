@@ -1330,6 +1330,103 @@ def test_gateway_aliyun_ws_audio_chunk_reads_async_results(
     assert credibility["type"] == "credibility"
 
 
+def test_gateway_aliyun_ws_matches_async_result_to_audio_context(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("ASR_PROVIDER", "aliyun_ws")
+    monkeypatch.setenv("ALIYUN_ASR_API_KEY", "dashscope-secret")
+
+    class DelayedAliyunSession:
+        def __init__(self, session_id: str) -> None:
+            self.session_id = session_id
+            self.finished = False
+            self.error_reason = ""
+            self.sent_audio: list[bytes] = []
+            self.result_queue: asyncio.Queue[TranscriptSegment | None] = asyncio.Queue()
+
+        async def send_audio(self, pcm_bytes: bytes) -> None:
+            self.sent_audio.append(pcm_bytes)
+            if len(self.sent_audio) == 2:
+                await self.result_queue.put(
+                    TranscriptSegment(
+                        session_id=self.session_id,
+                        speaker="unknown",
+                        text="我负责 FastAPI 网关、异常重试和 JSON 校验。",
+                        start_ms=120,
+                        end_ms=980,
+                        is_final=True,
+                        confidence=0.92,
+                    )
+                )
+
+        async def close(self) -> None:
+            self.finished = True
+            await self.result_queue.put(None)
+
+    class FakeAliyunEngine:
+        def __init__(self) -> None:
+            self.session: DelayedAliyunSession | None = None
+
+        async def get_or_create_session(self, session_id: str) -> DelayedAliyunSession:
+            if self.session is None or self.session.finished:
+                self.session = DelayedAliyunSession(session_id)
+            return self.session
+
+        async def close_session(self, session_id: str) -> None:
+            if self.session is not None and self.session.session_id == session_id:
+                await self.session.close()
+
+    engine = FakeAliyunEngine()
+    monkeypatch.setattr("services.gateway.app.get_asr_engine", lambda: engine)
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+
+    with client.websocket_connect(f"/ws/interview/{interview['id']}") as websocket:
+        websocket.send_json(
+            {
+                "type": "audio_chunk",
+                "session_id": interview["id"],
+                "seq": 1,
+                "audio": base64.b64encode(b"candidate-audio").decode("ascii"),
+                "speaker": "candidate",
+                "format": "pcm16",
+                "sample_rate_hz": 16000,
+                "channels": 1,
+                "start_ms": 0,
+                "end_ms": 1000,
+            }
+        )
+        websocket.send_json(
+            {
+                "type": "audio_chunk",
+                "session_id": interview["id"],
+                "seq": 2,
+                "audio": base64.b64encode(b"interviewer-audio").decode("ascii"),
+                "speaker": "interviewer",
+                "format": "pcm16",
+                "sample_rate_hz": 16000,
+                "channels": 1,
+                "start_ms": 1000,
+                "end_ms": 2000,
+            }
+        )
+        transcript = websocket.receive_json()
+        probe = websocket.receive_json()
+        credibility = websocket.receive_json()
+
+    assert engine.session is not None
+    assert engine.session.sent_audio == [b"candidate-audio", b"interviewer-audio"]
+    assert transcript["type"] == "transcript"
+    assert transcript["payload"]["speaker"] == "candidate"
+    assert probe["type"] == "probe"
+    assert credibility["type"] == "credibility"
+
+
 def test_gateway_aliyun_ws_start_failure_surfaces_reason(
     tmp_path: Path, monkeypatch
 ) -> None:

@@ -4,6 +4,7 @@ import asyncio
 import base64
 import json
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
 
@@ -92,6 +93,7 @@ FALSE_FINALITY_VALUES = {
     "provisional",
 }
 TRUE_FINALITY_VALUES = {"1", "true", "yes", "on", "final", "finalized", "complete", "completed"}
+ALIYUN_AUDIO_CONTEXT_LIMIT = 200
 
 
 class _LockedWebSocketSender:
@@ -102,6 +104,18 @@ class _LockedWebSocketSender:
     async def send_json(self, payload: dict) -> None:
         async with self._lock:
             await self._websocket.send_json(payload)
+
+
+@dataclass(frozen=True)
+class _AliyunAudioContext:
+    seq: int
+    start_ms: int
+    end_ms: int
+    audio_b64: str
+    speaker_hint: str | None
+    question: str
+    question_source: str
+    probe_target: str | None
 
 
 @asynccontextmanager
@@ -357,6 +371,24 @@ def _event_probe_target(event: dict) -> str | None:
 def _aliyun_warning_reason(exc: Exception) -> str:
     reason = str(exc).strip()
     return reason if reason.startswith("aliyun_asr_") else "aliyun_asr_connect_failed"
+
+
+def _select_aliyun_audio_context(
+    contexts: list[_AliyunAudioContext],
+    segment: TranscriptSegment,
+) -> _AliyunAudioContext | None:
+    if not contexts:
+        return None
+
+    def score(context: _AliyunAudioContext) -> tuple[int, int, int]:
+        overlap = min(context.end_ms, segment.end_ms) - max(context.start_ms, segment.start_ms)
+        if overlap >= 0:
+            return (2, overlap, context.seq)
+        if context.end_ms <= segment.start_ms:
+            return (1, -abs(segment.start_ms - context.end_ms), context.seq)
+        return (0, -abs(context.start_ms - segment.end_ms), context.seq)
+
+    return max(contexts, key=score)
 
 
 async def _send_asr_warning(websocket: WebSocket, reason: str, seq: int) -> None:
@@ -738,11 +770,7 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
     aliyun_session = None
     aliyun_reader_task: asyncio.Task[None] | None = None
     aliyun_result_seq = 1
-    aliyun_audio_b64: str | None = None
-    aliyun_speaker_hint: str | None = None
-    aliyun_question = "实时语音片段"
-    aliyun_question_source = "interviewer"
-    aliyun_probe_target: str | None = None
+    aliyun_audio_contexts: list[_AliyunAudioContext] = []
 
     async def ensure_aliyun_session():
         nonlocal aliyun_session, aliyun_reader_task
@@ -770,9 +798,14 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                 return
             seq = aliyun_result_seq
             aliyun_result_seq += 1
-            if aliyun_speaker_hint is not None and item.speaker == "unknown":
-                item = item.model_copy(update={"speaker": aliyun_speaker_hint})
-            decision = asr_session_manager.accept_segment(seq, item, audio_b64=aliyun_audio_b64)
+            context = _select_aliyun_audio_context(aliyun_audio_contexts, item)
+            if context is not None and context.speaker_hint is not None and item.speaker == "unknown":
+                item = item.model_copy(update={"speaker": context.speaker_hint})
+            decision = asr_session_manager.accept_segment(
+                seq,
+                item,
+                audio_b64=context.audio_b64 if context is not None else None,
+            )
             if not decision.accepted or decision.segment is None:
                 await _send_asr_warning(sender, decision.reason, seq)
                 continue
@@ -784,9 +817,9 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                     interview_id,
                     record,
                     segment,
-                    question=aliyun_question,
-                    question_source=aliyun_question_source,
-                    probe_target=aliyun_probe_target,
+                    question=context.question if context is not None else "实时语音片段",
+                    question_source=context.question_source if context is not None else "interviewer",
+                    probe_target=context.probe_target if context is not None else None,
                 )
 
     try:
@@ -829,11 +862,21 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                     session = await ensure_aliyun_session()
                     if session is None:
                         continue
-                    aliyun_audio_b64 = audio_b64
-                    aliyun_speaker_hint = _event_speaker(event)
-                    aliyun_question = _event_question(event)
-                    aliyun_question_source = _event_question_source(event)
-                    aliyun_probe_target = _event_probe_target(event)
+                    start_ms, end_ms = _event_timestamp_bounds(event, seq)
+                    aliyun_audio_contexts.append(
+                        _AliyunAudioContext(
+                            seq=seq,
+                            start_ms=start_ms,
+                            end_ms=end_ms,
+                            audio_b64=audio_b64,
+                            speaker_hint=_event_speaker(event),
+                            question=_event_question(event),
+                            question_source=_event_question_source(event),
+                            probe_target=_event_probe_target(event),
+                        )
+                    )
+                    if len(aliyun_audio_contexts) > ALIYUN_AUDIO_CONTEXT_LIMIT:
+                        del aliyun_audio_contexts[:-ALIYUN_AUDIO_CONTEXT_LIMIT]
                     pcm_bytes = base64.b64decode(audio_b64)
                     try:
                         await session.send_audio(pcm_bytes)
