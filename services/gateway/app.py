@@ -94,6 +94,16 @@ FALSE_FINALITY_VALUES = {
 TRUE_FINALITY_VALUES = {"1", "true", "yes", "on", "final", "finalized", "complete", "completed"}
 
 
+class _LockedWebSocketSender:
+    def __init__(self, websocket: WebSocket) -> None:
+        self._websocket = websocket
+        self._lock = asyncio.Lock()
+
+    async def send_json(self, payload: dict) -> None:
+        async with self._lock:
+            await self._websocket.send_json(payload)
+
+
 @asynccontextmanager
 async def lifespan(fastapi_app: FastAPI):
     configure_opentelemetry(fastapi_app, get_settings())
@@ -718,6 +728,7 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
         await websocket.close(code=1008)
         return
     await websocket.accept()
+    sender = _LockedWebSocketSender(websocket)
     engine = get_asr_engine()
     aliyun_session = None
     aliyun_reader_task: asyncio.Task[None] | None = None
@@ -732,7 +743,7 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
         try:
             aliyun_session = await engine.get_or_create_session(interview_id)  # type: ignore[attr-defined]
         except Exception:
-            await _send_asr_warning(websocket, "aliyun_asr_connect_failed", 0)
+            await _send_asr_warning(sender, "aliyun_asr_connect_failed", 0)
             return None
         aliyun_reader_task = asyncio.create_task(_aliyun_result_reader())
         return aliyun_session
@@ -745,19 +756,19 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
             item = await aliyun_session.result_queue.get()
             if item is None:
                 if aliyun_session.error_reason:
-                    await _send_asr_warning(websocket, aliyun_session.error_reason, aliyun_result_seq)
+                    await _send_asr_warning(sender, aliyun_session.error_reason, aliyun_result_seq)
                 return
             seq = aliyun_result_seq
             aliyun_result_seq += 1
             decision = asr_session_manager.accept_segment(seq, item)
             if not decision.accepted or decision.segment is None:
-                await _send_asr_warning(websocket, decision.reason, seq)
+                await _send_asr_warning(sender, decision.reason, seq)
                 continue
             segment = decision.segment
-            await websocket.send_json({"type": "transcript", "payload": segment.model_dump()})
+            await sender.send_json({"type": "transcript", "payload": segment.model_dump()})
             if should_probe(segment, record):
                 record = await _send_probe_for_segment(
-                    websocket,
+                    sender,
                     interview_id,
                     record,
                     segment,
@@ -771,47 +782,60 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
             try:
                 event = await websocket.receive_json()
             except json.JSONDecodeError:
-                await websocket.send_json(
+                await sender.send_json(
                     {"type": "error", "detail": "event payload must be valid JSON"}
                 )
                 continue
             except KeyError:
-                await websocket.send_json(
+                await sender.send_json(
                     {"type": "error", "detail": "event payload must be a text JSON frame"}
                 )
                 continue
             if not isinstance(event, dict):
-                await websocket.send_json(
+                await sender.send_json(
                     {"type": "error", "detail": "event payload must be an object"}
                 )
                 continue
             if event.get("type") == "audio_chunk":
                 seq = _event_seq(event, 0)
                 if seq is None:
-                    await _send_asr_warning(websocket, "invalid_seq", 0)
+                    await _send_asr_warning(sender, "invalid_seq", 0)
                     continue
                 if _event_session_mismatch(interview_id, event):
-                    await _send_asr_warning(websocket, "session_id_mismatch", seq)
+                    await _send_asr_warning(sender, "session_id_mismatch", seq)
                     continue
                 audio_b64 = event.get("audio", "")
                 if not _valid_audio_b64(audio_b64):
-                    await _send_asr_warning(websocket, "invalid_audio_base64", seq)
+                    await _send_asr_warning(sender, "invalid_audio_base64", seq)
                     continue
                 contract_warning = _audio_contract_warning(event)
                 if contract_warning is not None:
-                    await _send_asr_warning(websocket, contract_warning, seq)
+                    await _send_asr_warning(sender, contract_warning, seq)
                     continue
                 if settings.asr_provider == "aliyun_ws":
                     session = await ensure_aliyun_session()
                     if session is None:
                         continue
+                    pcm_bytes = base64.b64decode(audio_b64)
                     try:
-                        await session.send_audio(base64.b64decode(audio_b64))
+                        await session.send_audio(pcm_bytes)
                     except Exception:
-                        await _send_asr_warning(websocket, "aliyun_asr_disconnected", seq)
+                        if aliyun_session is not None:
+                            await aliyun_session.close()
+                        if hasattr(engine, "close_session"):
+                            await engine.close_session(interview_id)  # type: ignore[attr-defined]
+                        aliyun_session = None
+                        session = await ensure_aliyun_session()
+                        if session is None:
+                            await _send_asr_warning(sender, "aliyun_asr_disconnected", seq)
+                            continue
+                        try:
+                            await session.send_audio(pcm_bytes)
+                        except Exception:
+                            await _send_asr_warning(sender, "aliyun_asr_disconnected", seq)
                     continue
                 segment = await _transcribe_or_warn(
-                    websocket,
+                    sender,
                     engine,
                     session_id=interview_id,
                     seq=seq,
@@ -830,13 +854,13 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                     audio_b64=audio_b64,
                 )
                 if not decision.accepted or decision.segment is None:
-                    await _send_asr_warning(websocket, decision.reason, seq)
+                    await _send_asr_warning(sender, decision.reason, seq)
                     continue
                 segment = decision.segment
-                await websocket.send_json({"type": "transcript", "payload": segment.model_dump()})
+                await sender.send_json({"type": "transcript", "payload": segment.model_dump()})
                 if should_probe(segment, record):
                     record = await _send_probe_for_segment(
-                        websocket,
+                        sender,
                         interview_id,
                         record,
                         segment,
@@ -847,11 +871,11 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
             elif event.get("type") == "text_turn":
                 seq = _event_seq(event, 1)
                 if seq is None:
-                    await websocket.send_json({"type": "error", "detail": "invalid seq"})
+                    await sender.send_json({"type": "error", "detail": "invalid seq"})
                     continue
                 text = str(event.get("answer", "")).strip()
                 if not text:
-                    await websocket.send_json(
+                    await sender.send_json(
                         {"type": "error", "detail": "text_turn requires answer"}
                     )
                     continue
@@ -869,7 +893,7 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                     )
                 else:
                     segment = await _transcribe_or_warn(
-                        websocket,
+                        sender,
                         engine,
                         session_id=interview_id,
                         seq=seq,
@@ -884,13 +908,13 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                         continue
                 decision = asr_session_manager.accept_segment(seq, segment, audio_b64=encoded)
                 if not decision.accepted or decision.segment is None:
-                    await _send_asr_warning(websocket, decision.reason, seq)
+                    await _send_asr_warning(sender, decision.reason, seq)
                     continue
                 segment = decision.segment
-                await websocket.send_json({"type": "transcript", "payload": segment.model_dump()})
+                await sender.send_json({"type": "transcript", "payload": segment.model_dump()})
                 if should_probe(segment, record):
                     record = await _send_probe_for_segment(
-                        websocket,
+                        sender,
                         interview_id,
                         record,
                         segment,
@@ -900,17 +924,17 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                     )
             elif event.get("type") == "manual_probe":
                 if not str(event.get("answer") or event.get("latest_answer") or "").strip():
-                    await websocket.send_json(
+                    await sender.send_json(
                         {"type": "error", "detail": "manual_probe requires answer"}
                     )
                     continue
                 try:
                     segment = _manual_probe_segment(interview_id, event)
                 except ValueError as exc:
-                    await websocket.send_json({"type": "error", "detail": str(exc)})
+                    await sender.send_json({"type": "error", "detail": str(exc)})
                     continue
                 record = await _send_probe_for_segment(
-                    websocket,
+                    sender,
                     interview_id,
                     record,
                     segment,
@@ -926,14 +950,14 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                         await aliyun_reader_task
                     result = await asyncio.to_thread(end_interview, interview_id)
                 except (KeyError, ValueError) as exc:
-                    await websocket.send_json({"type": "error", "detail": str(exc)})
+                    await sender.send_json({"type": "error", "detail": str(exc)})
                     continue
                 event_type = "task_queued" if isinstance(result, OfflineTaskAccepted) else "report"
-                await websocket.send_json({"type": event_type, "payload": result.model_dump(mode="json")})
+                await sender.send_json({"type": event_type, "payload": result.model_dump(mode="json")})
                 asr_session_manager.close(interview_id)
                 break
             else:
-                await websocket.send_json({"type": "error", "detail": "unsupported event type"})
+                await sender.send_json({"type": "error", "detail": "unsupported event type"})
     except WebSocketDisconnect:
         if aliyun_session is not None:
             await aliyun_session.close()
@@ -943,9 +967,9 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
         if aliyun_session is not None:
             await aliyun_session.close()
         asr_session_manager.close(interview_id)
-        await websocket.send_json({"type": "error", "detail": str(exc)})
+        await sender.send_json({"type": "error", "detail": str(exc)})
     except ValueError as exc:
         if aliyun_session is not None:
             await aliyun_session.close()
         asr_session_manager.close(interview_id)
-        await websocket.send_json({"type": "error", "detail": str(exc)})
+        await sender.send_json({"type": "error", "detail": str(exc)})
