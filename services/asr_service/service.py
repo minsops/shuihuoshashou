@@ -437,6 +437,10 @@ def get_asr_engine() -> ASREngine:
         from services.asr_service.aliyun_engine import AliyunWSASREngine
 
         return AliyunWSASREngine()
+    if settings.asr_provider == "aliyun_nls_ws":
+        from services.asr_service.nls_engine import AliyunNLSWSASREngine
+
+        return AliyunNLSWSASREngine()
     if settings.asr_provider == "http":
         return HTTPASREngine()
     return StubASREngine()

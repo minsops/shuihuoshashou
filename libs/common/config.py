@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     llm_max_retries: int = Field(default=1, ge=0)
     llm_rate_limit_enabled: bool = False
     llm_rate_limit_requests_per_minute: int = Field(default=60, ge=0)
-    asr_provider: Literal["stub", "http", "aliyun_ws"] = "stub"
+    asr_provider: Literal["stub", "http", "aliyun_ws", "aliyun_nls_ws"] = "stub"
     asr_base_url: str = ""
     asr_api_path: str = "/transcribe"
     asr_api_key: str = ""
@@ -46,6 +46,11 @@ class Settings(BaseSettings):
     aliyun_asr_format: str = "pcm"
     aliyun_asr_language_hints: str = "zh,en"
     aliyun_asr_endpoint: str = "wss://dashscope.aliyuncs.com/api-ws/v1/inference"
+    aliyun_nls_app_key: str = ""
+    aliyun_nls_token: str = ""
+    aliyun_nls_endpoint: str = "wss://nls-gateway-cn-shanghai.aliyuncs.com/ws/v1"
+    aliyun_nls_sample_rate: int = Field(default=16000, gt=0)
+    aliyun_nls_format: str = "pcm"
     probe_min_answer_chars: int = Field(default=20, ge=0)
     probe_min_interval_ms: int = Field(default=1000, ge=0)
     probe_require_topic_match: bool = True
@@ -100,6 +105,11 @@ class Settings(BaseSettings):
             raise ValueError("ASR_PROVIDER=http requires ASR_BASE_URL")
         if self.asr_provider == "aliyun_ws" and not self.aliyun_asr_api_key.strip():
             raise ValueError("ASR_PROVIDER=aliyun_ws requires ALIYUN_ASR_API_KEY")
+        if self.asr_provider == "aliyun_nls_ws":
+            if not self.aliyun_nls_app_key.strip():
+                raise ValueError("ASR_PROVIDER=aliyun_nls_ws requires ALIYUN_NLS_APP_KEY")
+            if not self.aliyun_nls_token.strip():
+                raise ValueError("ASR_PROVIDER=aliyun_nls_ws requires ALIYUN_NLS_TOKEN")
         if (
             self.speaker_diarization_provider == "http"
             and not self.speaker_diarization_base_url.strip()

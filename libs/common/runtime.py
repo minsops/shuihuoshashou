@@ -41,6 +41,11 @@ class RuntimeStatus(BaseModel):
     aliyun_asr_sample_rate: int
     aliyun_asr_format: str
     aliyun_asr_language_hints_configured: bool
+    aliyun_nls_app_key_configured: bool
+    aliyun_nls_token_configured: bool
+    aliyun_nls_endpoint_configured: bool
+    aliyun_nls_sample_rate: int
+    aliyun_nls_format: str
     probe_min_answer_chars: int
     probe_min_interval_ms: int
     probe_require_topic_match: bool
@@ -116,6 +121,11 @@ def get_runtime_status() -> RuntimeStatus:
         aliyun_asr_sample_rate=settings.aliyun_asr_sample_rate,
         aliyun_asr_format=settings.aliyun_asr_format,
         aliyun_asr_language_hints_configured=bool(settings.aliyun_asr_language_hints.strip()),
+        aliyun_nls_app_key_configured=bool(settings.aliyun_nls_app_key),
+        aliyun_nls_token_configured=bool(settings.aliyun_nls_token),
+        aliyun_nls_endpoint_configured=bool(settings.aliyun_nls_endpoint),
+        aliyun_nls_sample_rate=settings.aliyun_nls_sample_rate,
+        aliyun_nls_format=settings.aliyun_nls_format,
         probe_min_answer_chars=settings.probe_min_answer_chars,
         probe_min_interval_ms=settings.probe_min_interval_ms,
         probe_require_topic_match=settings.probe_require_topic_match,

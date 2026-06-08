@@ -62,10 +62,25 @@ def test_settings_accepts_aliyun_ws_asr_provider() -> None:
     assert settings.aliyun_asr_format == "pcm"
 
 
+def test_settings_accepts_aliyun_nls_ws_asr_provider() -> None:
+    settings = Settings(
+        asr_provider="aliyun_nls_ws",
+        aliyun_nls_app_key="nls-app-key",
+        aliyun_nls_token="nls-token",
+    )
+
+    assert settings.asr_provider == "aliyun_nls_ws"
+    assert settings.aliyun_nls_endpoint == "wss://nls-gateway-cn-shanghai.aliyuncs.com/ws/v1"
+    assert settings.aliyun_nls_sample_rate == 16000
+    assert settings.aliyun_nls_format == "pcm"
+
+
 def test_settings_rejects_missing_provider_dependencies() -> None:
     cases = [
         {"asr_provider": "http", "asr_base_url": ""},
         {"asr_provider": "aliyun_ws", "aliyun_asr_api_key": ""},
+        {"asr_provider": "aliyun_nls_ws", "aliyun_nls_app_key": "", "aliyun_nls_token": "t"},
+        {"asr_provider": "aliyun_nls_ws", "aliyun_nls_app_key": "a", "aliyun_nls_token": ""},
         {
             "speaker_diarization_provider": "http",
             "speaker_diarization_base_url": "",

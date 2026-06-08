@@ -94,6 +94,7 @@ FALSE_FINALITY_VALUES = {
 }
 TRUE_FINALITY_VALUES = {"1", "true", "yes", "on", "final", "finalized", "complete", "completed"}
 ALIYUN_AUDIO_CONTEXT_LIMIT = 200
+STREAMING_ASR_PROVIDERS = {"aliyun_ws", "aliyun_nls_ws"}
 
 
 class _LockedWebSocketSender:
@@ -774,7 +775,7 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
 
     async def ensure_aliyun_session():
         nonlocal aliyun_session, aliyun_reader_task
-        if settings.asr_provider != "aliyun_ws":
+        if settings.asr_provider not in STREAMING_ASR_PROVIDERS:
             return None
         if aliyun_session is not None and not getattr(aliyun_session, "finished", False):
             return aliyun_session
@@ -856,7 +857,7 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                 if contract_warning is not None:
                     await _send_asr_warning(sender, contract_warning, seq)
                     continue
-                if settings.asr_provider == "aliyun_ws":
+                if settings.asr_provider in STREAMING_ASR_PROVIDERS:
                     session = await ensure_aliyun_session()
                     if session is None:
                         continue
@@ -939,7 +940,7 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                     )
                     continue
                 encoded = base64.b64encode(text.encode("utf-8")).decode("ascii")
-                if settings.asr_provider == "aliyun_ws":
+                if settings.asr_provider in STREAMING_ASR_PROVIDERS:
                     start_ms, end_ms = _event_timestamp_bounds(event, seq)
                     segment = TranscriptSegment(
                         session_id=interview_id,

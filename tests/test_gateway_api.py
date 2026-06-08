@@ -4,6 +4,7 @@ import base64
 import asyncio
 import json
 import logging
+import os
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -36,6 +37,9 @@ def _client(
     monkeypatch.setenv("RATE_LIMIT_ENABLED", str(rate_limit_enabled).lower())
     monkeypatch.setenv("RATE_LIMIT_REQUESTS_PER_MINUTE", str(rate_limit_requests_per_minute))
     monkeypatch.setenv("GATEWAY_API_KEY", gateway_api_key)
+    if os.environ.get("ASR_PROVIDER") != "aliyun_nls_ws":
+        monkeypatch.setenv("ALIYUN_NLS_APP_KEY", "")
+        monkeypatch.setenv("ALIYUN_NLS_TOKEN", "")
     monkeypatch.setenv("OFFLINE_TASK_BACKEND", "local")
     get_settings.cache_clear()
     event_bus.reset()
@@ -255,6 +259,11 @@ def test_gateway_config_status_hides_secrets(tmp_path: Path, monkeypatch) -> Non
     assert payload["aliyun_asr_sample_rate"] == 16000
     assert payload["aliyun_asr_format"] == "pcm"
     assert payload["aliyun_asr_language_hints_configured"] is True
+    assert payload["aliyun_nls_app_key_configured"] is False
+    assert payload["aliyun_nls_token_configured"] is False
+    assert payload["aliyun_nls_endpoint_configured"] is True
+    assert payload["aliyun_nls_sample_rate"] == 16000
+    assert payload["aliyun_nls_format"] == "pcm"
     assert payload["probe_min_answer_chars"] == 20
     assert payload["probe_min_interval_ms"] == 1000
     assert payload["probe_require_topic_match"] is True
@@ -1468,6 +1477,87 @@ def test_gateway_aliyun_ws_start_failure_surfaces_reason(
             "seq": 0,
         },
     }
+
+
+def test_gateway_aliyun_nls_ws_audio_chunk_uses_streaming_path(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("ASR_PROVIDER", "aliyun_nls_ws")
+    monkeypatch.setenv("ALIYUN_NLS_APP_KEY", "nls-app-key")
+    monkeypatch.setenv("ALIYUN_NLS_TOKEN", "nls-token")
+
+    class FakeNLSSession:
+        def __init__(self, session_id: str) -> None:
+            self.session_id = session_id
+            self.finished = False
+            self.error_reason = ""
+            self.sent_audio: list[bytes] = []
+            self.result_queue: asyncio.Queue[TranscriptSegment | None] = asyncio.Queue()
+
+        async def send_audio(self, pcm_bytes: bytes) -> None:
+            self.sent_audio.append(pcm_bytes)
+            await self.result_queue.put(
+                TranscriptSegment(
+                    session_id=self.session_id,
+                    speaker="unknown",
+                    text="我负责 NLS 实时识别接入和异常处理。",
+                    start_ms=0,
+                    end_ms=900,
+                    is_final=True,
+                    confidence=0.9,
+                )
+            )
+
+        async def close(self) -> None:
+            self.finished = True
+            await self.result_queue.put(None)
+
+    class FakeNLSEngine:
+        def __init__(self) -> None:
+            self.session: FakeNLSSession | None = None
+
+        async def get_or_create_session(self, session_id: str) -> FakeNLSSession:
+            if self.session is None or self.session.finished:
+                self.session = FakeNLSSession(session_id)
+            return self.session
+
+        async def close_session(self, session_id: str) -> None:
+            if self.session is not None and self.session.session_id == session_id:
+                await self.session.close()
+
+    engine = FakeNLSEngine()
+    monkeypatch.setattr("services.gateway.app.get_asr_engine", lambda: engine)
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+
+    with client.websocket_connect(f"/ws/interview/{interview['id']}") as websocket:
+        websocket.send_json(
+            {
+                "type": "audio_chunk",
+                "session_id": interview["id"],
+                "seq": 1,
+                "audio": base64.b64encode(b"nls-audio").decode("ascii"),
+                "speaker": "candidate",
+                "format": "pcm16",
+                "sample_rate_hz": 16000,
+                "channels": 1,
+            }
+        )
+        transcript = websocket.receive_json()
+        probe = websocket.receive_json()
+        credibility = websocket.receive_json()
+
+    assert engine.session is not None
+    assert engine.session.sent_audio == [b"nls-audio"]
+    assert transcript["type"] == "transcript"
+    assert transcript["payload"]["speaker"] == "candidate"
+    assert probe["type"] == "probe"
+    assert credibility["type"] == "credibility"
 
 
 def test_gateway_websocket_end_error_does_not_close_session(
