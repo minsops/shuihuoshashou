@@ -733,6 +733,11 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
     aliyun_session = None
     aliyun_reader_task: asyncio.Task[None] | None = None
     aliyun_result_seq = 1
+    aliyun_audio_b64: str | None = None
+    aliyun_speaker_hint: str | None = None
+    aliyun_question = "实时语音片段"
+    aliyun_question_source = "interviewer"
+    aliyun_probe_target: str | None = None
 
     async def ensure_aliyun_session():
         nonlocal aliyun_session, aliyun_reader_task
@@ -760,7 +765,9 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                 return
             seq = aliyun_result_seq
             aliyun_result_seq += 1
-            decision = asr_session_manager.accept_segment(seq, item)
+            if aliyun_speaker_hint is not None and item.speaker == "unknown":
+                item = item.model_copy(update={"speaker": aliyun_speaker_hint})
+            decision = asr_session_manager.accept_segment(seq, item, audio_b64=aliyun_audio_b64)
             if not decision.accepted or decision.segment is None:
                 await _send_asr_warning(sender, decision.reason, seq)
                 continue
@@ -772,8 +779,9 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                     interview_id,
                     record,
                     segment,
-                    question="实时语音片段",
-                    question_source="interviewer",
+                    question=aliyun_question,
+                    question_source=aliyun_question_source,
+                    probe_target=aliyun_probe_target,
                 )
 
     try:
@@ -816,6 +824,11 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                     session = await ensure_aliyun_session()
                     if session is None:
                         continue
+                    aliyun_audio_b64 = audio_b64
+                    aliyun_speaker_hint = _event_speaker(event)
+                    aliyun_question = _event_question(event)
+                    aliyun_question_source = _event_question_source(event)
+                    aliyun_probe_target = _event_probe_target(event)
                     pcm_bytes = base64.b64decode(audio_b64)
                     try:
                         await session.send_audio(pcm_bytes)

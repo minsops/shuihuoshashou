@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import asyncio
 import json
 import logging
 from pathlib import Path
@@ -1245,6 +1246,88 @@ def test_gateway_text_turn_works_with_aliyun_ws_provider(tmp_path: Path, monkeyp
         assert transcript["payload"]["speaker"] == "candidate"
         assert probe["type"] == "probe"
         assert credibility["type"] == "credibility"
+
+
+def test_gateway_aliyun_ws_audio_chunk_reads_async_results(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("ASR_PROVIDER", "aliyun_ws")
+    monkeypatch.setenv("ALIYUN_ASR_API_KEY", "dashscope-secret")
+
+    class FakeAliyunSession:
+        def __init__(self, session_id: str) -> None:
+            self.session_id = session_id
+            self.finished = False
+            self.error_reason = ""
+            self.sent_audio: list[bytes] = []
+            self.result_queue: asyncio.Queue[TranscriptSegment | None] = asyncio.Queue()
+
+        async def send_audio(self, pcm_bytes: bytes) -> None:
+            self.sent_audio.append(pcm_bytes)
+            await self.result_queue.put(
+                TranscriptSegment(
+                    session_id=self.session_id,
+                    speaker="unknown",
+                    text="我负责 FastAPI 网关、异常重试和 JSON 校验。",
+                    start_ms=120,
+                    end_ms=980,
+                    is_final=True,
+                    confidence=0.92,
+                )
+            )
+
+        async def close(self) -> None:
+            self.finished = True
+            await self.result_queue.put(None)
+
+    class FakeAliyunEngine:
+        def __init__(self) -> None:
+            self.session: FakeAliyunSession | None = None
+
+        async def get_or_create_session(self, session_id: str) -> FakeAliyunSession:
+            if self.session is None or self.session.finished:
+                self.session = FakeAliyunSession(session_id)
+            return self.session
+
+        async def close_session(self, session_id: str) -> None:
+            if self.session is not None and self.session.session_id == session_id:
+                await self.session.close()
+
+    engine = FakeAliyunEngine()
+    monkeypatch.setattr("services.gateway.app.get_asr_engine", lambda: engine)
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+    audio = base64.b64encode(b"pcm-audio").decode("ascii")
+
+    with client.websocket_connect(f"/ws/interview/{interview['id']}") as websocket:
+        websocket.send_json(
+            {
+                "type": "audio_chunk",
+                "session_id": interview["id"],
+                "seq": 1,
+                "audio": audio,
+                "speaker": "candidate",
+                "format": "pcm16",
+                "sample_rate_hz": 16000,
+                "channels": 1,
+            }
+        )
+        transcript = websocket.receive_json()
+        probe = websocket.receive_json()
+        credibility = websocket.receive_json()
+
+    assert engine.session is not None
+    assert engine.session.sent_audio == [b"pcm-audio"]
+    assert transcript["type"] == "transcript"
+    assert transcript["payload"]["text"] == "我负责 FastAPI 网关、异常重试和 JSON 校验。"
+    assert transcript["payload"]["speaker"] == "candidate"
+    assert probe["type"] == "probe"
+    assert credibility["type"] == "credibility"
 
 
 def test_gateway_websocket_end_error_does_not_close_session(
