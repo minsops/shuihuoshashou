@@ -34,10 +34,24 @@ class AliyunASRSession:
             return
         if self.ws is None:
             self.ws = await self._connect_websocket()
-        await self.ws.send(json.dumps(self._run_task_payload(), ensure_ascii=False))
-        event = await asyncio.wait_for(self._receive_json_event(), timeout=10)
+        try:
+            await self.ws.send(json.dumps(self._run_task_payload(), ensure_ascii=False))
+            event = await asyncio.wait_for(self._receive_json_event(), timeout=10)
+        except TimeoutError as exc:
+            self.error_reason = "aliyun_asr_connect_failed"
+            await self._close_websocket()
+            raise RuntimeError(self.error_reason) from exc
+        except Exception:
+            await self._close_websocket()
+            raise
         if event.get("header", {}).get("event") != "task-started":
-            raise RuntimeError("aliyun_asr_connect_failed")
+            self.error_reason = (
+                _task_failed_reason(event)
+                if event.get("header", {}).get("event") == "task-failed"
+                else "aliyun_asr_connect_failed"
+            )
+            await self._close_websocket()
+            raise RuntimeError(self.error_reason)
         self.started = True
         self._reader_task = asyncio.create_task(self._reader_loop())
 

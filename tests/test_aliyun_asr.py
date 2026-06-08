@@ -4,6 +4,8 @@ import asyncio
 import json
 from pathlib import Path
 
+import pytest
+
 from libs.common.config import Settings
 from libs.schemas import TranscriptSegment
 from scripts import check_aliyun_asr
@@ -11,8 +13,15 @@ from services.asr_service.aliyun_engine import AliyunASRSession
 
 
 class FakeAliyunWS:
-    def __init__(self, *, fail_on_audio: bool = False, heartbeat_first: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        fail_on_audio: bool = False,
+        fail_on_start: bool = False,
+        heartbeat_first: bool = False,
+    ) -> None:
         self.fail_on_audio = fail_on_audio
+        self.fail_on_start = fail_on_start
         self.heartbeat_first = heartbeat_first
         self.closed = False
         self.sent: list[str | bytes] = []
@@ -66,6 +75,19 @@ class FakeAliyunWS:
         data = json.loads(message)
         action = data.get("header", {}).get("action")
         if action == "run-task":
+            if self.fail_on_start:
+                await self._events.put(
+                    json.dumps(
+                        {
+                            "header": {
+                                "event": "task-failed",
+                                "error_code": "InvalidApiKey",
+                                "error_message": "bad key",
+                            }
+                        }
+                    )
+                )
+                return
             await self._events.put(json.dumps({"header": {"event": "task-started"}}))
         elif action == "finish-task":
             await self._events.put(json.dumps({"header": {"event": "task-finished"}}))
@@ -137,6 +159,22 @@ def test_aliyun_session_handles_task_failed() -> None:
 
         assert item is None
         assert session.error_reason == "aliyun_asr_task_failed:InvalidAudio:bad audio"
+
+    asyncio.run(run())
+
+
+def test_aliyun_session_closes_websocket_when_start_fails() -> None:
+    async def run() -> None:
+        ws = FakeAliyunWS(fail_on_start=True)
+        session = AliyunASRSession("interview-1", settings=_settings(), ws=ws)
+
+        with pytest.raises(RuntimeError) as exc_info:
+            await session.connect()
+
+        assert "aliyun_asr_task_failed:InvalidApiKey:bad key" in str(exc_info.value)
+        assert session.error_reason == "aliyun_asr_task_failed:InvalidApiKey:bad key"
+        assert ws.closed is True
+        assert session.ws is None
 
     asyncio.run(run())
 
