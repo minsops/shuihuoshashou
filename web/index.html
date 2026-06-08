@@ -1195,6 +1195,7 @@
         if (state.micRecording || !state.socket || state.socket.readyState !== WebSocket.OPEN) return;
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
           appendEvent("麦克风", "当前浏览器不支持麦克风采集。", "red");
+          setPill(micStatus, "麦克风不可用", "");
           return;
         }
         try {
@@ -1223,9 +1224,25 @@
           appendEvent("麦克风", "正在发送 16k PCM 音频。");
           setControls();
         } catch (error) {
-          appendEvent("麦克风", escapeHtml(error), "red");
+          const reason = micErrorMessage(error);
+          appendEvent("麦克风", escapeHtml(reason), "red");
+          setPill(micStatus, reason, "");
           stopMicCapture();
         }
+      }
+
+      function micErrorMessage(error) {
+        const name = error && error.name ? error.name : "";
+        if (name === "NotAllowedError" || name === "SecurityError") {
+          return "麦克风权限被拒绝：请在浏览器站点权限和 macOS 系统设置中允许当前浏览器使用麦克风。";
+        }
+        if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+          return "未找到可用麦克风：请确认系统已连接输入设备。";
+        }
+        if (name === "NotReadableError" || name === "TrackStartError") {
+          return "麦克风被其他程序占用，或系统暂时无法读取。";
+        }
+        return `麦克风启动失败：${error}`;
       }
 
       function stopMicCapture() {
