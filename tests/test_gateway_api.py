@@ -37,7 +37,9 @@ def _client(
     monkeypatch.setenv("RATE_LIMIT_ENABLED", str(rate_limit_enabled).lower())
     monkeypatch.setenv("RATE_LIMIT_REQUESTS_PER_MINUTE", str(rate_limit_requests_per_minute))
     monkeypatch.setenv("GATEWAY_API_KEY", gateway_api_key)
-    if os.environ.get("ASR_PROVIDER") != "aliyun_nls_ws":
+    asr_provider = os.environ.get("ASR_PROVIDER", "stub")
+    monkeypatch.setenv("ASR_PROVIDER", asr_provider)
+    if asr_provider != "aliyun_nls_ws":
         monkeypatch.setenv("ALIYUN_NLS_APP_KEY", "")
         monkeypatch.setenv("ALIYUN_NLS_TOKEN", "")
     monkeypatch.setenv("OFFLINE_TASK_BACKEND", "local")
@@ -94,6 +96,23 @@ def test_gateway_offline_report_flow(tmp_path: Path, monkeypatch) -> None:
     assert pdf.status_code == 200
     assert pdf.headers["content-type"] == "application/pdf"
     assert pdf.content.startswith(b"%PDF")
+
+
+def test_gateway_document_parse_uploads_resume_text(tmp_path: Path, monkeypatch) -> None:
+    client = _client(tmp_path, monkeypatch)
+
+    response = client.post(
+        "/api/documents/parse?kind=resume&filename=resume.md",
+        content="候选人负责 FastAPI 网关和报告生成".encode("utf-8"),
+        headers={"content-type": "text/markdown"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["kind"] == "resume"
+    assert payload["source"] == "text"
+    assert payload["llm_attempted"] is False
+    assert "FastAPI" in payload["text"]
 
 
 def test_gateway_report_json_falls_back_to_persisted_payload_when_artifact_missing(

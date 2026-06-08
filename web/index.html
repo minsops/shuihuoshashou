@@ -597,16 +597,24 @@
             <textarea name="jd_text" id="jdText" required>负责 Python/FastAPI 微服务、LLM 应用、评估体系、可观测性与稳定性工程，需要能独立排查线上问题并推动复杂项目落地。</textarea>
           </label>
           <label>
-            上传 JD 文本
-            <input type="file" id="jdFile" accept=".txt,.md,.markdown,.json,.csv" />
+            上传 JD 文档
+            <input
+              type="file"
+              id="jdFile"
+              accept=".txt,.md,.markdown,.json,.csv,.pdf,.doc,.docx,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff,.heic,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,image/*"
+            />
           </label>
           <label>
             简历摘要
             <textarea name="resume_text" id="resumeText">候选人做过 AI 应用和后端服务，自述负责过 FastAPI 网关、模型调用编排、异常重试和评估报告链路。</textarea>
           </label>
           <label>
-            上传简历文本
-            <input type="file" id="resumeFile" accept=".txt,.md,.markdown,.json,.csv" />
+            上传简历文档
+            <input
+              type="file"
+              id="resumeFile"
+              accept=".txt,.md,.markdown,.json,.csv,.pdf,.doc,.docx,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff,.heic,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,image/*"
+            />
           </label>
           <div class="toolbar">
             <button type="submit" id="prepareInterview">创建实时面试</button>
@@ -811,11 +819,31 @@
         }
       }
 
-      async function readTextFile(file, target, label) {
+      async function parseDocumentFile(file, target, label, kind) {
         if (!file) return;
-        const text = await file.text();
-        target.value = text.trim() ? text : target.value;
-        appendEvent("资料上传", `${escapeHtml(label)} 已读取：${escapeHtml(file.name)}`);
+        appendEvent("资料上传", `${escapeHtml(label)} 正在解析：${escapeHtml(file.name)}`);
+        try {
+          const params = new URLSearchParams({ kind, filename: file.name });
+          const response = await fetch(`/api/documents/parse?${params.toString()}`, {
+            method: "POST",
+            headers: { "content-type": file.type || "application/octet-stream" },
+            body: await file.arrayBuffer(),
+          });
+          if (!response.ok) throw new Error(await response.text());
+          const result = await response.json();
+          target.value = result.text.trim() ? result.text : target.value;
+          const modelNote = result.llm_attempted
+            ? result.used_llm
+              ? "，已调用 DeepSeek 清洗正文"
+              : "，已调用 DeepSeek 校验正文"
+            : "";
+          appendEvent(
+            "资料上传",
+            `${escapeHtml(label)} 已解析：${escapeHtml(file.name)}（${escapeHtml(result.source)}${modelNote}）`
+          );
+        } catch (error) {
+          appendEvent("资料上传失败", escapeHtml(error), "red");
+        }
       }
 
       function renderCompetencies(job) {
@@ -1295,11 +1323,11 @@
       });
 
       document.querySelector("#jdFile").addEventListener("change", (event) => {
-        readTextFile(event.target.files[0], jdText, "JD");
+        parseDocumentFile(event.target.files[0], jdText, "JD", "jd");
       });
 
       document.querySelector("#resumeFile").addEventListener("change", (event) => {
-        readTextFile(event.target.files[0], resumeText, "简历");
+        parseDocumentFile(event.target.files[0], resumeText, "简历", "resume");
       });
 
       document.querySelector("#loadSample").addEventListener("click", loadSample);

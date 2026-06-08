@@ -47,6 +47,7 @@ from services.asr_service.service import (
     configure_asr_runtime,
     get_asr_engine,
 )
+from services.document_service import parse_document
 from services.interview_orchestrator.service import (
     add_turn,
     create_candidate,
@@ -549,6 +550,22 @@ def _event_int(event: dict, *keys: str) -> int | None:
 @app.post("/api/jobs")
 def api_create_job(payload: JobCreate):
     return create_job(payload)
+
+
+@app.post("/api/documents/parse")
+async def api_parse_document(request: Request, kind: str = "resume", filename: str = "upload"):
+    if kind not in {"jd", "resume"}:
+        raise HTTPException(status_code=400, detail="kind must be jd or resume")
+    data = await request.body()
+    try:
+        return parse_document(
+            filename,
+            data,
+            kind=kind,  # type: ignore[arg-type]
+            content_type=request.headers.get("content-type", ""),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.get("/api/jobs/{job_id}")
