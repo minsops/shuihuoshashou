@@ -756,11 +756,14 @@
         micProcessor: null,
         micSamples: [],
         micSentSamples: 0,
+        micSpeechStarted: false,
+        micWaitingForVoiceNotice: false,
         micRecording: false,
       };
 
       const micSampleRate = 16000;
       const micChunkSamples = micSampleRate;
+      const micVoiceRmsThreshold = 0.012;
 
       function escapeHtml(value) {
         return String(value)
@@ -1197,6 +1200,19 @@
 
       function sendMicSamples(samples) {
         if (!state.socket || state.socket.readyState !== WebSocket.OPEN || samples.length === 0) return;
+        if (!state.micSpeechStarted) {
+          if (!hasVoiceEnergy(samples)) {
+            if (!state.micWaitingForVoiceNotice) {
+              appendEvent("麦克风", "已开启采集，等待检测到候选人声音后开始 ASR。");
+              setPill(micStatus, "等待声音输入", "live");
+              state.micWaitingForVoiceNotice = true;
+            }
+            return;
+          }
+          state.micSpeechStarted = true;
+          state.micWaitingForVoiceNotice = false;
+          appendEvent("麦克风", "检测到声音，开始发送 ASR 音频。");
+        }
         const startMs = Math.round((state.micSentSamples / micSampleRate) * 1000);
         state.micSentSamples += samples.length;
         const endMs = Math.round((state.micSentSamples / micSampleRate) * 1000);
@@ -1219,9 +1235,12 @@
         );
       }
 
-      function sendMicWarmupFrame() {
-        if (!state.socket || state.socket.readyState !== WebSocket.OPEN) return;
-        sendMicSamples(new Float32Array(Math.round(micSampleRate * 0.2)));
+      function hasVoiceEnergy(samples) {
+        let sum = 0;
+        for (let index = 0; index < samples.length; index += 1) {
+          sum += samples[index] * samples[index];
+        }
+        return Math.sqrt(sum / samples.length) >= micVoiceRmsThreshold;
       }
 
       async function startMicCapture() {
@@ -1245,8 +1264,9 @@
           state.micProcessor = state.micContext.createScriptProcessor(4096, 1, 1);
           state.micSamples = [];
           state.micSentSamples = 0;
+          state.micSpeechStarted = false;
+          state.micWaitingForVoiceNotice = false;
           state.micRecording = true;
-          sendMicWarmupFrame();
           state.micProcessor.onaudioprocess = (event) => {
             const input = event.inputBuffer.getChannelData(0);
             const output = event.outputBuffer.getChannelData(0);
@@ -1255,7 +1275,7 @@
           };
           state.micSource.connect(state.micProcessor);
           state.micProcessor.connect(state.micContext.destination);
-          appendEvent("麦克风", "正在发送 16k PCM 音频。");
+          appendEvent("麦克风", "麦克风已开启，请开始说话。");
           setControls();
         } catch (error) {
           const reason = micErrorMessage(error);
@@ -1301,6 +1321,8 @@
         state.micSource = null;
         state.micProcessor = null;
         state.micSamples = [];
+        state.micSpeechStarted = false;
+        state.micWaitingForVoiceNotice = false;
         setControls();
       }
 

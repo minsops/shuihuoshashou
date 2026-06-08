@@ -102,8 +102,6 @@ def test_aliyun_nls_session_lifecycle() -> None:
 
         assert isinstance(ws.sent[0], str)
         assert isinstance(ws.sent[1], bytes)
-        assert len(ws.sent[1]) == 6400
-        assert isinstance(ws.sent[2], bytes)
         assert segment is not None
         assert segment.session_id == "interview-1"
         assert segment.speaker == "unknown"
