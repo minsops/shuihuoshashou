@@ -86,6 +86,21 @@ export LLM_RATE_LIMIT_REQUESTS_PER_MINUTE=60
 
 设置 `LLM_RATE_LIMIT_ENABLED=true` 可以在请求离开进程前按模型限流；限流调用默认本地 fallback，除非诊断代码明确要求 `raise_on_error`。
 
+DeepSeek v4 pro 可直接使用同一套 OpenAI-compatible 配置：
+
+```bash
+export LLM_PROVIDER=openai_compatible
+export LLM_MODEL=deepseek-v4-pro
+export LLM_BASE_URL="https://api.deepseek.com"
+export LLM_API_PATH="/chat/completions"
+export LLM_API_KEY="your-deepseek-key"
+export LLM_AUTH_HEADER="Authorization"
+export LLM_AUTH_SCHEME="Bearer"
+export LLM_RESPONSE_CONTENT_PATH="choices.0.message.content"
+```
+
+配置后运行 `python scripts/check_llm.py`，看到 `LLM smoke test ok.` 表示大模型链路已经接通。
+
 部署环境建议设置 `GATEWAY_API_KEY`，要求 `/api/*` 和 WebSocket 流量携带 `X-API-Key: ...` 或 `Authorization: Bearer ...`。本地 demo 默认不启用。
 
 ## 本地运行
