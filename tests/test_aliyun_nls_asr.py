@@ -263,7 +263,8 @@ def test_create_aliyun_nls_token_builds_signed_request(monkeypatch) -> None:
                 }
             ).encode("utf-8")
 
-    def fake_urlopen(url: str, *, timeout: float) -> FakeResponse:
+    def fake_urlopen(url: str, *, timeout: float, context) -> FakeResponse:
+        del context
         calls["url"] = url
         calls["timeout"] = timeout
         return FakeResponse()

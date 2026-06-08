@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import ssl
 from typing import Any
 from uuid import uuid4
 
@@ -92,11 +93,14 @@ class AliyunASRSession:
             return await websockets.connect(
                 self.settings.aliyun_asr_endpoint,
                 additional_headers=headers,
+                proxy=None,
+                ssl=_ssl_context(),
             )
         except TypeError:
             return await websockets.connect(
                 self.settings.aliyun_asr_endpoint,
                 extra_headers=headers,
+                ssl=_ssl_context(),
             )
 
     async def _reader_loop(self) -> None:
@@ -255,3 +259,11 @@ def _task_failed_reason(data: dict[str, Any]) -> str:
     if error_message:
         return f"aliyun_asr_task_failed:{error_code}:{error_message}"
     return f"aliyun_asr_task_failed:{error_code}"
+
+
+def _ssl_context() -> ssl.SSLContext:
+    try:
+        import certifi
+    except ImportError:
+        return ssl.create_default_context()
+    return ssl.create_default_context(cafile=certifi.where())

@@ -7,6 +7,7 @@ import hashlib
 import hmac
 import json
 import os
+import ssl
 import sys
 import uuid
 from dataclasses import dataclass
@@ -56,7 +57,7 @@ def create_token(
     )
     query = urlencode(params, quote_via=quote, safe="-_.~")
     url = f"{endpoint.rstrip('/')}?{query}"
-    with urlopen(url, timeout=timeout) as response:
+    with urlopen(url, timeout=timeout, context=_ssl_context()) as response:
         payload = json.loads(response.read().decode("utf-8"))
     token = _parse_token(payload)
     if token is None:
@@ -120,6 +121,14 @@ def _utc_timestamp() -> str:
 
 def _percent_encode(value: str) -> str:
     return quote(str(value), safe="-_.~")
+
+
+def _ssl_context() -> ssl.SSLContext:
+    try:
+        import certifi
+    except ImportError:
+        return ssl.create_default_context()
+    return ssl.create_default_context(cafile=certifi.where())
 
 
 def main() -> int:

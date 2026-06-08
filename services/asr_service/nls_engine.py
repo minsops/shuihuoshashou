@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import ssl
 from typing import Any
 from urllib.parse import urlencode
 from uuid import uuid4
@@ -87,7 +88,10 @@ class AliyunNLSSession:
         endpoint = self.settings.aliyun_nls_endpoint
         separator = "&" if "?" in endpoint else "?"
         url = f"{endpoint}{separator}{urlencode({'token': self.settings.aliyun_nls_token})}"
-        return await websockets.connect(url)
+        try:
+            return await websockets.connect(url, proxy=None, ssl=_ssl_context())
+        except TypeError:
+            return await websockets.connect(url, ssl=_ssl_context())
 
     async def _reader_loop(self) -> None:
         try:
@@ -259,3 +263,11 @@ def _coerce_confidence(value: Any, fallback: float) -> float:
         return max(0.0, min(1.0, float(value)))
     except (TypeError, ValueError):
         return fallback
+
+
+def _ssl_context() -> ssl.SSLContext:
+    try:
+        import certifi
+    except ImportError:
+        return ssl.create_default_context()
+    return ssl.create_default_context(cafile=certifi.where())
