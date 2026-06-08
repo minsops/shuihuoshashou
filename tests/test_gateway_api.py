@@ -1330,6 +1330,49 @@ def test_gateway_aliyun_ws_audio_chunk_reads_async_results(
     assert credibility["type"] == "credibility"
 
 
+def test_gateway_aliyun_ws_start_failure_surfaces_reason(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("ASR_PROVIDER", "aliyun_ws")
+    monkeypatch.setenv("ALIYUN_ASR_API_KEY", "dashscope-secret")
+
+    class FailingAliyunEngine:
+        async def get_or_create_session(self, session_id: str) -> None:
+            raise RuntimeError("aliyun_asr_task_failed:InvalidApiKey:bad key")
+
+    monkeypatch.setattr("services.gateway.app.get_asr_engine", lambda: FailingAliyunEngine())
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+
+    with client.websocket_connect(f"/ws/interview/{interview['id']}") as websocket:
+        websocket.send_json(
+            {
+                "type": "audio_chunk",
+                "session_id": interview["id"],
+                "seq": 7,
+                "audio": base64.b64encode(b"pcm-audio").decode("ascii"),
+                "speaker": "candidate",
+                "format": "pcm16",
+                "sample_rate_hz": 16000,
+                "channels": 1,
+            }
+        )
+        warning = websocket.receive_json()
+
+    assert warning == {
+        "type": "asr_warning",
+        "payload": {
+            "reason": "aliyun_asr_task_failed:InvalidApiKey:bad key",
+            "seq": 0,
+        },
+    }
+
+
 def test_gateway_websocket_end_error_does_not_close_session(
     tmp_path: Path, monkeypatch
 ) -> None:

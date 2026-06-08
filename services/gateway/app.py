@@ -354,6 +354,11 @@ def _event_probe_target(event: dict) -> str | None:
     return value or None
 
 
+def _aliyun_warning_reason(exc: Exception) -> str:
+    reason = str(exc).strip()
+    return reason if reason.startswith("aliyun_asr_") else "aliyun_asr_connect_failed"
+
+
 async def _send_asr_warning(websocket: WebSocket, reason: str, seq: int) -> None:
     await websocket.send_json({"type": "asr_warning", "payload": {"reason": reason, "seq": seq}})
 
@@ -747,8 +752,8 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
             return aliyun_session
         try:
             aliyun_session = await engine.get_or_create_session(interview_id)  # type: ignore[attr-defined]
-        except Exception:
-            await _send_asr_warning(sender, "aliyun_asr_connect_failed", 0)
+        except Exception as exc:
+            await _send_asr_warning(sender, _aliyun_warning_reason(exc), 0)
             return None
         aliyun_reader_task = asyncio.create_task(_aliyun_result_reader())
         return aliyun_session
