@@ -783,18 +783,16 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
         except Exception as exc:
             await _send_asr_warning(sender, _aliyun_warning_reason(exc), 0)
             return None
-        aliyun_reader_task = asyncio.create_task(_aliyun_result_reader())
+        aliyun_reader_task = asyncio.create_task(_aliyun_result_reader(aliyun_session))
         return aliyun_session
 
-    async def _aliyun_result_reader() -> None:
+    async def _aliyun_result_reader(session) -> None:
         nonlocal record, aliyun_result_seq
-        if aliyun_session is None:
-            return
         while True:
-            item = await aliyun_session.result_queue.get()
+            item = await session.result_queue.get()
             if item is None:
-                if aliyun_session.error_reason:
-                    await _send_asr_warning(sender, aliyun_session.error_reason, aliyun_result_seq)
+                if session.error_reason:
+                    await _send_asr_warning(sender, session.error_reason, aliyun_result_seq)
                 return
             seq = aliyun_result_seq
             aliyun_result_seq += 1
