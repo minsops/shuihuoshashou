@@ -32,6 +32,11 @@ async def _run(pcm_path: Path, *, allow_empty_result: bool = False) -> int:
             await asyncio.sleep(0.1)
         await session.close()
     except Exception as exc:
+        if session.started and not session.finished:
+            try:
+                await session.close()
+            except Exception as close_exc:
+                print(f"Aliyun ASR cleanup failed: {close_exc}", file=sys.stderr)
         print(f"Aliyun ASR smoke test failed: {exc}", file=sys.stderr)
         return 1
 

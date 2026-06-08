@@ -251,3 +251,39 @@ def test_check_aliyun_asr_smoke_script_fails_without_transcript(
     exit_code = asyncio.run(check_aliyun_asr._run(pcm_path))
 
     assert exit_code == 1
+
+
+def test_check_aliyun_asr_smoke_script_closes_session_on_send_failure(
+    tmp_path: Path, monkeypatch
+) -> None:
+    pcm_path = tmp_path / "sample.pcm"
+    pcm_path.write_bytes(b"\x00" * 3200)
+    monkeypatch.setenv("ALIYUN_ASR_API_KEY", "dashscope-secret")
+
+    class FakeFailingSendSession:
+        instances: list["FakeFailingSendSession"] = []
+
+        def __init__(self, session_id: str, *, settings: Settings) -> None:
+            self.session_id = session_id
+            self.settings = settings
+            self.result_queue: asyncio.Queue[TranscriptSegment | None] = asyncio.Queue()
+            self.started = False
+            self.finished = False
+            FakeFailingSendSession.instances.append(self)
+
+        async def connect(self) -> None:
+            self.started = True
+
+        async def send_audio(self, pcm_bytes: bytes) -> None:
+            raise RuntimeError("aliyun_asr_disconnected")
+
+        async def close(self) -> None:
+            self.finished = True
+
+    monkeypatch.setattr(check_aliyun_asr, "AliyunASRSession", FakeFailingSendSession)
+
+    exit_code = asyncio.run(check_aliyun_asr._run(pcm_path))
+
+    assert exit_code == 1
+    assert FakeFailingSendSession.instances
+    assert FakeFailingSendSession.instances[0].finished is True
