@@ -213,6 +213,8 @@ WebSocket `audio_chunk` 事件可以包含 `speaker`、`channel`/`audio_channel`
 
 设置 `ASR_PROVIDER=aliyun_ws` 和 `ALIYUN_ASR_API_KEY` 后，gateway 会为每场面试建立一个阿里云 DashScope Paraformer 实时 ASR WebSocket 会话。浏览器音频帧会以二进制 PCM 持续发送，阿里云 `result-generated` 事件会异步转换为 `transcript` 下行事件。默认模型为 `ALIYUN_ASR_MODEL=paraformer-realtime-v2`，endpoint 为 `wss://dashscope.aliyuncs.com/api-ws/v1/inference`。Paraformer 实时接口不返回说话人分离结果，因此 `speaker=unknown` 会继续走本地声纹/短间隔连续性解析。真实 key 冒烟检查：
 
+`ALIYUN_ASR_API_KEY` 必须是百炼/DashScope API Key，不是智能语音交互 NLS 的 AppKey。NLS AppKey 单独不能用于当前 DashScope WebSocket Bearer 鉴权。
+
 ```bash
 ALIYUN_ASR_API_KEY=your-dashscope-key python scripts/check_aliyun_asr.py
 ```
