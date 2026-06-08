@@ -7,140 +7,52 @@
     <style>
       :root {
         color-scheme: light;
-        --bg: #f6f7f9;
-        --panel: #ffffff;
-        --text: #18202f;
-        --muted: #667085;
-        --line: #d7dce5;
-        --accent: #0f766e;
-        --accent-strong: #115e59;
-        --risk: #b42318;
-        --ok: #157f3b;
+        --bg: oklch(0.965 0.012 178);
+        --surface: oklch(0.992 0.006 178);
+        --surface-2: oklch(0.948 0.014 178);
+        --ink: oklch(0.215 0.032 238);
+        --muted: oklch(0.485 0.028 236);
+        --line: oklch(0.86 0.018 220);
+        --teal: oklch(0.46 0.105 183);
+        --teal-deep: oklch(0.34 0.09 184);
+        --amber: oklch(0.72 0.145 74);
+        --red: oklch(0.52 0.17 29);
+        --green: oklch(0.5 0.13 148);
+        --blue: oklch(0.48 0.12 248);
+        --shadow: 0 18px 48px color-mix(in oklch, var(--ink), transparent 88%);
+        --space-2xs: 4px;
+        --space-xs: 8px;
+        --space-sm: 12px;
+        --space-md: 16px;
+        --space-lg: 24px;
+        --space-xl: 32px;
       }
 
       * {
         box-sizing: border-box;
       }
 
+      html {
+        min-width: 320px;
+      }
+
       body {
         margin: 0;
-        background: var(--bg);
-        color: var(--text);
+        min-height: 100vh;
+        background:
+          linear-gradient(180deg, color-mix(in oklch, var(--teal), transparent 92%), transparent 280px),
+          var(--bg);
+        color: var(--ink);
         font-family:
-          -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei",
-          sans-serif;
-      }
-
-      header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 16px;
-        min-height: 64px;
-        padding: 12px 24px;
-        border-bottom: 1px solid var(--line);
-        background: var(--panel);
-      }
-
-      h1 {
-        margin: 0;
-        font-size: 20px;
+          "Avenir Next", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
         letter-spacing: 0;
       }
 
-      main {
-        display: grid;
-        grid-template-columns: minmax(360px, 0.9fr) minmax(420px, 1.1fr);
-        gap: 16px;
-        padding: 16px;
-      }
-
-      section {
-        min-width: 0;
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        background: var(--panel);
-      }
-
-      .panel-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        padding: 14px 16px;
-        border-bottom: 1px solid var(--line);
-      }
-
-      h2 {
-        margin: 0;
-        font-size: 15px;
-        letter-spacing: 0;
-      }
-
-      form,
-      .results {
-        display: grid;
-        gap: 14px;
-        padding: 16px;
-      }
-
-      label {
-        display: grid;
-        gap: 6px;
-        color: var(--muted);
-        font-size: 13px;
-      }
-
+      button,
       input,
       textarea {
-        width: 100%;
-        border: 1px solid var(--line);
-        border-radius: 6px;
-        padding: 10px 12px;
-        color: var(--text);
-        background: #fff;
         font: inherit;
-        font-size: 14px;
-      }
-
-      textarea {
-        min-height: 96px;
-        resize: vertical;
-        line-height: 1.5;
-      }
-
-      .turn {
-        display: grid;
-        gap: 8px;
-        padding: 12px;
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        background: #fbfcfe;
-      }
-
-      .toolbar {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 8px;
-      }
-
-      .toolbar .status {
-        min-height: 38px;
-        display: inline-flex;
-        align-items: center;
-        font-size: 13px;
-      }
-
-      .full-width {
-        grid-column: 1 / -1;
-      }
-
-      .live-grid {
-        display: grid;
-        grid-template-columns: minmax(320px, 0.8fr) minmax(420px, 1.2fr);
-        gap: 16px;
-        padding: 16px;
+        letter-spacing: 0;
       }
 
       button,
@@ -148,234 +60,697 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
+        gap: 8px;
         min-height: 38px;
-        border: 1px solid var(--accent);
+        border: 1px solid var(--teal);
         border-radius: 6px;
         padding: 8px 12px;
-        background: var(--accent);
-        color: #fff;
-        font: inherit;
+        background: var(--teal);
+        color: oklch(0.99 0.006 178);
         font-size: 14px;
+        font-weight: 650;
         text-decoration: none;
         cursor: pointer;
       }
 
       button.secondary,
       a.secondary {
-        background: #fff;
-        color: var(--accent-strong);
+        background: var(--surface);
+        color: var(--teal-deep);
+      }
+
+      button.ghost {
+        border-color: transparent;
+        background: transparent;
+        color: var(--muted);
+      }
+
+      button.danger {
+        border-color: var(--red);
+        background: var(--red);
       }
 
       button:disabled {
-        opacity: 0.55;
         cursor: wait;
+        opacity: 0.52;
       }
 
-      .score {
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-md);
+        min-height: 72px;
+        padding: 12px clamp(16px, 2.4vw, 32px);
+        border-bottom: 1px solid var(--line);
+        background: color-mix(in oklch, var(--surface), transparent 4%);
+        backdrop-filter: blur(16px);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+        min-width: 0;
+      }
+
+      .brand-mark {
         display: grid;
-        grid-template-columns: 160px 1fr;
-        gap: 12px;
+        place-items: center;
+        width: 42px;
+        height: 42px;
+        border-radius: 8px;
+        background: var(--ink);
+        color: var(--surface);
+        font-weight: 800;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 20px;
+        line-height: 1.15;
+      }
+
+      .brand p,
+      .muted {
+        color: var(--muted);
+      }
+
+      .brand p {
+        margin-top: 2px;
+        font-size: 13px;
+      }
+
+      .top-actions,
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-xs);
+      }
+
+      .workspace {
+        display: grid;
+        grid-template-columns: minmax(320px, 0.8fr) minmax(420px, 1.15fr) minmax(320px, 0.9fr);
+        gap: var(--space-md);
+        padding: var(--space-md);
+      }
+
+      .panel {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface);
+        box-shadow: var(--shadow);
+      }
+
+      .panel-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: var(--space-sm);
+        padding: var(--space-md);
+        border-bottom: 1px solid var(--line);
+      }
+
+      .panel-title {
+        display: grid;
+        gap: 3px;
+      }
+
+      .step {
+        color: var(--teal-deep);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      h2 {
+        font-size: 17px;
+        line-height: 1.2;
+      }
+
+      h3 {
+        font-size: 14px;
+        line-height: 1.25;
+      }
+
+      form,
+      .panel-body,
+      .stack {
+        display: grid;
+        gap: var(--space-sm);
+      }
+
+      form,
+      .panel-body {
+        padding: var(--space-md);
+      }
+
+      label {
+        display: grid;
+        gap: 6px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 620;
+      }
+
+      input,
+      textarea {
+        width: 100%;
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 10px 12px;
+        background: oklch(0.996 0.004 178);
+        color: var(--ink);
+        font-size: 14px;
+        line-height: 1.45;
+        outline: none;
+      }
+
+      input:focus,
+      textarea:focus {
+        border-color: color-mix(in oklch, var(--teal), var(--line) 20%);
+        box-shadow: 0 0 0 3px color-mix(in oklch, var(--teal), transparent 84%);
+      }
+
+      textarea {
+        min-height: 110px;
+        resize: vertical;
+      }
+
+      .compact-textarea {
+        min-height: 84px;
+      }
+
+      input[type="file"] {
+        padding: 8px;
+        background: var(--surface-2);
+      }
+
+      .split {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--space-sm);
+      }
+
+      .session-strip {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: var(--space-xs);
+        padding: var(--space-md);
+        border-bottom: 1px solid var(--line);
+        background: color-mix(in oklch, var(--surface-2), transparent 35%);
+      }
+
+      .metric {
+        display: grid;
+        gap: 2px;
+        min-height: 56px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px;
+        background: var(--surface);
+      }
+
+      .metric span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .metric strong {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 14px;
+      }
+
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        min-height: 28px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 5px 10px;
+        background: var(--surface-2);
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--muted);
+      }
+
+      .status-pill.ready .status-dot {
+        background: var(--green);
+      }
+
+      .status-pill.live .status-dot {
+        background: var(--amber);
+      }
+
+      .dimension-list,
+      .probe-list,
+      .feed {
+        display: grid;
+        gap: var(--space-xs);
+      }
+
+      .dimension-list {
+        max-height: 280px;
+        overflow: auto;
+      }
+
+      .dimension,
+      .probe-card,
+      .event,
+      .report-box {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: color-mix(in oklch, var(--surface), var(--surface-2) 48%);
+      }
+
+      .dimension {
+        display: grid;
+        gap: var(--space-xs);
+        padding: 11px;
+      }
+
+      .dimension-top,
+      .event-top,
+      .probe-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: var(--space-xs);
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        border: 1px solid color-mix(in oklch, var(--teal), transparent 65%);
+        border-radius: 999px;
+        padding: 3px 8px;
+        color: var(--teal-deep);
+        font-size: 12px;
+        font-weight: 750;
+        white-space: nowrap;
+      }
+
+      .tag.amber {
+        border-color: color-mix(in oklch, var(--amber), transparent 55%);
+        color: oklch(0.42 0.095 68);
+      }
+
+      .tag.blue {
+        border-color: color-mix(in oklch, var(--blue), transparent 58%);
+        color: var(--blue);
+      }
+
+      .tag.red {
+        border-color: color-mix(in oklch, var(--red), transparent 58%);
+        color: var(--red);
+      }
+
+      .small {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .feed {
+        max-height: 480px;
+        min-height: 220px;
+        overflow: auto;
+        padding: var(--space-md);
+      }
+
+      .event {
+        display: grid;
+        gap: var(--space-xs);
+        padding: 11px;
+      }
+
+      .event strong {
+        font-size: 13px;
+      }
+
+      .event p,
+      .probe-card p,
+      .report-box p,
+      .dimension p {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      .probe-card {
+        display: grid;
+        gap: var(--space-xs);
+        padding: 12px;
+      }
+
+      .probe-card button {
+        width: fit-content;
+      }
+
+      .question-field {
+        min-height: 94px;
+      }
+
+      .answer-field {
+        min-height: 128px;
+      }
+
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-xs);
+      }
+
+      .toolbar .status-pill {
+        margin-left: auto;
+      }
+
+      .report-box {
+        display: grid;
+        gap: var(--space-sm);
+        padding: var(--space-sm);
+      }
+
+      .score-line {
+        display: grid;
+        grid-template-columns: 112px 1fr;
+        gap: var(--space-sm);
+        align-items: stretch;
       }
 
       .score-main {
         display: grid;
         place-items: center;
-        min-height: 160px;
-        border: 1px solid var(--line);
+        min-height: 112px;
         border-radius: 8px;
-        background: #f8fbfa;
+        background: var(--ink);
+        color: var(--surface);
       }
 
       .score-main strong {
-        font-size: 44px;
+        font-size: 38px;
         line-height: 1;
-        letter-spacing: 0;
       }
 
-      .summary {
-        display: grid;
-        align-content: center;
-        gap: 8px;
-        min-height: 160px;
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        padding: 14px;
-      }
-
-      .muted {
-        color: var(--muted);
+      .score-main span {
+        font-size: 12px;
       }
 
       table {
         width: 100%;
         border-collapse: collapse;
-        font-size: 13px;
+        font-size: 12px;
       }
 
       th,
       td {
         border-bottom: 1px solid var(--line);
-        padding: 10px 8px;
+        padding: 8px 6px;
         text-align: left;
         vertical-align: top;
       }
 
       th {
         color: var(--muted);
-        font-weight: 600;
-      }
-
-      .risk {
-        color: var(--risk);
+        font-weight: 760;
       }
 
       .empty {
         display: grid;
         place-items: center;
-        min-height: 360px;
+        min-height: 180px;
+        border: 1px dashed color-mix(in oklch, var(--line), var(--muted) 18%);
+        border-radius: 8px;
         color: var(--muted);
+        font-size: 13px;
         text-align: center;
       }
 
-      .feed {
-        display: grid;
-        align-content: start;
-        gap: 10px;
-        min-height: 360px;
-        max-height: 560px;
-        overflow: auto;
+      .risk {
+        color: var(--red);
       }
 
-      .event {
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        padding: 10px 12px;
-        background: #fbfcfe;
+      .success {
+        color: var(--green);
       }
 
-      .event strong {
-        display: block;
-        margin-bottom: 4px;
-        font-size: 13px;
+      @media (max-width: 1180px) {
+        .workspace {
+          grid-template-columns: minmax(320px, 0.95fr) minmax(420px, 1.05fr);
+        }
+
+        .insight-panel {
+          grid-column: 1 / -1;
+        }
       }
 
-      @media (max-width: 900px) {
-        main,
-        .score,
-        .live-grid {
+      @media (max-width: 820px) {
+        .topbar,
+        .top-actions {
+          align-items: flex-start;
+        }
+
+        .topbar,
+        .workspace,
+        .split,
+        .session-strip,
+        .score-line {
           grid-template-columns: 1fr;
+        }
+
+        .topbar {
+          display: grid;
+        }
+
+        .workspace {
+          padding: var(--space-sm);
+        }
+
+        .toolbar .status-pill {
+          margin-left: 0;
         }
       }
     </style>
   </head>
   <body>
-    <header>
-      <h1>水货杀手</h1>
-      <span class="muted">AI 实时深挖面试官助手</span>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">杀</span>
+        <div>
+          <h1>水货杀手</h1>
+          <p>实时深挖面试工作台</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <span class="status-pill" id="runtimeStatus"><span class="status-dot"></span><span>检查中</span></span>
+        <button class="secondary" type="button" id="loadSample">样例资料</button>
+        <a class="button secondary" href="/docs" target="_blank">API 文档</a>
+      </div>
     </header>
-    <main>
-      <section>
+
+    <main class="workspace">
+      <section class="panel setup-panel">
         <div class="panel-head">
-          <h2>离线评估</h2>
-          <button class="secondary" type="button" id="addTurn">添加问答</button>
-        </div>
-        <form id="evaluateForm">
-          <label>
-            岗位名称
-            <input name="job_title" value="AI 后端工程师" required />
-          </label>
-          <label>
-            JD 文本
-            <textarea name="jd_text" required>负责 Python/FastAPI 微服务、LLM 应用、评估体系和可靠性工程。</textarea>
-          </label>
-          <label>
-            候选人
-            <input name="candidate_name" value="候选人A" required />
-          </label>
-          <label>
-            简历摘要
-            <textarea name="resume_text">做过 AI 应用和后端服务。</textarea>
-          </label>
-          <div id="turns"></div>
-          <div class="toolbar">
-            <button id="submit" type="submit">生成报告</button>
-            <button class="secondary" type="button" id="loadSample">填入样例</button>
+          <div class="panel-title">
+            <span class="step">01 资料</span>
+            <h2>岗位 JD 与候选人简历</h2>
           </div>
-        </form>
-      </section>
-      <section>
-        <div class="panel-head">
-          <h2>评估报告</h2>
-          <div class="toolbar" id="links"></div>
+          <span class="status-pill" id="setupStatus"><span class="status-dot"></span><span>未建面试</span></span>
         </div>
-        <div class="results" id="results">
-          <div class="empty">提交一段问答后，这里会显示评分、风险点和报告链接。</div>
-        </div>
-      </section>
-      <section class="full-width">
-        <div class="panel-head">
-          <h2>实时追问</h2>
-          <span class="muted" id="liveStatus">未连接</span>
-        </div>
-        <div class="live-grid">
-          <form id="liveForm">
+        <form id="setupForm">
+          <div class="split">
             <label>
               岗位名称
-              <input name="live_job_title" value="AI 后端工程师" required />
-            </label>
-            <label>
-              JD 文本
-              <textarea name="live_jd_text" required>Python FastAPI LLM 可靠性 项目决策 指标复盘</textarea>
+              <input name="job_title" value="AI 后端工程师" required />
             </label>
             <label>
               候选人
-              <input name="live_candidate_name" value="候选人B" required />
+              <input name="candidate_name" value="候选人A" required />
             </label>
-            <label>
-              候选人回答
-              <textarea name="live_answer" required>我主要负责优化项目架构，做了很多可靠性提升，最终效果比较明显。</textarea>
-            </label>
-            <div class="toolbar">
-              <button type="submit" id="liveConnect">开始</button>
-              <button class="secondary" type="button" id="sendTurn" disabled>发送回答</button>
-              <button class="secondary" type="button" id="startMic" disabled>开始麦克风</button>
-              <button class="secondary" type="button" id="stopMic" disabled>停止麦克风</button>
-              <button class="secondary" type="button" id="manualProbe" disabled>手动追问</button>
-              <button class="secondary" type="button" id="endLive" disabled>结束</button>
-              <span class="muted status" id="micStatus">麦克风未开启</span>
-            </div>
-          </form>
-          <div class="feed" id="liveFeed">
-            <div class="empty">开始后，转写、追问卡、可信度和报告会显示在这里。</div>
+          </div>
+          <label>
+            岗位 JD
+            <textarea name="jd_text" id="jdText" required>负责 Python/FastAPI 微服务、LLM 应用、评估体系、可观测性与稳定性工程，需要能独立排查线上问题并推动复杂项目落地。</textarea>
+          </label>
+          <label>
+            上传 JD 文本
+            <input type="file" id="jdFile" accept=".txt,.md,.markdown,.json,.csv" />
+          </label>
+          <label>
+            简历摘要
+            <textarea name="resume_text" id="resumeText">候选人做过 AI 应用和后端服务，自述负责过 FastAPI 网关、模型调用编排、异常重试和评估报告链路。</textarea>
+          </label>
+          <label>
+            上传简历文本
+            <input type="file" id="resumeFile" accept=".txt,.md,.markdown,.json,.csv" />
+          </label>
+          <div class="toolbar">
+            <button type="submit" id="prepareInterview">创建实时面试</button>
+            <button class="secondary" type="button" id="resetSession">重置</button>
+          </div>
+          <div class="dimension-list" id="competencyList">
+            <div class="empty">创建面试后显示岗位能力维度</div>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel interview-panel">
+        <div class="panel-head">
+          <div class="panel-title">
+            <span class="step">02 面试</span>
+            <h2>实时语音与专业追问</h2>
+          </div>
+          <span class="status-pill" id="liveStatus"><span class="status-dot"></span><span>未连接</span></span>
+        </div>
+        <div class="session-strip">
+          <div class="metric">
+            <span>岗位</span>
+            <strong id="metricJob">待创建</strong>
+          </div>
+          <div class="metric">
+            <span>候选人</span>
+            <strong id="metricCandidate">待创建</strong>
+          </div>
+          <div class="metric">
+            <span>面试轮次</span>
+            <strong id="metricTurns">0</strong>
           </div>
         </div>
+        <form id="interviewForm">
+          <label>
+            当前面试问题
+            <textarea class="question-field" name="current_question" id="currentQuestion" required>请介绍一个你最核心的 AI 后端项目，重点说明你本人负责的模块、关键技术取舍和上线后的指标变化。</textarea>
+          </label>
+          <label>
+            候选人回答
+            <textarea class="answer-field" name="answer" id="answerText" required>我主要负责优化项目架构，做了很多可靠性提升，最终效果比较明显。</textarea>
+          </label>
+          <div class="toolbar">
+            <button type="submit" id="sendAnswer" disabled>发送回答</button>
+            <button class="secondary" type="button" id="startMic" disabled>开始麦克风</button>
+            <button class="secondary" type="button" id="stopMic" disabled>停止麦克风</button>
+            <button class="secondary" type="button" id="manualProbe" disabled>根据回答追问</button>
+            <button class="danger" type="button" id="endInterview" disabled>结束并评分</button>
+            <span class="status-pill" id="micStatus"><span class="status-dot"></span><span>麦克风未开启</span></span>
+          </div>
+        </form>
+        <div class="feed" id="liveFeed">
+          <div class="empty">实时转写、回答和追问事件会出现在这里</div>
+        </div>
       </section>
+
+      <aside class="panel insight-panel">
+        <div class="panel-head">
+          <div class="panel-title">
+            <span class="step">03 决策</span>
+            <h2>追问方向与评分报告</h2>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="stack">
+            <div class="dimension-top">
+              <h3>问题候选方向</h3>
+              <span class="tag blue" id="probeCount">0 条</span>
+            </div>
+            <div class="probe-list" id="probeList">
+              <div class="empty">候选人回答后显示可点击的专业追问</div>
+            </div>
+          </div>
+          <div class="stack">
+            <div class="dimension-top">
+              <h3>可信度信号</h3>
+              <span class="tag amber" id="credibilityLevel">待观察</span>
+            </div>
+            <div class="report-box" id="credibilityBox">
+              <p>等待候选人首个回答。</p>
+            </div>
+          </div>
+          <div class="stack">
+            <div class="dimension-top">
+              <h3>最终评分</h3>
+              <div class="row" id="reportLinks"></div>
+            </div>
+            <div id="reportPanel">
+              <div class="empty">结束面试后生成综合评分</div>
+            </div>
+          </div>
+        </div>
+      </aside>
     </main>
+
     <script>
-      const turns = document.querySelector("#turns");
-      const results = document.querySelector("#results");
-      const links = document.querySelector("#links");
-      const submit = document.querySelector("#submit");
-      const liveForm = document.querySelector("#liveForm");
-      const liveFeed = document.querySelector("#liveFeed");
+      const setupForm = document.querySelector("#setupForm");
+      const interviewForm = document.querySelector("#interviewForm");
+      const jdText = document.querySelector("#jdText");
+      const resumeText = document.querySelector("#resumeText");
+      const currentQuestion = document.querySelector("#currentQuestion");
+      const answerText = document.querySelector("#answerText");
+      const setupStatus = document.querySelector("#setupStatus");
+      const runtimeStatus = document.querySelector("#runtimeStatus");
       const liveStatus = document.querySelector("#liveStatus");
-      const liveConnectButton = document.querySelector("#liveConnect");
-      const sendTurnButton = document.querySelector("#sendTurn");
-      const startMicButton = document.querySelector("#startMic");
-      const stopMicButton = document.querySelector("#stopMic");
-      const manualProbeButton = document.querySelector("#manualProbe");
-      const endLiveButton = document.querySelector("#endLive");
       const micStatus = document.querySelector("#micStatus");
-      let liveSocket = null;
-      let liveInterviewId = "";
-      let liveSeq = 1;
-      let micStream = null;
-      let micContext = null;
-      let micSource = null;
-      let micProcessor = null;
-      let micSamples = [];
-      let micSentSamples = 0;
-      let micRecording = false;
+      const competencyList = document.querySelector("#competencyList");
+      const probeList = document.querySelector("#probeList");
+      const probeCount = document.querySelector("#probeCount");
+      const credibilityLevel = document.querySelector("#credibilityLevel");
+      const credibilityBox = document.querySelector("#credibilityBox");
+      const reportPanel = document.querySelector("#reportPanel");
+      const reportLinks = document.querySelector("#reportLinks");
+      const liveFeed = document.querySelector("#liveFeed");
+      const metricJob = document.querySelector("#metricJob");
+      const metricCandidate = document.querySelector("#metricCandidate");
+      const metricTurns = document.querySelector("#metricTurns");
+      const prepareInterview = document.querySelector("#prepareInterview");
+      const sendAnswer = document.querySelector("#sendAnswer");
+      const startMic = document.querySelector("#startMic");
+      const stopMic = document.querySelector("#stopMic");
+      const manualProbe = document.querySelector("#manualProbe");
+      const endInterview = document.querySelector("#endInterview");
+
+      const state = {
+        job: null,
+        candidate: null,
+        interview: null,
+        socket: null,
+        seq: 1,
+        turns: 0,
+        selectedQuestionSource: "interviewer",
+        selectedProbeTarget: null,
+        selectedCompetency: null,
+        startedAt: 0,
+        micStream: null,
+        micContext: null,
+        micSource: null,
+        micProcessor: null,
+        micSamples: [],
+        micSentSamples: 0,
+        micRecording: false,
+      };
+
       const micSampleRate = 16000;
       const micChunkSamples = micSampleRate;
 
@@ -388,95 +763,33 @@
           .replaceAll("'", "&#39;");
       }
 
-      function addTurn(question = "", answer = "") {
-        const index = turns.children.length + 1;
-        const node = document.createElement("div");
-        node.className = "turn";
-        node.innerHTML = `
-          <label>问题 ${index}<textarea name="question" required>${question}</textarea></label>
-          <label>回答 ${index}<textarea name="answer" required>${answer}</textarea></label>
-        `;
-        turns.appendChild(node);
+      function setPill(node, text, tone = "") {
+        node.className = `status-pill ${tone}`;
+        node.innerHTML = `<span class="status-dot"></span><span>${escapeHtml(text)}</span>`;
       }
 
-      function loadSample() {
-        turns.innerHTML = "";
-        addTurn("介绍一个你最核心的 AI 项目。", "我主要负责整体架构设计并推动项目落地，优化后效果有显著提升。");
-        addTurn("具体你写了哪部分？", "我写了 FastAPI 的调用编排、重试和 JSON 解析，因为线上模型偶发返回格式错误。");
+      function setControls() {
+        const connected = Boolean(state.socket && state.socket.readyState === WebSocket.OPEN);
+        sendAnswer.disabled = !connected;
+        startMic.disabled = !connected || state.micRecording;
+        stopMic.disabled = !connected || !state.micRecording;
+        manualProbe.disabled = !connected;
+        endInterview.disabled = !connected;
+        prepareInterview.disabled = connected;
+        setPill(liveStatus, connected ? `已连接 ${state.interview.id.slice(0, 8)}` : "未连接", connected ? "live" : "");
+        setPill(micStatus, state.micRecording ? "麦克风采集中" : "麦克风未开启", state.micRecording ? "live" : "");
       }
 
-      function formPayload(form) {
-        const turnNodes = [...turns.querySelectorAll(".turn")];
-        return {
-          job_title: form.job_title.value,
-          jd_text: form.jd_text.value,
-          candidate_name: form.candidate_name.value,
-          resume_text: form.resume_text.value,
-          turns: turnNodes.map((node, index) => ({
-            question: node.querySelector('[name="question"]').value,
-            answer: node.querySelector('[name="answer"]').value,
-            answer_start_ms: index * 30000,
-            answer_end_ms: index * 30000 + 20000,
-          })),
-        };
-      }
-
-      function renderReport(payload) {
-        const report = payload.report;
-        const score = report.score;
-        links.innerHTML = `
-          <a class="button secondary" href="/api/interviews/${report.interview_id}/report.html" target="_blank">HTML</a>
-          <a class="button secondary" href="/api/interviews/${report.interview_id}/report.pdf" target="_blank">PDF</a>
-        `;
-        const dimensions = score.dimensions
-          .map(
-            (d) => `
-              <tr>
-                <td>${escapeHtml(d.dimension)}</td>
-                <td>${escapeHtml(d.score)}</td>
-                <td>${escapeHtml(d.weight)}</td>
-                <td>${d.evidence.map((e) => escapeHtml(e.excerpt)).join("<br>")}</td>
-              </tr>`
-          )
-          .join("");
-        const risks =
-          score.risk_notes.length > 0
-            ? score.risk_notes.map((note) => `<p class="risk">${escapeHtml(note)}</p>`).join("")
-            : '<p class="muted">暂无高置信风险点。</p>';
-        results.innerHTML = `
-          <div class="score">
-            <div class="score-main"><strong>${escapeHtml(score.total_score)}</strong><span class="muted">${escapeHtml(score.recommendation)}</span></div>
-            <div class="summary"><strong>总评</strong><span>${escapeHtml(report.summary)}</span></div>
-          </div>
-          <div>${risks}</div>
-          <table>
-            <thead><tr><th>维度</th><th>分数</th><th>权重</th><th>证据</th></tr></thead>
-            <tbody>${dimensions}</tbody>
-          </table>
-        `;
-      }
-
-      function appendLiveEvent(title, body, tone = "") {
+      function appendEvent(title, body, tone = "") {
         if (liveFeed.querySelector(".empty")) liveFeed.innerHTML = "";
         const node = document.createElement("div");
-        node.className = `event ${tone}`;
-        node.innerHTML = `<strong>${escapeHtml(title)}</strong><div>${body}</div>`;
+        node.className = "event";
+        const tag = tone ? `<span class="tag ${tone}">${escapeHtml(tone)}</span>` : "";
+        node.innerHTML = `
+          <div class="event-top"><strong>${escapeHtml(title)}</strong>${tag}</div>
+          <p>${body}</p>
+        `;
         liveFeed.prepend(node);
-      }
-
-      async function createLiveInterview(form) {
-        const job = await postJson("/api/jobs", {
-          title: form.live_job_title.value,
-          jd_text: form.live_jd_text.value,
-        });
-        const candidate = await postJson("/api/candidates", {
-          name: form.live_candidate_name.value,
-          resume_text: "",
-        });
-        return postJson("/api/interviews", {
-          job_id: job.id,
-          candidate_id: candidate.id,
-        });
       }
 
       async function postJson(url, payload) {
@@ -489,81 +802,329 @@
         return response.json();
       }
 
-      function setLiveConnected(connected) {
-        liveStatus.textContent = connected ? `已连接 ${liveInterviewId}` : "未连接";
-        liveConnectButton.disabled = connected;
-        sendTurnButton.disabled = !connected;
-        startMicButton.disabled = !connected || micRecording;
-        stopMicButton.disabled = !connected || !micRecording;
-        manualProbeButton.disabled = !connected;
-        endLiveButton.disabled = !connected;
+      async function checkRuntime() {
+        try {
+          const status = await fetch("/health").then((response) => response.json());
+          setPill(runtimeStatus, status.status === "ok" ? "服务正常" : "服务异常", status.status === "ok" ? "ready" : "");
+        } catch (error) {
+          setPill(runtimeStatus, "服务不可达", "");
+        }
       }
 
-      function openLiveSocket(interviewId) {
+      async function readTextFile(file, target, label) {
+        if (!file) return;
+        const text = await file.text();
+        target.value = text.trim() ? text : target.value;
+        appendEvent("资料上传", `${escapeHtml(label)} 已读取：${escapeHtml(file.name)}`);
+      }
+
+      function renderCompetencies(job) {
+        const items = job.competency_model.items || [];
+        if (!items.length) {
+          competencyList.innerHTML = '<div class="empty">暂无能力维度</div>';
+          return;
+        }
+        competencyList.innerHTML = items
+          .map(
+            (item, index) => `
+              <div class="dimension">
+                <div class="dimension-top">
+                  <h3>${escapeHtml(item.name)}</h3>
+                  <span class="tag">${Math.round(Number(item.weight || 0) * 100)}%</span>
+                </div>
+                <p>${escapeHtml(item.description)}</p>
+                <button class="secondary" type="button" data-seed-question="${index}">生成此维度问题</button>
+              </div>
+            `
+          )
+          .join("");
+        competencyList.querySelectorAll("[data-seed-question]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const item = items[Number(button.dataset.seedQuestion)];
+            const question = seedQuestionFor(item);
+            selectQuestion(question, {
+              questionSource: "interviewer",
+              probeTarget: item.name,
+              competency: item.name,
+            });
+          });
+        });
+        renderProbeCards(
+          items.slice(0, 3).map((item, index) => ({
+            priority: index + 1,
+            question: seedQuestionFor(item),
+            target: "建立候选方向",
+            competency: item.name,
+          }))
+        );
+      }
+
+      function seedQuestionFor(item) {
+        const pattern = item.probe_patterns && item.probe_patterns[0];
+        return (
+          pattern ||
+          `围绕「${item.name}」，请候选人讲一个真实项目细节：本人负责哪一段、为什么这样设计、遇到什么异常、最后指标如何变化？`
+        );
+      }
+
+      function renderProbeCards(suggestions = []) {
+        probeCount.textContent = `${suggestions.length} 条`;
+        if (!suggestions.length) {
+          probeList.innerHTML = '<div class="empty">候选人回答后显示可点击的专业追问</div>';
+          return;
+        }
+        probeList.innerHTML = suggestions
+          .map(
+            (item, index) => `
+              <div class="probe-card">
+                <div class="probe-top">
+                  <span class="tag amber">P${escapeHtml(item.priority || index + 1)}</span>
+                  <span class="tag blue">${escapeHtml(item.competency)}</span>
+                </div>
+                <h3>${escapeHtml(item.question)}</h3>
+                <p>${escapeHtml(item.target)}</p>
+                <button class="secondary" type="button" data-probe-index="${index}">设为下一问</button>
+              </div>
+            `
+          )
+          .join("");
+        probeList.querySelectorAll("[data-probe-index]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const item = suggestions[Number(button.dataset.probeIndex)];
+            selectQuestion(item.question, {
+              questionSource: "ai_probe",
+              probeTarget: item.target,
+              competency: item.competency,
+            });
+          });
+        });
+      }
+
+      function selectQuestion(question, meta = {}) {
+        currentQuestion.value = question;
+        state.selectedQuestionSource = meta.questionSource || "interviewer";
+        state.selectedProbeTarget = meta.probeTarget || null;
+        state.selectedCompetency = meta.competency || null;
+        appendEvent(
+          "下一问",
+          `${escapeHtml(question)}<br><span class="small">${escapeHtml(meta.competency || "自定义问题")}</span>`
+        );
+        answerText.focus();
+      }
+
+      async function prepareSession(form) {
+        closeSocket();
+        stopMicCapture();
+        state.seq = 1;
+        state.turns = 0;
+        state.startedAt = Date.now();
+        metricTurns.textContent = "0";
+        reportLinks.innerHTML = "";
+        reportPanel.innerHTML = '<div class="empty">结束面试后生成综合评分</div>';
+        credibilityLevel.textContent = "待观察";
+        credibilityBox.innerHTML = "<p>等待候选人首个回答。</p>";
+        liveFeed.innerHTML = '<div class="empty">实时转写、回答和追问事件会出现在这里</div>';
+        setPill(setupStatus, "创建中", "live");
+        prepareInterview.disabled = true;
+        try {
+          const job = await postJson("/api/jobs", {
+            title: form.job_title.value.trim(),
+            jd_text: form.jd_text.value.trim(),
+          });
+          const candidate = await postJson("/api/candidates", {
+            name: form.candidate_name.value.trim(),
+            resume_text: form.resume_text.value.trim(),
+          });
+          const interview = await postJson("/api/interviews", {
+            job_id: job.id,
+            candidate_id: candidate.id,
+          });
+          state.job = job;
+          state.candidate = candidate;
+          state.interview = interview;
+          metricJob.textContent = job.title;
+          metricCandidate.textContent = candidate.name;
+          renderCompetencies(job);
+          openSocket(interview.id);
+          setPill(setupStatus, "已建面试", "ready");
+          appendEvent("面试创建", `${escapeHtml(job.title)} · ${escapeHtml(candidate.name)}`);
+        } catch (error) {
+          setPill(setupStatus, "创建失败", "");
+          appendEvent("错误", escapeHtml(error), "red");
+          prepareInterview.disabled = false;
+        }
+      }
+
+      function openSocket(interviewId) {
         const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-        liveSocket = new WebSocket(`${protocol}://${window.location.host}/ws/interview/${interviewId}`);
-        liveSocket.addEventListener("open", () => {
-          setLiveConnected(true);
-          appendLiveEvent("连接", "实时通道已打开。");
+        state.socket = new WebSocket(`${protocol}://${window.location.host}/ws/interview/${interviewId}`);
+        state.socket.addEventListener("open", () => {
+          setControls();
+          appendEvent("实时通道", "WebSocket 已打开。");
         });
-        liveSocket.addEventListener("close", () => {
+        state.socket.addEventListener("close", () => {
           stopMicCapture();
-          setLiveConnected(false);
-          appendLiveEvent("连接", "实时通道已关闭。");
+          setControls();
+          appendEvent("实时通道", "WebSocket 已关闭。");
         });
-        liveSocket.addEventListener("message", (event) => renderLiveMessage(JSON.parse(event.data)));
+        state.socket.addEventListener("message", (event) => {
+          renderLiveMessage(JSON.parse(event.data));
+        });
+      }
+
+      function closeSocket() {
+        if (state.socket && state.socket.readyState === WebSocket.OPEN) {
+          state.socket.close();
+        }
+        state.socket = null;
+        setControls();
+      }
+
+      function turnTiming() {
+        const start = Math.max(0, Date.now() - state.startedAt);
+        const estimated = Math.max(1200, Math.min(30000, answerText.value.length * 220));
+        return { start_ms: Math.round(start), end_ms: Math.round(start + estimated) };
+      }
+
+      function eventQuestionMeta() {
+        return {
+          question: currentQuestion.value.trim(),
+          question_source: state.selectedQuestionSource,
+          probe_target: state.selectedProbeTarget,
+        };
+      }
+
+      function sendTurn(manual = false) {
+        if (!state.socket || state.socket.readyState !== WebSocket.OPEN) return;
+        const answer = answerText.value.trim();
+        const question = currentQuestion.value.trim();
+        if (!answer || !question) {
+          appendEvent("输入缺失", "当前问题和候选人回答都需要填写。", "red");
+          return;
+        }
+        const timing = turnTiming();
+        const payload = manual
+          ? {
+              type: "manual_probe",
+              answer,
+              confidence: 1,
+              ...timing,
+              ...eventQuestionMeta(),
+            }
+          : {
+              type: "text_turn",
+              seq: state.seq++,
+              answer,
+              speaker: "candidate",
+              confidence: 1,
+              ...timing,
+              ...eventQuestionMeta(),
+            };
+        state.socket.send(JSON.stringify(payload));
+        appendEvent(
+          manual ? "追问触发" : "回答已发送",
+          `<span class="small">Q</span> ${escapeHtml(question)}<br><span class="small">A</span> ${escapeHtml(answer)}`
+        );
       }
 
       function renderLiveMessage(message) {
         if (message.type === "transcript") {
-          appendLiveEvent(
+          state.turns += message.payload.speaker === "candidate" && message.payload.is_final ? 1 : 0;
+          metricTurns.textContent = String(state.turns);
+          appendEvent(
             "转写",
             `${escapeHtml(message.payload.speaker)} · ${escapeHtml(message.payload.text)}`
           );
         } else if (message.type === "probe") {
-          const cards = message.payload.suggestions
-            .map((item) => `<p>${escapeHtml(item.priority)}. ${escapeHtml(item.question)}<br><span class="muted">${escapeHtml(item.target)} · ${escapeHtml(item.competency)}</span></p>`)
-            .join("");
-          appendLiveEvent("追问卡", cards);
+          renderProbeCards(message.payload.suggestions || []);
+          appendEvent("追问方向", "已生成新的专业问题候选。", "blue");
         } else if (message.type === "credibility") {
-          appendLiveEvent(
-            "可信度",
-            `${escapeHtml(message.payload.level)} · ${escapeHtml(message.payload.reason)}<br><span class="muted">${escapeHtml(message.payload.drill_down_hint)}</span>`
-          );
+          credibilityLevel.textContent = message.payload.level;
+          credibilityBox.innerHTML = `
+            <h3>${escapeHtml(message.payload.reason)}</h3>
+            <p>${escapeHtml(message.payload.drill_down_hint)}</p>
+          `;
         } else if (message.type === "signal") {
-          appendLiveEvent(
+          appendEvent(
             "行为信号",
             `fluency ${escapeHtml(message.payload.fluency)} · hesitation ${escapeHtml(message.payload.hesitation)}`
           );
         } else if (message.type === "asr_warning") {
-          appendLiveEvent("ASR", escapeHtml(message.payload.reason), "risk");
+          appendEvent("ASR", escapeHtml(message.payload.reason), "red");
         } else if (message.type === "report") {
           stopMicCapture();
-          const id = message.payload.interview_id;
-          appendLiveEvent(
-            "报告",
-            `<a class="button secondary" href="/api/interviews/${id}/report.html" target="_blank">HTML</a> <a class="button secondary" href="/api/interviews/${id}/report.pdf" target="_blank">PDF</a>`
-          );
+          renderReport(message.payload);
+          appendEvent("评分完成", `总分 ${escapeHtml(message.payload.score.total_score)}`, "green");
         } else if (message.type === "task_queued") {
-          appendLiveEvent(
-            "任务已排队",
-            `${escapeHtml(message.payload.task_name)} · ${escapeHtml(message.payload.task_id)}`
-          );
+          appendEvent("任务已排队", `${escapeHtml(message.payload.task_name)} · ${escapeHtml(message.payload.task_id)}`);
         } else if (message.type === "error") {
-          appendLiveEvent("错误", escapeHtml(message.detail || "unknown error"), "risk");
+          appendEvent("错误", escapeHtml(message.detail || "unknown error"), "red");
         }
+        setControls();
       }
 
-      function sendLiveTurn(manual = false) {
-        if (!liveSocket || liveSocket.readyState !== WebSocket.OPEN) return;
-        const answer = liveForm.live_answer.value;
-        liveSocket.send(
-          JSON.stringify(
-            manual
-              ? { type: "manual_probe", answer }
-              : { type: "text_turn", seq: liveSeq++, answer, speaker: "candidate" }
+      function recommendationLabel(value) {
+        return {
+          strong_yes: "强烈推荐",
+          yes: "推荐",
+          hold: "待定",
+          no: "不推荐",
+        }[value] || value;
+      }
+
+      function renderReport(report) {
+        const score = report.score;
+        reportLinks.innerHTML = `
+          <a class="button secondary" href="/api/interviews/${report.interview_id}/report.html" target="_blank">HTML</a>
+          <a class="button secondary" href="/api/interviews/${report.interview_id}/report.pdf" target="_blank">PDF</a>
+          <a class="button secondary" href="/api/interviews/${report.interview_id}/report.json" target="_blank">JSON</a>
+        `;
+        const rows = score.dimensions
+          .map(
+            (dimension) => `
+              <tr>
+                <td>${escapeHtml(dimension.dimension)}</td>
+                <td>${escapeHtml(dimension.score)}</td>
+                <td>${dimension.evidence.map((item) => escapeHtml(item.excerpt)).join("<br>")}</td>
+              </tr>
+            `
           )
-        );
+          .join("");
+        const risks = score.risk_notes.length
+          ? score.risk_notes.map((note) => `<p class="risk">${escapeHtml(note)}</p>`).join("")
+          : '<p class="success">暂无高置信风险点。</p>';
+        const transcript = report.transcript
+          .map(
+            (turn, index) => `
+              <tr>
+                <td>${index + 1}</td>
+                <td>${escapeHtml(turn.question)}</td>
+                <td>${escapeHtml(turn.answer)}</td>
+              </tr>
+            `
+          )
+          .join("");
+        reportPanel.innerHTML = `
+          <div class="report-box">
+            <div class="score-line">
+              <div class="score-main"><strong>${escapeHtml(score.total_score)}</strong><span>${escapeHtml(recommendationLabel(score.recommendation))}</span></div>
+              <div class="stack">
+                <h3>总评</h3>
+                <p>${escapeHtml(report.summary)}</p>
+                ${report.candidate_resume_text ? `<p><strong>简历摘要：</strong>${escapeHtml(report.candidate_resume_text)}</p>` : ""}
+              </div>
+            </div>
+            <div>${risks}</div>
+            <table>
+              <thead><tr><th>维度</th><th>分数</th><th>证据</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+            <table>
+              <thead><tr><th>#</th><th>问题</th><th>回答</th></tr></thead>
+              <tbody>${transcript}</tbody>
+            </table>
+          </div>
+        `;
       }
 
       function downsampleBuffer(buffer, inputRate, outputRate) {
@@ -599,23 +1160,23 @@
 
       function appendMicSamples(samples) {
         for (let index = 0; index < samples.length; index += 1) {
-          micSamples.push(samples[index]);
+          state.micSamples.push(samples[index]);
         }
-        while (micSamples.length >= micChunkSamples) {
-          sendMicSamples(micSamples.splice(0, micChunkSamples));
+        while (state.micSamples.length >= micChunkSamples) {
+          sendMicSamples(state.micSamples.splice(0, micChunkSamples));
         }
       }
 
       function sendMicSamples(samples) {
-        if (!liveSocket || liveSocket.readyState !== WebSocket.OPEN || samples.length === 0) return;
-        const startMs = Math.round((micSentSamples / micSampleRate) * 1000);
-        micSentSamples += samples.length;
-        const endMs = Math.round((micSentSamples / micSampleRate) * 1000);
-        liveSocket.send(
+        if (!state.socket || state.socket.readyState !== WebSocket.OPEN || samples.length === 0) return;
+        const startMs = Math.round((state.micSentSamples / micSampleRate) * 1000);
+        state.micSentSamples += samples.length;
+        const endMs = Math.round((state.micSentSamples / micSampleRate) * 1000);
+        state.socket.send(
           JSON.stringify({
             type: "audio_chunk",
-            session_id: liveInterviewId,
-            seq: liveSeq++,
+            session_id: state.interview.id,
+            seq: state.seq++,
             audio: samplesToBase64Pcm16(samples),
             speaker: "candidate",
             format: "pcm16",
@@ -625,18 +1186,19 @@
             end_ms: endMs,
             is_final: true,
             confidence: 0.95,
+            ...eventQuestionMeta(),
           })
         );
       }
 
       async function startMicCapture() {
-        if (micRecording || !liveSocket || liveSocket.readyState !== WebSocket.OPEN) return;
+        if (state.micRecording || !state.socket || state.socket.readyState !== WebSocket.OPEN) return;
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          appendLiveEvent("麦克风", "当前浏览器不支持麦克风采集。", "risk");
+          appendEvent("麦克风", "当前浏览器不支持麦克风采集。", "red");
           return;
         }
         try {
-          micStream = await navigator.mediaDevices.getUserMedia({
+          state.micStream = await navigator.mediaDevices.getUserMedia({
             audio: {
               channelCount: 1,
               echoCancellation: true,
@@ -644,106 +1206,119 @@
               autoGainControl: true,
             },
           });
-          micContext = new AudioContext();
-          micSource = micContext.createMediaStreamSource(micStream);
-          micProcessor = micContext.createScriptProcessor(4096, 1, 1);
-          micSamples = [];
-          micSentSamples = 0;
-          micRecording = true;
-          micProcessor.onaudioprocess = (event) => {
+          state.micContext = new AudioContext();
+          state.micSource = state.micContext.createMediaStreamSource(state.micStream);
+          state.micProcessor = state.micContext.createScriptProcessor(4096, 1, 1);
+          state.micSamples = [];
+          state.micSentSamples = 0;
+          state.micRecording = true;
+          state.micProcessor.onaudioprocess = (event) => {
             const input = event.inputBuffer.getChannelData(0);
             const output = event.outputBuffer.getChannelData(0);
             output.fill(0);
-            appendMicSamples(downsampleBuffer(input, micContext.sampleRate, micSampleRate));
+            appendMicSamples(downsampleBuffer(input, state.micContext.sampleRate, micSampleRate));
           };
-          micSource.connect(micProcessor);
-          micProcessor.connect(micContext.destination);
-          micStatus.textContent = "麦克风采集中";
-          appendLiveEvent(
-            "麦克风",
-            "已开始发送 16k PCM 音频。若仍使用本地 stub ASR，只能验证链路；真实转写需配置 ASR_PROVIDER=http。"
-          );
-          setLiveConnected(true);
+          state.micSource.connect(state.micProcessor);
+          state.micProcessor.connect(state.micContext.destination);
+          appendEvent("麦克风", "正在发送 16k PCM 音频。");
+          setControls();
         } catch (error) {
-          micStatus.textContent = "麦克风未开启";
-          appendLiveEvent("麦克风", escapeHtml(error), "risk");
+          appendEvent("麦克风", escapeHtml(error), "red");
           stopMicCapture();
         }
       }
 
       function stopMicCapture() {
-        if (!micRecording && !micStream && !micContext) return;
-        if (micSamples.length > 0) {
-          sendMicSamples(micSamples.splice(0, micSamples.length));
+        if (!state.micRecording && !state.micStream && !state.micContext) return;
+        if (state.micSamples.length > 0) {
+          sendMicSamples(state.micSamples.splice(0, state.micSamples.length));
         }
-        micRecording = false;
-        if (micProcessor) {
-          micProcessor.disconnect();
-          micProcessor.onaudioprocess = null;
+        state.micRecording = false;
+        if (state.micProcessor) {
+          state.micProcessor.disconnect();
+          state.micProcessor.onaudioprocess = null;
         }
-        if (micSource) micSource.disconnect();
-        if (micStream) {
-          micStream.getTracks().forEach((track) => track.stop());
+        if (state.micSource) state.micSource.disconnect();
+        if (state.micStream) {
+          state.micStream.getTracks().forEach((track) => track.stop());
         }
-        if (micContext && micContext.state !== "closed") {
-          micContext.close().catch(() => {});
+        if (state.micContext && state.micContext.state !== "closed") {
+          state.micContext.close().catch(() => {});
         }
-        micStream = null;
-        micContext = null;
-        micSource = null;
-        micProcessor = null;
-        micSamples = [];
-        micStatus.textContent = "麦克风未开启";
-        setLiveConnected(Boolean(liveSocket && liveSocket.readyState === WebSocket.OPEN));
+        state.micStream = null;
+        state.micContext = null;
+        state.micSource = null;
+        state.micProcessor = null;
+        state.micSamples = [];
+        setControls();
       }
 
-      document.querySelector("#addTurn").addEventListener("click", () => addTurn());
+      function loadSample() {
+        setupForm.job_title.value = "高级 AI 后端工程师";
+        setupForm.candidate_name.value = "张三";
+        jdText.value =
+          "负责 LLM 应用平台、FastAPI 微服务、模型调用编排、可靠性治理、评估报告与线上故障排查。要求能独立做技术方案、指标设计、降级策略和跨团队协作。";
+        resumeText.value =
+          "候选人自述 5 年 Python 后端经验，最近负责 AI 面试评估系统，涉及 FastAPI 网关、LLM JSON 解析、重试降级、报告生成和可观测性指标。";
+        currentQuestion.value =
+          "请讲一个最近负责的 LLM 后端项目，说明你本人写了哪些模块，核心技术取舍是什么，上线后哪些指标发生了变化？";
+        answerText.value =
+          "我主要写了 FastAPI 网关和模型调用编排，处理过 JSON 解析失败、超时重试和报告生成。我把失败重试从固定次数改成按错误类型分流，P95 延迟从 3.8 秒降到 2.4 秒。";
+        appendEvent("样例资料", "已填入一组 JD、简历和首问回答。");
+      }
+
+      setupForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        prepareSession(event.currentTarget);
+      });
+
+      interviewForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        sendTurn(false);
+      });
+
+      document.querySelector("#jdFile").addEventListener("change", (event) => {
+        readTextFile(event.target.files[0], jdText, "JD");
+      });
+
+      document.querySelector("#resumeFile").addEventListener("change", (event) => {
+        readTextFile(event.target.files[0], resumeText, "简历");
+      });
+
       document.querySelector("#loadSample").addEventListener("click", loadSample);
-      liveForm.addEventListener("submit", async (event) => {
-        event.preventDefault();
-        liveConnectButton.disabled = true;
-        try {
-          const interview = await createLiveInterview(event.currentTarget);
-          liveInterviewId = interview.id;
-          liveSeq = 1;
-          liveFeed.innerHTML = "";
-          openLiveSocket(liveInterviewId);
-        } catch (error) {
-          appendLiveEvent("错误", escapeHtml(error), "risk");
-          liveConnectButton.disabled = false;
-        }
-      });
-      sendTurnButton.addEventListener("click", () => sendLiveTurn(false));
-      startMicButton.addEventListener("click", () => startMicCapture());
-      stopMicButton.addEventListener("click", () => stopMicCapture());
-      manualProbeButton.addEventListener("click", () => sendLiveTurn(true));
-      endLiveButton.addEventListener("click", () => {
+      document.querySelector("#resetSession").addEventListener("click", () => {
         stopMicCapture();
-        if (liveSocket && liveSocket.readyState === WebSocket.OPEN) {
-          liveSocket.send(JSON.stringify({ type: "end" }));
-        }
+        closeSocket();
+        state.job = null;
+        state.candidate = null;
+        state.interview = null;
+        state.seq = 1;
+        state.turns = 0;
+        state.selectedQuestionSource = "interviewer";
+        state.selectedProbeTarget = null;
+        state.selectedCompetency = null;
+        metricJob.textContent = "待创建";
+        metricCandidate.textContent = "待创建";
+        metricTurns.textContent = "0";
+        competencyList.innerHTML = '<div class="empty">创建面试后显示岗位能力维度</div>';
+        renderProbeCards([]);
+        reportLinks.innerHTML = "";
+        reportPanel.innerHTML = '<div class="empty">结束面试后生成综合评分</div>';
+        setPill(setupStatus, "未建面试", "");
       });
-      document.querySelector("#evaluateForm").addEventListener("submit", async (event) => {
-        event.preventDefault();
-        submit.disabled = true;
-        submit.textContent = "生成中";
-        try {
-          const response = await fetch("/api/offline/evaluate", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify(formPayload(event.currentTarget)),
-          });
-          if (!response.ok) throw new Error(await response.text());
-          renderReport(await response.json());
-        } catch (error) {
-          results.innerHTML = `<div class="empty risk">${String(error)}</div>`;
-        } finally {
-          submit.disabled = false;
-          submit.textContent = "生成报告";
+      startMic.addEventListener("click", startMicCapture);
+      stopMic.addEventListener("click", stopMicCapture);
+      manualProbe.addEventListener("click", () => sendTurn(true));
+      endInterview.addEventListener("click", () => {
+        stopMicCapture();
+        if (state.socket && state.socket.readyState === WebSocket.OPEN) {
+          state.socket.send(JSON.stringify({ type: "end" }));
         }
       });
 
+      checkRuntime();
       loadSample();
+      setControls();
     </script>
   </body>
 </html>

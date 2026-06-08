@@ -94,6 +94,7 @@ def _scoring_payload(ctx: InterviewContext, aigc_results: list[AIGCResult]) -> s
     payload = {
         "job_id": ctx.job_id,
         "candidate_id": ctx.candidate_id,
+        "candidate_resume_text": ctx.candidate_resume_text,
         "competency_model": ctx.competency_model.model_dump(),
         "turns": [turn.model_dump() for turn in ctx.turns],
         "consistency_flags": [flag.model_dump() for flag in ctx.flags],

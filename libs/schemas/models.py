@@ -195,6 +195,7 @@ class InterviewContext(BaseModel):
     job_id: str
     candidate_id: str
     competency_model: CompetencyModel
+    candidate_resume_text: str = ""
     turns: list[QATurn] = Field(default_factory=list)
     started_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     ended_at: datetime | None = None
@@ -647,6 +648,7 @@ class Report(BaseModel):
     aigc_results: list[AIGCResult] = Field(min_length=1)
     consistency_flags: list[ConsistencyFlag]
     transcript: list[QATurn] = Field(min_length=1)
+    candidate_resume_text: str = ""
     summary: str
     json_path: str | None = None
     html_path: str | None = None

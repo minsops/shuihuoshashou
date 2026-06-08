@@ -60,6 +60,7 @@ def test_gateway_offline_report_flow(tmp_path: Path, monkeypatch) -> None:
         "/api/interviews",
         json={"job_id": job["id"], "candidate_id": candidate["id"]},
     ).json()
+    assert interview["context"]["candidate_resume_text"] == "AI backend"
     client.post(
         f"/api/interviews/{interview['id']}/turns",
         json={
@@ -72,6 +73,7 @@ def test_gateway_offline_report_flow(tmp_path: Path, monkeypatch) -> None:
 
     report = client.post(f"/api/interviews/{interview['id']}/end").json()
     assert report["score"]["total_score"] > 0
+    assert report["candidate_resume_text"] == "AI backend"
     assert client.get(f"/api/interviews/{interview['id']}/report").status_code == 200
     assert client.get(f"/api/interviews/{interview['id']}/report.html").status_code == 200
     report_json = client.get(f"/api/interviews/{interview['id']}/report.json")
@@ -211,8 +213,9 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     response = client.get("/")
     assert response.status_code == 200
     assert "水货杀手" in response.text
-    assert "/api/offline/evaluate" in response.text
-    assert "实时追问" in response.text
+    assert "/api/jobs" in response.text
+    assert "创建实时面试" in response.text
+    assert "专业追问" in response.text
     assert "/ws/interview/" in response.text
     assert "asr_warning" in response.text
     assert "开始麦克风" in response.text
@@ -1182,17 +1185,29 @@ def test_gateway_websocket_text_turn_probe_flow(tmp_path: Path, monkeypatch) -> 
             {
                 "type": "text_turn",
                 "seq": 1,
+                "question": "请说明你在 FastAPI 网关里亲自负责的模块。",
+                "question_source": "ai_probe",
+                "probe_target": "验证项目真实性",
                 "answer": "我主要负责优化，做了很多事情，效果比较好。",
             }
         )
         transcript = websocket.receive_json()
         probe = websocket.receive_json()
         credibility = websocket.receive_json()
+        websocket.send_json({"type": "end"})
+        report = websocket.receive_json()
         assert transcript["type"] == "transcript"
         assert transcript["payload"]["speaker"] == "candidate"
         assert probe["type"] == "probe"
         assert probe["payload"]["suggestions"]
         assert credibility["type"] == "credibility"
+        assert report["type"] == "report"
+        assert (
+            report["payload"]["transcript"][0]["question"]
+            == "请说明你在 FastAPI 网关里亲自负责的模块。"
+        )
+        assert report["payload"]["transcript"][0]["question_source"] == "ai_probe"
+        assert report["payload"]["transcript"][0]["probe_target"] == "验证项目真实性"
 
 
 def test_gateway_websocket_end_error_does_not_close_session(

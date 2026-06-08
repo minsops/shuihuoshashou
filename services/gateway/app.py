@@ -243,12 +243,28 @@ def index() -> str:
     return WEB_INDEX.read_text(encoding="utf-8")
 
 
-async def _send_probe_for_segment(websocket: WebSocket, interview_id: str, record, segment):
+async def _send_probe_for_segment(
+    websocket: WebSocket,
+    interview_id: str,
+    record,
+    segment,
+    *,
+    question: str = "实时输入片段",
+    question_source: str = "interviewer",
+    probe_target: str | None = None,
+):
+    clean_question = question.strip() or "实时输入片段"
+    clean_source = "ai_probe" if question_source == "ai_probe" else "interviewer"
+    clean_probe_target = probe_target.strip() if probe_target else None
+    if clean_source == "ai_probe" and not clean_probe_target:
+        clean_probe_target = "AI 追问建议"
     turn = QATurn(
-        question="实时输入片段",
+        question=clean_question,
+        question_source=clean_source,
         answer=segment.text,
         answer_start_ms=segment.start_ms,
         answer_end_ms=segment.end_ms,
+        probe_target=clean_probe_target,
     )
     record = add_turn(interview_id, turn)
     probe = await generate_probe(
@@ -312,6 +328,19 @@ def _manual_probe_confidence(event: dict) -> float:
     if not 0.0 <= confidence <= 1.0:
         raise ValueError("manual_probe confidence must be between 0 and 1")
     return confidence
+
+
+def _event_question(event: dict) -> str:
+    return str(event.get("question") or "实时输入片段").strip() or "实时输入片段"
+
+
+def _event_question_source(event: dict) -> str:
+    return "ai_probe" if str(event.get("question_source") or "").strip() == "ai_probe" else "interviewer"
+
+
+def _event_probe_target(event: dict) -> str | None:
+    value = str(event.get("probe_target") or "").strip()
+    return value or None
 
 
 async def _send_asr_warning(websocket: WebSocket, reason: str, seq: int) -> None:
@@ -733,7 +762,15 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                 segment = decision.segment
                 await websocket.send_json({"type": "transcript", "payload": segment.model_dump()})
                 if should_probe(segment, record):
-                    record = await _send_probe_for_segment(websocket, interview_id, record, segment)
+                    record = await _send_probe_for_segment(
+                        websocket,
+                        interview_id,
+                        record,
+                        segment,
+                        question=_event_question(event),
+                        question_source=_event_question_source(event),
+                        probe_target=_event_probe_target(event),
+                    )
             elif event.get("type") == "text_turn":
                 seq = _event_seq(event, 1)
                 if seq is None:
@@ -767,7 +804,15 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                 segment = decision.segment
                 await websocket.send_json({"type": "transcript", "payload": segment.model_dump()})
                 if should_probe(segment, record):
-                    record = await _send_probe_for_segment(websocket, interview_id, record, segment)
+                    record = await _send_probe_for_segment(
+                        websocket,
+                        interview_id,
+                        record,
+                        segment,
+                        question=_event_question(event),
+                        question_source=_event_question_source(event),
+                        probe_target=_event_probe_target(event),
+                    )
             elif event.get("type") == "manual_probe":
                 if not str(event.get("answer") or event.get("latest_answer") or "").strip():
                     await websocket.send_json(
@@ -779,7 +824,15 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                 except ValueError as exc:
                     await websocket.send_json({"type": "error", "detail": str(exc)})
                     continue
-                record = await _send_probe_for_segment(websocket, interview_id, record, segment)
+                record = await _send_probe_for_segment(
+                    websocket,
+                    interview_id,
+                    record,
+                    segment,
+                    question=_event_question(event),
+                    question_source=_event_question_source(event),
+                    probe_target=_event_probe_target(event),
+                )
             elif event.get("type") == "end":
                 try:
                     result = end_interview(interview_id)

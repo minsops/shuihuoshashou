@@ -115,7 +115,7 @@ def has_active_consent(candidate_id: str, consent_type: str) -> bool:
 def create_interview(payload: InterviewCreate) -> InterviewRecord:
     init_db()
     job = get_job(payload.job_id)
-    get_candidate(payload.candidate_id)
+    candidate = get_candidate(payload.candidate_id)
     if payload.signal_enabled:
         if not get_settings().signal_enabled:
             raise PermissionError("behavior signal requires admin enablement")
@@ -127,6 +127,7 @@ def create_interview(payload: InterviewCreate) -> InterviewRecord:
         job_id=payload.job_id,
         candidate_id=payload.candidate_id,
         competency_model=job.competency_model,
+        candidate_resume_text=candidate.resume_text,
     )
     record = InterviewRecord(
         id=interview_id,

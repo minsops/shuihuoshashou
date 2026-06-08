@@ -38,6 +38,12 @@ REPORT_TEMPLATE = Template(
         <h2>总评</h2>
         <p>{{ summary }}</p>
       </section>
+      {% if candidate_resume_text %}
+      <section>
+        <h2>简历摘要</h2>
+        <p>{{ candidate_resume_text }}</p>
+      </section>
+      {% endif %}
       <section>
         <h2>亮点</h2>
         {% if strengths %}
@@ -280,6 +286,7 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
         aigc_results=aigc,
         risk_highlights=_risk_highlights(score, ctx.flags),
         transcript=ctx.turns,
+        candidate_resume_text=ctx.candidate_resume_text,
         radar_chart_uri=_radar_chart_uri(score),
     )
     settings = get_settings()
@@ -322,6 +329,7 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
         aigc_results=aigc,
         consistency_flags=ctx.flags,
         transcript=ctx.turns,
+        candidate_resume_text=ctx.candidate_resume_text,
         summary=summary,
         json_path=str(json_path),
         html_path=str(html_path),
