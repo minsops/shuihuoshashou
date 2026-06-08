@@ -1219,6 +1219,11 @@
         );
       }
 
+      function sendMicWarmupFrame() {
+        if (!state.socket || state.socket.readyState !== WebSocket.OPEN) return;
+        sendMicSamples(new Float32Array(Math.round(micSampleRate * 0.2)));
+      }
+
       async function startMicCapture() {
         if (state.micRecording || !state.socket || state.socket.readyState !== WebSocket.OPEN) return;
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -1241,6 +1246,7 @@
           state.micSamples = [];
           state.micSentSamples = 0;
           state.micRecording = true;
+          sendMicWarmupFrame();
           state.micProcessor.onaudioprocess = (event) => {
             const input = event.inputBuffer.getChannelData(0);
             const output = event.outputBuffer.getChannelData(0);

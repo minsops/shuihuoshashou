@@ -12,6 +12,8 @@ from libs.common.config import Settings, get_settings
 from libs.schemas import TranscriptSegment
 from services.asr_service.service import ASREngine, Speaker
 
+NLS_STARTUP_SILENCE_MS = 200
+
 
 class AliyunNLSSession:
     def __init__(
@@ -51,6 +53,7 @@ class AliyunNLSSession:
             await self._close_websocket()
             raise RuntimeError(self.error_reason)
         self.started = True
+        await self._send_startup_silence()
         self._reader_task = asyncio.create_task(self._reader_loop())
 
     async def send_audio(self, pcm_bytes: bytes) -> None:
@@ -173,6 +176,16 @@ class AliyunNLSSession:
             },
             "payload": {},
         }
+
+    async def _send_startup_silence(self) -> None:
+        if self.ws is None:
+            return
+        bytes_per_sample = 2
+        sample_count = max(
+            1,
+            int(self.settings.aliyun_nls_sample_rate * NLS_STARTUP_SILENCE_MS / 1000),
+        )
+        await self.ws.send(b"\x00" * sample_count * bytes_per_sample)
 
     async def _close_websocket(self) -> None:
         if self.ws is None:
