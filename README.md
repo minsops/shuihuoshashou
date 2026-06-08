@@ -231,6 +231,12 @@ ALIYUN_NLS_TOKEN=your-nls-token
 
 NLS AppKey 用于 StartTranscription payload，NLS Token 用于 WebSocket URL 鉴权；只配置 AppKey 不能连接。
 
+```bash
+ALIYUN_NLS_APP_KEY=your-nls-appkey ALIYUN_NLS_TOKEN=your-nls-token python scripts/check_aliyun_nls_asr.py
+```
+
+脚本默认同样发送 `tests/fixtures/sample_16k_mono.pcm`；如果会话完成但没有返回任何转写文本，脚本会返回失败。
+
 如果 ASR provider 对某一帧失败或返回非法 transcript，WebSocket 会发送 `asr_warning`，`reason=asr_transcription_failed`，并保持面试会话打开，后续帧仍可继续处理。
 
 设置 `SPEAKER_DIARIZATION_PROVIDER=http`、`SPEAKER_DIARIZATION_BASE_URL`、`SPEAKER_DIARIZATION_API_PATH` 和 `SPEAKER_DIARIZATION_API_KEY` 后，可通过生产声纹聚类服务解析 unknown speaker。响应 speaker path 默认是 `SPEAKER_DIARIZATION_SPEAKER_PATH=speaker`。Docker Compose 会把同一组 `SPEAKER_DIARIZATION_*` 变量传给 gateway，并在启动时用运行时 settings 刷新 ASR session diarizer。

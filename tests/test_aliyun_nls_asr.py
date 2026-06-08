@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+from pathlib import Path
 
 from libs.common.config import Settings
+from libs.schemas import TranscriptSegment
+from scripts import check_aliyun_nls_asr
 from services.asr_service.nls_engine import AliyunNLSSession
 
 
@@ -124,3 +127,62 @@ def test_aliyun_nls_session_closes_websocket_when_start_fails() -> None:
         assert session.ws is None
 
     asyncio.run(run())
+
+
+def test_check_aliyun_nls_asr_smoke_script_uses_pcm_file(
+    tmp_path: Path, monkeypatch
+) -> None:
+    pcm_path = tmp_path / "sample.pcm"
+    pcm_path.write_bytes(b"\x00" * 6400)
+    monkeypatch.setenv("ALIYUN_NLS_APP_KEY", "nls-app-key")
+    monkeypatch.setenv("ALIYUN_NLS_TOKEN", "nls-token")
+
+    class FakeSmokeSession:
+        instances: list["FakeSmokeSession"] = []
+
+        def __init__(self, session_id: str, *, settings: Settings) -> None:
+            self.session_id = session_id
+            self.settings = settings
+            self.result_queue: asyncio.Queue[TranscriptSegment | None] = asyncio.Queue()
+            self.sent_audio: list[bytes] = []
+            FakeSmokeSession.instances.append(self)
+
+        async def connect(self) -> None:
+            return None
+
+        async def send_audio(self, pcm_bytes: bytes) -> None:
+            self.sent_audio.append(pcm_bytes)
+
+        async def close(self) -> None:
+            await self.result_queue.put(
+                TranscriptSegment(
+                    session_id=self.session_id,
+                    speaker="unknown",
+                    text="水货杀手 NLS 语音识别测试",
+                    start_ms=0,
+                    end_ms=1000,
+                    is_final=True,
+                    confidence=0.92,
+                )
+            )
+
+    monkeypatch.setattr(check_aliyun_nls_asr, "AliyunNLSSession", FakeSmokeSession)
+
+    exit_code = asyncio.run(check_aliyun_nls_asr._run(pcm_path))
+
+    assert exit_code == 0
+    assert FakeSmokeSession.instances
+    assert FakeSmokeSession.instances[0].sent_audio == [b"\x00" * 3200, b"\x00" * 3200]
+
+
+def test_check_aliyun_nls_asr_smoke_script_requires_token(
+    tmp_path: Path, monkeypatch
+) -> None:
+    pcm_path = tmp_path / "sample.pcm"
+    pcm_path.write_bytes(b"\x00" * 3200)
+    monkeypatch.setenv("ALIYUN_NLS_APP_KEY", "nls-app-key")
+    monkeypatch.setenv("ALIYUN_NLS_TOKEN", "")
+
+    exit_code = asyncio.run(check_aliyun_nls_asr._run(pcm_path))
+
+    assert exit_code == 2
