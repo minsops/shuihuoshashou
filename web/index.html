@@ -567,6 +567,7 @@
       </div>
       <div class="top-actions">
         <span class="status-pill" id="runtimeStatus"><span class="status-dot"></span><span>检查中</span></span>
+        <span class="status-pill" id="modelStatus"><span class="status-dot"></span><span>模型检查中</span></span>
         <button class="secondary" type="button" id="loadSample">样例资料</button>
         <a class="button secondary" href="/docs" target="_blank">API 文档</a>
       </div>
@@ -719,6 +720,7 @@
       const answerText = document.querySelector("#answerText");
       const setupStatus = document.querySelector("#setupStatus");
       const runtimeStatus = document.querySelector("#runtimeStatus");
+      const modelStatus = document.querySelector("#modelStatus");
       const liveStatus = document.querySelector("#liveStatus");
       const micStatus = document.querySelector("#micStatus");
       const competencyList = document.querySelector("#competencyList");
@@ -819,6 +821,21 @@
           setPill(runtimeStatus, status.status === "ok" ? "服务正常" : "服务异常", status.status === "ok" ? "ready" : "");
         } catch (error) {
           setPill(runtimeStatus, "服务不可达", "");
+        }
+        try {
+          const config = await fetch("/api/config/status").then((response) => response.json());
+          const connected =
+            config.llm_provider === "openai_compatible" &&
+            config.llm_base_url_configured &&
+            config.llm_api_key_configured;
+          const modelName = config.llm_model || "未知模型";
+          setPill(
+            modelStatus,
+            connected ? `模型 ${modelName} 已连接` : "模型未连接",
+            connected ? "ready" : ""
+          );
+        } catch (error) {
+          setPill(modelStatus, "模型状态未知", "");
         }
       }
 
