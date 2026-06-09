@@ -305,6 +305,9 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "url.searchParams.set(key, value)" in response.text
     assert "new WebSocket(wsUrl(`/ws/interview/${interviewId}`))" in response.text
     assert "gatewayUrl(`/api/interviews/${report.interview_id}/report.html`)" in response.text
+    assert "gatewayAuthError" in response.text
+    assert "需要 Gateway Key" in response.text
+    assert "Gateway 已启用鉴权" in response.text
     assert "interviewEnded" in response.text
     assert "面试已结束，请重置后创建新的面试" in response.text
     assert "正在结束面试并生成评分报告" in response.text

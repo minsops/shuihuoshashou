@@ -1065,12 +1065,23 @@
           const asr = asrStatusFromConfig(config);
           setPill(asrStatus, asr.text, asr.ready ? "ready" : "");
         } catch (error) {
-          setPill(modelStatus, "模型状态未知", "");
-          setPill(asrStatus, "ASR 状态未知", "");
+          if (gatewayAuthError(error)) {
+            setPill(modelStatus, "需要 Gateway Key", "");
+            setPill(asrStatus, "需要 Gateway Key", "");
+            appendEvent("服务检查", "Gateway 已启用鉴权，请在顶部 Gateway Key 输入框保存 key。", "red");
+          } else {
+            setPill(modelStatus, "模型状态未知", "");
+            setPill(asrStatus, "ASR 状态未知", "");
+          }
         } finally {
           refreshStatus.disabled = false;
           refreshStatus.title = "重新检查服务、模型和 ASR 状态";
         }
+      }
+
+      function gatewayAuthError(error) {
+        const text = errorText(error).toLowerCase();
+        return text.includes("401") || text.includes("unauthorized");
       }
 
       async function checkLlmConnection() {
