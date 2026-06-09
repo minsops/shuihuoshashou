@@ -789,6 +789,7 @@
         micSpeechStarted: false,
         micWaitingForVoiceNotice: false,
         micStarting: false,
+        micStartToken: 0,
         micRecording: false,
         micError: "",
         apiOrigin:
@@ -1985,6 +1986,24 @@
         return window.AudioContext || window.webkitAudioContext;
       }
 
+      function nextMicStartToken() {
+        state.micStartToken += 1;
+        return state.micStartToken;
+      }
+
+      function micStartStillCurrent(token) {
+        return (
+          token === state.micStartToken &&
+          !state.interviewEnded &&
+          state.socket &&
+          state.socket.readyState === WebSocket.OPEN
+        );
+      }
+
+      function stopMediaStream(stream) {
+        if (stream) stream.getTracks().forEach((track) => track.stop());
+      }
+
       async function startMicCapture() {
         if (state.interviewEnded) {
           appendEvent("麦克风", "面试已结束，请重置后创建新的面试。", "red");
@@ -1998,6 +2017,7 @@
         ) {
           return;
         }
+        const micStartToken = nextMicStartToken();
         state.micStarting = true;
         state.micError = "";
         setControls();
@@ -2017,7 +2037,7 @@
           return;
         }
         try {
-          state.micStream = await navigator.mediaDevices.getUserMedia({
+          const stream = await navigator.mediaDevices.getUserMedia({
             audio: {
               channelCount: 1,
               echoCancellation: true,
@@ -2025,6 +2045,12 @@
               autoGainControl: true,
             },
           });
+          if (!micStartStillCurrent(micStartToken)) {
+            stopMediaStream(stream);
+            appendEvent("麦克风", "麦克风启动已取消：实时通道已断开或面试已重置。", "red");
+            return;
+          }
+          state.micStream = stream;
           state.micContext = new AudioContextCtor();
           state.micSource = state.micContext.createMediaStreamSource(state.micStream);
           state.micProcessor = state.micContext.createScriptProcessor(4096, 1, 1);
@@ -2051,7 +2077,7 @@
           appendEvent("麦克风", escapeHtml(reason), "red");
           stopMicCapture();
         } finally {
-          if (state.micStarting) {
+          if (micStartToken === state.micStartToken && state.micStarting) {
             state.micStarting = false;
             setControls();
           }
@@ -2073,7 +2099,14 @@
       }
 
       function stopMicCapture() {
-        if (!state.micRecording && !state.micStream && !state.micContext) return;
+        if (state.micStarting) {
+          nextMicStartToken();
+          state.micStarting = false;
+        }
+        if (!state.micRecording && !state.micStream && !state.micContext) {
+          setControls();
+          return;
+        }
         if (state.micSamples.length > 0) {
           sendMicSamples(state.micSamples.splice(0, state.micSamples.length));
         }
@@ -2083,9 +2116,7 @@
           state.micProcessor.onaudioprocess = null;
         }
         if (state.micSource) state.micSource.disconnect();
-        if (state.micStream) {
-          state.micStream.getTracks().forEach((track) => track.stop());
-        }
+        if (state.micStream) stopMediaStream(state.micStream);
         if (state.micContext && state.micContext.state !== "closed") {
           state.micContext.close().catch(() => {});
         }
@@ -2116,6 +2147,7 @@
       function resetSessionState() {
         stopMicCapture();
         closeSocket();
+        nextMicStartToken();
         state.job = null;
         state.candidate = null;
         state.interview = null;
