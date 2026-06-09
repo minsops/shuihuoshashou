@@ -915,12 +915,11 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                         aliyun_session = None
                         session = await ensure_aliyun_session()
                         if session is None:
-                            await _send_asr_warning(sender, "aliyun_asr_disconnected", seq)
                             continue
                         try:
                             await session.send_audio(pcm_bytes)
-                        except Exception:
-                            await _send_asr_warning(sender, "aliyun_asr_disconnected", seq)
+                        except Exception as exc:
+                            await _send_asr_warning(sender, _asr_warning_reason(exc), seq)
                     continue
                 segment = await _transcribe_or_warn(
                     sender,

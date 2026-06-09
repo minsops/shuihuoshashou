@@ -1558,6 +1558,83 @@ def test_gateway_aliyun_ws_start_failure_surfaces_reason(
     }
 
 
+def test_gateway_aliyun_ws_send_retry_preserves_failure_reason(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("ASR_PROVIDER", "aliyun_ws")
+    monkeypatch.setenv("ALIYUN_ASR_API_KEY", "dashscope-secret")
+
+    class FailingSendSession:
+        def __init__(self, session_id: str, *, reason: str) -> None:
+            self.session_id = session_id
+            self.reason = reason
+            self.finished = False
+            self.error_reason = ""
+            self.result_queue: asyncio.Queue[TranscriptSegment | None] = asyncio.Queue()
+
+        async def send_audio(self, pcm_bytes: bytes) -> None:
+            del pcm_bytes
+            raise RuntimeError(self.reason)
+
+        async def close(self) -> None:
+            if not self.finished:
+                self.finished = True
+                await self.result_queue.put(None)
+
+    class FailingSendEngine:
+        def __init__(self) -> None:
+            self.sessions: list[FailingSendSession] = []
+
+        async def get_or_create_session(self, session_id: str) -> FailingSendSession:
+            reason = (
+                "aliyun_asr_disconnected"
+                if not self.sessions
+                else "aliyun_asr_task_failed:InvalidApiKey:bad key"
+            )
+            session = FailingSendSession(session_id, reason=reason)
+            self.sessions.append(session)
+            return session
+
+        async def close_session(self, session_id: str) -> None:
+            for session in self.sessions:
+                if session.session_id == session_id and not session.finished:
+                    await session.close()
+
+    engine = FailingSendEngine()
+    monkeypatch.setattr("services.gateway.app.get_asr_engine", lambda: engine)
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+
+    with client.websocket_connect(f"/ws/interview/{interview['id']}") as websocket:
+        websocket.send_json(
+            {
+                "type": "audio_chunk",
+                "session_id": interview["id"],
+                "seq": 9,
+                "audio": base64.b64encode(b"pcm-audio").decode("ascii"),
+                "speaker": "candidate",
+                "format": "pcm16",
+                "sample_rate_hz": 16000,
+                "channels": 1,
+            }
+        )
+        warning = websocket.receive_json()
+
+    assert warning == {
+        "type": "asr_warning",
+        "payload": {
+            "reason": "aliyun_asr_task_failed:InvalidApiKey:bad key",
+            "seq": 9,
+        },
+    }
+    assert len(engine.sessions) == 2
+
+
 def test_gateway_aliyun_nls_ws_audio_chunk_uses_streaming_path(
     tmp_path: Path, monkeypatch
 ) -> None:
