@@ -1399,7 +1399,6 @@
         state.runtimeCheckToken = checkToken;
         state.modelCheckToken += 1;
         state.asrCheckToken += 1;
-        state.lastRuntimeCheckAt = Date.now();
         refreshStatus.disabled = true;
         setButtonBusy(refreshStatus, true);
         refreshStatus.title = "正在刷新服务、模型和 ASR 状态";
@@ -1451,6 +1450,7 @@
       }
 
       function setRuntimeStatusFromGateway(status) {
+        state.lastRuntimeCheckAt = Date.now();
         setPill(
           runtimeStatus,
           status.status === "ok" ? "服务正常" : "服务异常",
@@ -1460,6 +1460,7 @@
       }
 
       function setRuntimeStatusGatewayUnavailable(error) {
+        state.lastRuntimeCheckAt = Date.now();
         setPill(runtimeStatus, "服务不可达", "");
         runtimeStatus.title = gatewayFailureTitle(error);
       }

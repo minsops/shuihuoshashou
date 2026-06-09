@@ -328,6 +328,7 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "function setRuntimeStatusFromGateway(status)" in response.text
     assert "setRuntimeStatusGatewayUnavailable(error)" in response.text
     assert "function setRuntimeStatusGatewayUnavailable(error)" in response.text
+    assert response.text.count("state.lastRuntimeCheckAt = Date.now()") == 2
     assert "runtimeStatus.title = gatewayFailureTitle(error)" in response.text
     assert "服务不可达：${errorText(error)}。${gatewayHelpText()}" in response.text
     assert "setDependentStatusWaitingForGateway(error)" in response.text
