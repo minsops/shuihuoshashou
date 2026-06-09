@@ -976,11 +976,12 @@
         const connected = socketState === WebSocket.OPEN;
         const connecting = socketState === WebSocket.CONNECTING;
         const active = connected && !state.interviewEnded && !state.endingInterview;
-        sendAnswer.disabled = !active;
+        const textReady = active && textTurnReady();
+        sendAnswer.disabled = !textReady;
         startMic.disabled = !active || state.micRecording || state.micStarting;
         stopMic.disabled = !connected || !state.micRecording;
         reconnectSocket.disabled = !state.interview || connected || connecting || state.interviewEnded;
-        manualProbe.disabled = !active;
+        manualProbe.disabled = !textReady;
         endInterview.disabled = !active;
         loadSampleButton.disabled =
           state.documentParsingCount > 0 || state.preparingInterview || Boolean(state.interview);
@@ -1038,14 +1039,17 @@
 
       function setControlHints(connected, connecting) {
         const reason = liveChannelUnavailableReason(connecting);
+        const inputReason = "当前问题和候选人回答都需要填写";
         const endedReason = "面试已结束，请重置后创建新的面试";
         const endingReason = "正在结束面试并生成评分报告，请等待结果";
         sendAnswer.title = state.interviewEnded
           ? endedReason
           : state.endingInterview
             ? endingReason
-          : connected
+          : connected && textTurnReady()
             ? "发送文本回答并触发追问"
+          : connected
+            ? inputReason
             : reason;
         startMic.title = state.interviewEnded
           ? endedReason
@@ -1066,8 +1070,10 @@
           ? endedReason
           : state.endingInterview
             ? endingReason
-          : connected
+          : connected && textTurnReady()
             ? "基于当前回答立即生成追问"
+          : connected
+            ? inputReason
             : reason;
         endInterview.title = state.interviewEnded
           ? endedReason
@@ -1099,6 +1105,9 @@
         if (state.micStarting) return "麦克风启动中。请在浏览器权限弹窗中允许麦克风，并等待初始化完成。";
         if (state.micRecording) return "麦克风采集中。可以停止麦克风，或结束面试生成评分报告。";
         if (state.micError) return `${state.micError} 可以修复后再次点击开始麦克风。`;
+        if (connected && !textTurnReady()) {
+          return "实时通道已连接。请填写当前问题和候选人回答后发送文字回答，或直接开始麦克风。";
+        }
         if (connected) return "实时通道已连接。可以发送文字回答，或点击开始麦克风进行语音转写。";
         if (connecting) return "实时通道连接中，请稍候。连接成功后按钮会自动启用。";
         if (state.interview) return "实时通道未连接。请点击重连通道，或重置后重新创建面试。";
@@ -1124,6 +1133,11 @@
           answerChars > 0 && answerChars < answerMinChars
             ? "small text-counter warn"
             : "small text-counter";
+        setControls();
+      }
+
+      function textTurnReady() {
+        return Boolean(currentQuestion.value.trim() && answerText.value.trim());
       }
 
       function appendEvent(title, body, tone = "") {

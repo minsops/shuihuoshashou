@@ -391,6 +391,11 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert 'id="answerCharCount" role="status" aria-live="polite"' in response.text
     assert "answerMinChars = 20" in response.text
     assert "updateTextCounters" in response.text
+    assert "textTurnReady" in response.text
+    assert "sendAnswer.disabled = !textReady" in response.text
+    assert "manualProbe.disabled = !textReady" in response.text
+    assert "当前问题和候选人回答都需要填写" in response.text
+    assert "请填写当前问题和候选人回答后发送文字回答" in response.text
     assert "建议至少 ${answerMinChars} 字" in response.text
     assert 'answerText.addEventListener("input", updateTextCounters)' in response.text
     assert ".control-hint.warn" in response.text
