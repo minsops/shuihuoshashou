@@ -112,12 +112,18 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 python scripts/run_offline_demo.py
-uvicorn services.gateway.app:app --reload --port 8001
+python scripts/run_gateway.py
 ```
 
 API 文档地址：`http://127.0.0.1:8001/docs`。
 
 本地 demo UI 地址：`http://127.0.0.1:8001/`。
+
+如果端口被占用，脚本会直接提示；也可以手动指定端口：
+
+```bash
+python scripts/run_gateway.py --port 8002
+```
 
 ## 使用 Docker Compose 运行
 
