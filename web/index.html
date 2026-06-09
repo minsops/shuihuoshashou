@@ -1032,6 +1032,9 @@
       }
 
       function errorText(error) {
+        if (error && error.name === "AbortError") {
+          return "请求超时，请确认本地服务仍在运行，或稍后重试。";
+        }
         return error && error.message ? error.message : String(error);
       }
 
