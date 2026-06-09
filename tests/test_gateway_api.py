@@ -295,6 +295,7 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "supportedDocumentSuffixes" in response.text
     assert "supportedDocumentMimeTypes" in response.text
     assert "supportedDocumentFile(file)" in response.text
+    assert "normalizedContentType(file.type)" in response.text
     assert 'type.startsWith("text/")' in response.text
     assert 'type.startsWith("image/")' in response.text
     assert "文件格式暂不支持" in response.text

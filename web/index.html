@@ -1320,13 +1320,17 @@
       }
 
       function supportedDocumentFile(file) {
-        const type = String(file.type || "").toLowerCase();
+        const type = normalizedContentType(file.type);
         return (
           supportedDocumentSuffixes.has(fileSuffix(file.name)) ||
           supportedDocumentMimeTypes.has(type) ||
           type.startsWith("text/") ||
           type.startsWith("image/")
         );
+      }
+
+      function normalizedContentType(contentType) {
+        return String(contentType || "").split(";", 1)[0].trim().toLowerCase();
       }
 
       function renderCompetencies(job) {

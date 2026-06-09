@@ -54,7 +54,9 @@ def parse_document(
     if len(data) > MAX_UPLOAD_BYTES:
         raise ValueError("uploaded document is larger than 25MB")
     suffix = Path(filename).suffix.lower()
-    inferred_content_type = (content_type or mimetypes.guess_type(filename)[0] or "").lower()
+    inferred_content_type = _normalize_content_type(
+        content_type or mimetypes.guess_type(filename)[0] or ""
+    )
     raw_text, source, warning = _extract_text(filename, data, suffix, inferred_content_type)
     cleaned_text, llm_attempted, used_llm, cleanup_warning = _clean_with_llm(raw_text, kind=kind)
     return DocumentParseResult(
@@ -87,6 +89,10 @@ def _extract_text(
     raise ValueError(
         "unsupported document type; supported: txt, md, json, csv, log, pdf, docx, doc, png, jpg, jpeg, webp, bmp, tif, tiff, heic"
     )
+
+
+def _normalize_content_type(content_type: str) -> str:
+    return content_type.split(";", 1)[0].strip().lower()
 
 
 def _decode_text(data: bytes) -> str:

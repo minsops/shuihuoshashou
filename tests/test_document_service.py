@@ -85,7 +85,7 @@ def test_parse_document_uses_mime_type_without_extension(tmp_path: Path, monkeyp
         "upload",
         pdf_path.read_bytes(),
         kind="jd",
-        content_type="application/pdf",
+        content_type="application/pdf; charset=binary",
     )
     docx_result = parse_document(
         "upload",
