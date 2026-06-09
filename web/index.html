@@ -1456,15 +1456,18 @@
         if (!state.micSpeechStarted) {
           if (!hasVoiceEnergy(samples)) {
             if (!state.micWaitingForVoiceNotice) {
-              appendEvent("麦克风", "已开启采集，等待检测到候选人声音后开始 ASR。");
+              appendEvent(
+                "麦克风",
+                "已开启采集，等待检测到候选人声音；期间会发送低音量保活音频，避免 ASR 空闲断开。"
+              );
               setPill(micStatus, "等待声音输入", "live");
               state.micWaitingForVoiceNotice = true;
             }
-            return;
+          } else {
+            state.micSpeechStarted = true;
+            state.micWaitingForVoiceNotice = false;
+            appendEvent("麦克风", "检测到声音，开始发送 ASR 音频。");
           }
-          state.micSpeechStarted = true;
-          state.micWaitingForVoiceNotice = false;
-          appendEvent("麦克风", "检测到声音，开始发送 ASR 音频。");
         }
         const startMs = Math.round((state.micSentSamples / micSampleRate) * 1000);
         state.micSentSamples += samples.length;
