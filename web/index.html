@@ -801,6 +801,8 @@
         documentParsingCount: 0,
         documentParseEpoch: 0,
         runtimeCheckToken: 0,
+        modelCheckToken: 0,
+        asrCheckToken: 0,
         lastRuntimeCheckAt: 0,
         apiOrigin:
           window.location.origin && window.location.origin !== "null"
@@ -1205,6 +1207,14 @@
         return checkToken === state.runtimeCheckToken;
       }
 
+      function modelCheckStillCurrent(checkToken) {
+        return checkToken === state.modelCheckToken;
+      }
+
+      function asrCheckStillCurrent(checkToken) {
+        return checkToken === state.asrCheckToken;
+      }
+
       function shouldRefreshRuntimeOnFocus() {
         if (document.visibilityState !== "visible") return false;
         const statusText = runtimeStatus.textContent || "";
@@ -1224,6 +1234,8 @@
       async function checkRuntime() {
         const checkToken = state.runtimeCheckToken + 1;
         state.runtimeCheckToken = checkToken;
+        state.modelCheckToken += 1;
+        state.asrCheckToken += 1;
         state.lastRuntimeCheckAt = Date.now();
         refreshStatus.disabled = true;
         refreshStatus.title = "正在刷新服务、模型和 ASR 状态";
@@ -1299,6 +1311,8 @@
       }
 
       async function checkLlmConnection() {
+        const checkToken = state.modelCheckToken + 1;
+        state.modelCheckToken = checkToken;
         checkModel.disabled = true;
         checkModel.title = "正在调用真实模型检查连接";
         setPill(modelStatus, "模型连接检查中", "live");
@@ -1308,10 +1322,12 @@
             method: "POST",
             timeoutMs: externalCheckTimeoutMs,
           });
+          if (!modelCheckStillCurrent(checkToken)) return;
           setPill(modelStatus, result.ok ? "模型连接正常" : "模型连接异常", result.ok ? "ready" : "");
           setStatusTitleFromMessage(modelStatus, result.message);
           appendEvent("模型检查", escapeHtml(result.message), result.ok ? "green" : "red");
         } catch (error) {
+          if (!modelCheckStillCurrent(checkToken)) return;
           if (gatewayAuthError(error)) {
             showGatewayKeyRequired("模型检查", { model: true });
           } else {
@@ -1327,6 +1343,8 @@
       }
 
       async function checkAsrReadiness() {
+        const checkToken = state.asrCheckToken + 1;
+        state.asrCheckToken = checkToken;
         checkAsr.disabled = true;
         checkAsr.title = "正在检查 ASR 配置、依赖和 Token";
         setPill(asrStatus, "ASR 检查中", "live");
@@ -1336,10 +1354,12 @@
             method: "POST",
             timeoutMs: externalCheckTimeoutMs,
           });
+          if (!asrCheckStillCurrent(checkToken)) return;
           setPill(asrStatus, asrCheckStatusText(result), result.ok ? "ready" : "");
           setStatusTitleFromMessage(asrStatus, result.message);
           appendEvent("ASR 检查", escapeHtml(result.message), result.ok ? "green" : "red");
         } catch (error) {
+          if (!asrCheckStillCurrent(checkToken)) return;
           if (gatewayAuthError(error)) {
             showGatewayKeyRequired("ASR 检查", { asr: true });
           } else {

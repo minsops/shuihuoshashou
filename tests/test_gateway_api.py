@@ -312,6 +312,10 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "当前 gateway" in response.text
     assert "runtimeCheckToken" in response.text
     assert "runtimeCheckStillCurrent" in response.text
+    assert "modelCheckToken" in response.text
+    assert "modelCheckStillCurrent" in response.text
+    assert "asrCheckToken" in response.text
+    assert "asrCheckStillCurrent" in response.text
     assert "refreshRuntimeIfVisible" in response.text
     assert "window.addEventListener(\"online\", refreshRuntimeIfVisible)" in response.text
     assert "gatewayOriginFromResponse" in response.text
@@ -437,10 +441,12 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "checkLlmConnection" in response.text
     assert "/api/config/llm/check" in response.text
     assert "timeoutMs: externalCheckTimeoutMs" in response.text
+    assert "if (!modelCheckStillCurrent(checkToken)) return" in response.text
     assert "手动调用真实模型检查连接" in response.text
     assert 'id="checkAsr"' in response.text
     assert "checkAsrReadiness" in response.text
     assert "/api/config/asr/check" in response.text
+    assert "if (!asrCheckStillCurrent(checkToken)) return" in response.text
     assert "手动检查 ASR 配置、依赖和 Token" in response.text
     assert 'id="gatewayKey"' in response.text
     assert 'id="saveGatewayKey"' in response.text
