@@ -285,6 +285,9 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "等待重连通道" in response.text
     assert "WebSocket 已关闭。可点击重连通道继续当前面试。" in response.text
     assert "恢复后点击重连通道继续当前面试" in response.text
+    assert "openSocketWithLatestGateway" in response.text
+    assert "连接前无法确认本地 gateway" in response.text
+    assert "WebSocket 初始化失败" in response.text
     assert 'id="controlHint"' in response.text
     assert "controlHintText" in response.text
     assert "实时通道已连接。可以发送文字回答" in response.text
@@ -334,7 +337,8 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "websocketProtocols" in response.text
     assert "base64UrlEncode" in response.text
     assert 'gateway-key.${base64UrlEncode(state.gatewayApiKey)}' in response.text
-    assert "new WebSocket(wsUrl(`/ws/interview/${interviewId}`), websocketProtocols())" in response.text
+    assert "const socketUrl = wsUrl(`/ws/interview/${interviewId}`)" in response.text
+    assert "new WebSocket(socketUrl, websocketProtocols())" in response.text
     assert 'data-report-format="html"' in response.text
     assert 'data-report-format="transcript.json"' in response.text
     assert ">转写</button>" in response.text

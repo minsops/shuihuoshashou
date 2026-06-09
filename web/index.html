@@ -1484,7 +1484,7 @@
           metricJob.textContent = job.title;
           metricCandidate.textContent = candidate.name;
           renderCompetencies(job);
-          openSocket(interview.id);
+          await openSocketWithLatestGateway(interview.id);
           setPill(setupStatus, "已建面试", "ready");
           appendEvent("面试创建", `${escapeHtml(job.title)} · ${escapeHtml(candidate.name)}`);
         } catch (error) {
@@ -1496,8 +1496,29 @@
         }
       }
 
+      async function openSocketWithLatestGateway(interviewId) {
+        try {
+          await discoverGateway();
+        } catch (error) {
+          appendEvent(
+            "实时通道",
+            `连接前无法确认本地 gateway：${escapeHtml(errorText(error))}`,
+            "red"
+          );
+        }
+        openSocket(interviewId);
+      }
+
       function openSocket(interviewId) {
-        state.socket = new WebSocket(wsUrl(`/ws/interview/${interviewId}`), websocketProtocols());
+        const socketUrl = wsUrl(`/ws/interview/${interviewId}`);
+        try {
+          state.socket = new WebSocket(socketUrl, websocketProtocols());
+        } catch (error) {
+          state.socket = null;
+          setControls();
+          appendEvent("实时通道", `WebSocket 初始化失败：${escapeHtml(errorText(error))}`, "red");
+          return;
+        }
         setControls();
         state.socket.addEventListener("open", () => {
           setControls();
@@ -1521,7 +1542,7 @@
         });
       }
 
-      function reconnectLiveChannel() {
+      async function reconnectLiveChannel() {
         if (!state.interview) {
           appendEvent("实时通道", "请先创建实时面试。", "red");
           return;
@@ -1539,7 +1560,7 @@
           return;
         }
         stopMicCapture();
-        openSocket(state.interview.id);
+        await openSocketWithLatestGateway(state.interview.id);
         appendEvent("实时通道", "正在重新连接当前面试。");
       }
 
