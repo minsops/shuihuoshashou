@@ -379,6 +379,8 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert 'part !== "body" && part !== "query"' in response.text
     assert 'error.name === "AbortError"' in response.text
     assert "请求超时，请确认本地服务仍在运行" in response.text
+    assert "failed to fetch|networkerror|load failed" in response.text
+    assert "无法连接到本地服务，请确认 gateway 正在运行后重试" in response.text
     assert "const { timeoutMs, ...fetchOptions } = options" in response.text
     assert "timeoutMs: documentParseTimeoutMs" in response.text
     assert "documentParseTimeoutMs = 45_000" in response.text

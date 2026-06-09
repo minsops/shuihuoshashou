@@ -1035,7 +1035,11 @@
         if (error && error.name === "AbortError") {
           return "请求超时，请确认本地服务仍在运行，或稍后重试。";
         }
-        return error && error.message ? error.message : String(error);
+        const message = error && error.message ? error.message : String(error);
+        if (/failed to fetch|networkerror|load failed/i.test(message)) {
+          return "无法连接到本地服务，请确认 gateway 正在运行后重试。";
+        }
+        return message;
       }
 
       function attemptedGatewayOriginsText() {
