@@ -818,6 +818,7 @@
       const queuedReportMaxPollAttempts = 30;
       const documentParseTimeoutMs = 45_000;
       const reportDownloadTimeoutMs = 30_000;
+      const externalCheckTimeoutMs = 20_000;
       const supportedDocumentSuffixes = new Set([
         ".txt",
         ".md",
@@ -1303,7 +1304,10 @@
         setPill(modelStatus, "模型连接检查中", "live");
         try {
           await discoverGateway();
-          const result = await fetchGatewayJson("/api/config/llm/check", { method: "POST" });
+          const result = await fetchGatewayJson("/api/config/llm/check", {
+            method: "POST",
+            timeoutMs: externalCheckTimeoutMs,
+          });
           setPill(modelStatus, result.ok ? "模型连接正常" : "模型连接异常", result.ok ? "ready" : "");
           setStatusTitleFromMessage(modelStatus, result.message);
           appendEvent("模型检查", escapeHtml(result.message), result.ok ? "green" : "red");
@@ -1328,7 +1332,10 @@
         setPill(asrStatus, "ASR 检查中", "live");
         try {
           await discoverGateway();
-          const result = await fetchGatewayJson("/api/config/asr/check", { method: "POST" });
+          const result = await fetchGatewayJson("/api/config/asr/check", {
+            method: "POST",
+            timeoutMs: externalCheckTimeoutMs,
+          });
           setPill(asrStatus, asrCheckStatusText(result), result.ok ? "ready" : "");
           setStatusTitleFromMessage(asrStatus, result.message);
           appendEvent("ASR 检查", escapeHtml(result.message), result.ok ? "green" : "red");

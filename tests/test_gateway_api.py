@@ -390,6 +390,7 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "const { timeoutMs, ...fetchOptions } = options" in response.text
     assert "timeoutMs: documentParseTimeoutMs" in response.text
     assert "documentParseTimeoutMs = 45_000" in response.text
+    assert "externalCheckTimeoutMs = 20_000" in response.text
     assert "input.disabled = true" in response.text
     assert "input.value = \"\"" in response.text
     assert ".log,.pdf" in response.text
@@ -435,6 +436,7 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert 'id="checkModel"' in response.text
     assert "checkLlmConnection" in response.text
     assert "/api/config/llm/check" in response.text
+    assert "timeoutMs: externalCheckTimeoutMs" in response.text
     assert "手动调用真实模型检查连接" in response.text
     assert 'id="checkAsr"' in response.text
     assert "checkAsrReadiness" in response.text
