@@ -2042,14 +2042,15 @@
 
       function renderReport(report) {
         const score = report.score || {};
+        const reportId = reportInterviewId(report);
         const dimensions = Array.isArray(score.dimensions) ? score.dimensions : [];
         const riskNotes = Array.isArray(score.risk_notes) ? score.risk_notes : [];
         const transcriptTurns = Array.isArray(report.transcript) ? report.transcript : [];
         reportLinks.innerHTML = `
-          <button class="secondary" type="button" data-report-format="html" data-report-id="${escapeHtml(report.interview_id)}">HTML</button>
-          <button class="secondary" type="button" data-report-format="pdf" data-report-id="${escapeHtml(report.interview_id)}">PDF</button>
-          <button class="secondary" type="button" data-report-format="json" data-report-id="${escapeHtml(report.interview_id)}">JSON</button>
-          <button class="secondary" type="button" data-report-format="transcript.json" data-report-id="${escapeHtml(report.interview_id)}">转写</button>
+          <button class="secondary" type="button" data-report-format="html" data-report-id="${escapeHtml(reportId)}">HTML</button>
+          <button class="secondary" type="button" data-report-format="pdf" data-report-id="${escapeHtml(reportId)}">PDF</button>
+          <button class="secondary" type="button" data-report-format="json" data-report-id="${escapeHtml(reportId)}">JSON</button>
+          <button class="secondary" type="button" data-report-format="transcript.json" data-report-id="${escapeHtml(reportId)}">转写</button>
         `;
         reportLinks.querySelectorAll("[data-report-format]").forEach((button) => {
           button.addEventListener("click", () => {
@@ -2088,10 +2089,10 @@
         reportPanel.innerHTML = `
           <div class="report-box">
             <div class="score-line">
-              <div class="score-main"><strong>${escapeHtml(reportTotalScoreText(report))}</strong><span>${escapeHtml(recommendationLabel(score.recommendation))}</span></div>
+              <div class="score-main"><strong>${escapeHtml(reportTotalScoreText(report))}</strong><span>${escapeHtml(reportRecommendationText(report))}</span></div>
               <div class="stack">
                 <h3>总评</h3>
-                <p>${escapeHtml(report.summary)}</p>
+                <p>${escapeHtml(reportSummaryText(report))}</p>
                 ${report.candidate_resume_text ? `<p><strong>简历摘要：</strong>${escapeHtml(report.candidate_resume_text)}</p>` : ""}
               </div>
             </div>
@@ -2118,6 +2119,19 @@
       function reportTotalScoreText(report) {
         const value = report && report.score ? report.score.total_score : null;
         return value === null || value === undefined || value === "" ? "待确认" : value;
+      }
+
+      function reportRecommendationText(report) {
+        const value = report && report.score ? report.score.recommendation : "";
+        return value ? recommendationLabel(value) : "建议待确认";
+      }
+
+      function reportSummaryText(report) {
+        return String(report && report.summary ? report.summary : "暂无总评。");
+      }
+
+      function reportInterviewId(report) {
+        return String((report && report.interview_id) || (state.interview && state.interview.id) || "");
       }
 
       function renderQueuedReportState(interviewId) {
@@ -2197,7 +2211,10 @@
       }
 
       async function downloadReportArtifact(interviewId, format) {
-        if (!interviewId || !format) return;
+        if (!interviewId || !format) {
+          appendEvent("报告下载失败", "报告 ID 或格式缺失，请刷新报告后重试。", "red");
+          return;
+        }
         const button = reportLinks.querySelector(`[data-report-format="${format}"]`);
         const originalLabel = button ? button.textContent : "";
         const originalTitle = button ? button.title : "";

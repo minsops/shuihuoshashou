@@ -450,6 +450,12 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "reportEvidenceRows" in response.text
     assert "reportTotalScoreText" in response.text
     assert "待确认" in response.text
+    assert "reportRecommendationText" in response.text
+    assert "建议待确认" in response.text
+    assert "reportSummaryText" in response.text
+    assert "暂无总评" in response.text
+    assert "reportInterviewId" in response.text
+    assert "报告 ID 或格式缺失" in response.text
     assert "暂无维度评分" in response.text
     assert "暂无转写记录" in response.text
     assert "暂无证据" in response.text
