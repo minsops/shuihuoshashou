@@ -416,6 +416,8 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "documentParseToken" in response.text
     assert "documentParseEpoch" in response.text
     assert "documentParseStillCurrent" in response.text
+    assert "const parseStillCurrent = documentParseStillCurrent(input, documentParseToken)" in response.text
+    assert "if (!documentParseStillCurrent(input, documentParseToken)) return" in response.text
     assert "cancelDocumentParses" in response.text
     assert "resetDocumentUploadInputs" in response.text
     assert "解析已取消" in response.text

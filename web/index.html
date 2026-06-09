@@ -1527,16 +1527,18 @@
             appendEvent("资料上传提示", escapeHtml(result.warning), "red");
           }
         } catch (error) {
+          if (!documentParseStillCurrent(input, documentParseToken)) return;
           const message = errorText(error);
           setUploadInputStatus(input, `${label} 解析失败：${message}`);
           appendEvent("资料上传失败", escapeHtml(message), "red");
         } finally {
           state.documentParsingCount = Math.max(0, state.documentParsingCount - 1);
-          if (input.dataset.documentParseToken === documentParseToken) {
+          const parseStillCurrent = documentParseStillCurrent(input, documentParseToken);
+          if (parseStillCurrent) {
             delete input.dataset.documentParseToken;
+            input.disabled = false;
+            input.value = "";
           }
-          input.disabled = false;
-          input.value = "";
           setControls();
         }
       }
