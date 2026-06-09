@@ -1141,7 +1141,7 @@
             `fluency ${escapeHtml(message.payload.fluency)} · hesitation ${escapeHtml(message.payload.hesitation)}`
           );
         } else if (message.type === "asr_warning") {
-          appendEvent("ASR", escapeHtml(message.payload.reason), "red");
+          appendEvent("ASR", formatAsrWarning(message.payload.reason), "red");
         } else if (message.type === "report") {
           stopMicCapture();
           renderReport(message.payload);
@@ -1152,6 +1152,34 @@
           appendEvent("错误", escapeHtml(message.detail || "unknown error"), "red");
         }
         setControls();
+      }
+
+      function formatAsrWarning(reason) {
+        const raw = String(reason || "unknown");
+        const normalized = raw.toLowerCase();
+        let message = "ASR 转写暂时不可用，请重试或改用文本回答。";
+        if (normalized.includes("idle_timeout")) {
+          message = "ASR 长时间没有收到有效语音：请点击停止麦克风后重新开始，并在开启后直接说话。";
+        } else if (raw === "aliyun_asr_disconnected") {
+          message = "ASR 连接已断开：请停止麦克风后重新开始。";
+        } else if (raw === "asr_transcription_failed") {
+          message = "ASR 转写失败：请重新说一遍，或先用文本框发送回答。";
+        } else if (raw === "invalid_audio_base64") {
+          message = "音频数据无效：请重新开启麦克风。";
+        } else if (raw === "unsupported_audio_format") {
+          message = "音频格式不支持：浏览器应发送 16k PCM16 单声道音频。";
+        } else if (raw === "unsupported_sample_rate") {
+          message = "音频采样率不支持：需要 16000 Hz。";
+        } else if (raw === "unsupported_channel_count") {
+          message = "音频声道数不支持：需要单声道。";
+        } else if (raw === "duplicate_final_segment") {
+          message = "已忽略重复的最终转写片段。";
+        } else if (raw === "session_id_mismatch") {
+          message = "音频会话和当前面试不匹配：请重置后重新创建面试。";
+        } else if (raw === "invalid_seq") {
+          message = "音频序号无效：请重置会话后重试。";
+        }
+        return `${escapeHtml(message)}<br><span class="small">原始原因：${escapeHtml(raw)}</span>`;
       }
 
       function recommendationLabel(value) {
