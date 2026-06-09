@@ -527,6 +527,33 @@ def test_gateway_asr_check_validates_nls_auto_token(tmp_path: Path, monkeypatch)
     }
 
 
+def test_gateway_asr_check_prefers_fixed_nls_token_over_auto_token(
+    tmp_path: Path, monkeypatch
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+    monkeypatch.setenv("ASR_PROVIDER", "aliyun_nls_ws")
+    monkeypatch.setenv("ALIYUN_NLS_APP_KEY", "app-key")
+    monkeypatch.setenv("ALIYUN_NLS_TOKEN", "fixed-token")
+    monkeypatch.setenv("ALIYUN_AK_ID", "ak-id")
+    monkeypatch.setenv("ALIYUN_AK_SECRET", "ak-secret")
+    get_settings.cache_clear()
+
+    class UnexpectedTokenProvider:
+        def __init__(self, **kwargs):
+            raise AssertionError("fixed NLS token should take priority")
+
+    monkeypatch.setattr("services.gateway.app.AliyunNLSTokenProvider", UnexpectedTokenProvider)
+
+    response = client.post("/api/config/asr/check")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "ok": True,
+        "mode": "fixed_token",
+        "message": "阿里云 NLS ASR 基本配置存在：固定 Token 已配置；此检查未验证 Token 有效期。",
+    }
+
+
 def test_gateway_asr_check_sanitizes_nls_token_error(tmp_path: Path, monkeypatch) -> None:
     client = _client(tmp_path, monkeypatch)
     monkeypatch.setenv("ASR_PROVIDER", "aliyun_nls_ws")

@@ -432,6 +432,12 @@ async def check_asr_readiness() -> dict[str, str | bool]:
                 "mode": "incomplete",
                 "message": "阿里云 NLS ASR 配置不完整，请检查 AppKey 和 Endpoint。",
             }
+        if status.aliyun_nls_token_configured:
+            return {
+                "ok": True,
+                "mode": "fixed_token",
+                "message": "阿里云 NLS ASR 基本配置存在：固定 Token 已配置；此检查未验证 Token 有效期。",
+            }
         if status.aliyun_nls_token_auto_configured:
             try:
                 token = await asyncio.to_thread(
@@ -454,12 +460,6 @@ async def check_asr_readiness() -> dict[str, str | bool]:
                     "mode": "token_ready",
                     "message": "阿里云 NLS ASR 就绪：WebSocket 依赖存在，自动 Token 可生成。",
                 }
-        if status.aliyun_nls_token_configured:
-            return {
-                "ok": True,
-                "mode": "fixed_token",
-                "message": "阿里云 NLS ASR 基本配置存在：固定 Token 已配置；此检查未验证 Token 有效期。",
-            }
         return {
             "ok": False,
             "mode": "incomplete",
