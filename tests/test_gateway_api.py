@@ -402,6 +402,7 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "发送失败" in response.text
     assert "请点击重连通道后重试" in response.text
     assert 'answerText.value = ""' in response.text
+    assert "answerText.focus();" in response.text
     assert "if (!manual) {" in response.text
     assert "endingInterview" in response.text
     assert "正在结束面试并生成评分报告，请等待结果" in response.text
