@@ -807,7 +807,7 @@
       };
 
       const micSampleRate = 16000;
-      const micChunkSamples = micSampleRate;
+      const micChunkSamples = Math.floor(micSampleRate / 4);
       const micVoiceRmsThreshold = 0.012;
       const maxDocumentUploadBytes = 25 * 1024 * 1024;
       const maxLiveFeedEvents = 120;
@@ -2189,7 +2189,7 @@
             if (!state.micWaitingForVoiceNotice) {
               appendEvent(
                 "麦克风",
-                "已开启采集，等待检测到候选人声音；期间会发送低音量保活音频，避免 ASR 空闲断开。"
+                "已开启采集，等待检测到候选人声音；期间会每 250ms 发送低音量保活音频，避免 ASR 空闲断开。"
               );
               setPill(micStatus, "等待声音输入", "live");
               state.micWaitingForVoiceNotice = true;

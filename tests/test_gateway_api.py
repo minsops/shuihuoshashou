@@ -261,6 +261,7 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "点击“检查模型”后才会调用真实模型确认连接" in response.text
     assert "audio_chunk" in response.text
     assert "pcm16" in response.text
+    assert "micChunkSamples = Math.floor(micSampleRate / 4)" in response.text
     assert "audioContextConstructor" in response.text
     assert "window.webkitAudioContext" in response.text
     assert "当前浏览器不支持 Web Audio" in response.text
@@ -304,6 +305,7 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "NLS Token 创建失败" in response.text
     assert "ASR WebSocket 依赖缺失" in response.text
     assert "ASR 没有返回识别文本" in response.text
+    assert "每 250ms 发送低音量保活音频" in response.text
     assert "避免 ASR 空闲断开" in response.text
     assert "原始原因" in response.text
     assert "先创建实时面试" in response.text
