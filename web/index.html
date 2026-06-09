@@ -1216,7 +1216,7 @@
         try {
           await discoverGateway();
           const result = await fetchGatewayJson("/api/config/asr/check", { method: "POST" });
-          setPill(asrStatus, result.ok ? "ASR 就绪" : "ASR 异常", result.ok ? "ready" : "");
+          setPill(asrStatus, asrCheckStatusText(result), result.ok ? "ready" : "");
           appendEvent("ASR 检查", escapeHtml(result.message), result.ok ? "green" : "red");
         } catch (error) {
           if (gatewayAuthError(error)) {
@@ -1229,6 +1229,14 @@
           checkAsr.disabled = false;
           checkAsr.title = "手动检查 ASR 配置、依赖和 Token";
         }
+      }
+
+      function asrCheckStatusText(result) {
+        if (!result.ok) return "ASR 异常";
+        if (result.mode === "token_ready") return "ASR Token 可生成，未跑音频";
+        if (result.mode === "fixed_token") return "ASR 固定 Token 已配置，未验有效期";
+        if (result.mode === "configured") return "ASR 配置存在，未跑音频";
+        return "ASR 检查通过";
       }
 
       function modelStatusFromConfig(config) {
