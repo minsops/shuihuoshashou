@@ -663,6 +663,7 @@
             <button type="submit" id="sendAnswer" disabled>发送回答</button>
             <button class="secondary" type="button" id="startMic" disabled>开始麦克风</button>
             <button class="secondary" type="button" id="stopMic" disabled>停止麦克风</button>
+            <button class="secondary" type="button" id="reconnectSocket" disabled>重连通道</button>
             <button class="secondary" type="button" id="manualProbe" disabled>根据回答追问</button>
             <button class="danger" type="button" id="endInterview" disabled>结束并评分</button>
             <span class="status-pill" id="micStatus"><span class="status-dot"></span><span>麦克风未开启</span></span>
@@ -740,6 +741,7 @@
       const sendAnswer = document.querySelector("#sendAnswer");
       const startMic = document.querySelector("#startMic");
       const stopMic = document.querySelector("#stopMic");
+      const reconnectSocket = document.querySelector("#reconnectSocket");
       const manualProbe = document.querySelector("#manualProbe");
       const endInterview = document.querySelector("#endInterview");
 
@@ -790,9 +792,10 @@
         sendAnswer.disabled = !connected;
         startMic.disabled = !connected || state.micRecording;
         stopMic.disabled = !connected || !state.micRecording;
+        reconnectSocket.disabled = !state.interview || connected || connecting;
         manualProbe.disabled = !connected;
         endInterview.disabled = !connected;
-        prepareInterview.disabled = connected || connecting;
+        prepareInterview.disabled = Boolean(state.interview) || connected || connecting;
         setControlHints(connected, connecting);
         if (connected) {
           setPill(liveStatus, `已连接 ${state.interview.id.slice(0, 8)}`, "live");
@@ -819,9 +822,10 @@
         sendAnswer.title = connected ? "发送文本回答并触发追问" : reason;
         startMic.title = connected ? "开始浏览器麦克风采集" : reason;
         stopMic.title = state.micRecording ? "停止麦克风采集" : "麦克风尚未开启";
+        reconnectSocket.title = state.interview ? "重新连接当前面试实时通道" : "请先创建实时面试";
         manualProbe.title = connected ? "基于当前回答立即生成追问" : reason;
         endInterview.title = connected ? "结束面试并生成评分报告" : reason;
-        prepareInterview.title = connected || connecting ? "当前面试通道已创建" : "创建实时面试通道";
+        prepareInterview.title = state.interview ? "当前已有面试，请重置后再创建新的面试" : "创建实时面试通道";
       }
 
       function appendEvent(title, body, tone = "") {
@@ -1128,8 +1132,30 @@
         });
       }
 
-      function closeSocket() {
+      function reconnectLiveChannel() {
+        if (!state.interview) {
+          appendEvent("实时通道", "请先创建实时面试。", "red");
+          return;
+        }
         if (state.socket && state.socket.readyState === WebSocket.OPEN) {
+          appendEvent("实时通道", "当前实时通道已经连接。");
+          return;
+        }
+        if (state.socket && state.socket.readyState === WebSocket.CONNECTING) {
+          appendEvent("实时通道", "实时通道正在连接中。");
+          return;
+        }
+        stopMicCapture();
+        openSocket(state.interview.id);
+        appendEvent("实时通道", "正在重新连接当前面试。");
+      }
+
+      function closeSocket() {
+        if (
+          state.socket &&
+          (state.socket.readyState === WebSocket.OPEN ||
+            state.socket.readyState === WebSocket.CONNECTING)
+        ) {
           state.socket.close();
         }
         state.socket = null;
@@ -1534,6 +1560,7 @@
       });
       startMic.addEventListener("click", startMicCapture);
       stopMic.addEventListener("click", stopMicCapture);
+      reconnectSocket.addEventListener("click", reconnectLiveChannel);
       manualProbe.addEventListener("click", () => sendTurn(true));
       endInterview.addEventListener("click", () => {
         stopMicCapture();
