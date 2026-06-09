@@ -497,6 +497,8 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "resetQuestionMetaForManualEdit" in response.text
     assert "hadProbeMeta" in response.text
     assert "已改为手动编辑问题，将按面试官自定义问题记录" in response.text
+    assert 'title="把该能力维度生成当前面试问题"' in response.text
+    assert 'title="将此追问填入当前面试问题"' in response.text
     assert "function selectQuestion(question, meta = {})" in response.text
     assert 'answerText.value = "";\n        updateTextCounters();\n        state.selectedQuestionSource' in (
         response.text

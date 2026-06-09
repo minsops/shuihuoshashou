@@ -1775,7 +1775,7 @@
                   <span class="tag">${Math.round(Number(item.weight || 0) * 100)}%</span>
                 </div>
                 <p>${escapeHtml(item.description)}</p>
-                <button class="secondary" type="button" data-seed-question="${index}">生成此维度问题</button>
+                <button class="secondary" type="button" data-seed-question="${index}" title="把该能力维度生成当前面试问题">生成此维度问题</button>
               </div>
             `
           )
@@ -1825,7 +1825,7 @@
                 </div>
                 <h3>${escapeHtml(item.question)}</h3>
                 <p>${escapeHtml(item.target)}</p>
-                <button class="secondary" type="button" data-probe-index="${index}">设为下一问</button>
+                <button class="secondary" type="button" data-probe-index="${index}" title="将此追问填入当前面试问题">设为下一问</button>
               </div>
             `
           )
