@@ -1824,6 +1824,24 @@
         return true;
       }
 
+      function sendLiveSocketPayload(payload, title = "实时通道") {
+        try {
+          if (!state.socket || state.socket.readyState !== WebSocket.OPEN) {
+            throw new Error("实时通道未连接");
+          }
+          state.socket.send(JSON.stringify(payload));
+          return true;
+        } catch (error) {
+          appendEvent(
+            title,
+            `发送失败：${escapeHtml(errorText(error))}。请点击重连通道后重试。`,
+            "red"
+          );
+          setControls();
+          return false;
+        }
+      }
+
       function sendTurn(manual = false) {
         if (!liveChannelReadyForInput()) return;
         const answer = answerText.value.trim();
@@ -1843,14 +1861,15 @@
             }
           : {
               type: "text_turn",
-              seq: state.seq++,
+              seq: state.seq,
               answer,
               speaker: "candidate",
               confidence: 1,
               ...timing,
               ...eventQuestionMeta(),
             };
-        state.socket.send(JSON.stringify(payload));
+        if (!sendLiveSocketPayload(payload, manual ? "追问触发失败" : "回答发送失败")) return;
+        if (!manual) state.seq += 1;
         appendEvent(
           manual ? "追问触发" : "回答已发送",
           `<span class="small">Q</span> ${escapeHtml(question)}<br><span class="small">A</span> ${escapeHtml(answer)}`
@@ -1863,7 +1882,11 @@
         endInterview.disabled = true;
         endInterview.title = "正在结束面试并生成评分报告";
         setPill(liveStatus, "评分中", "live");
-        state.socket.send(JSON.stringify({ type: "end" }));
+        if (!sendLiveSocketPayload({ type: "end" }, "结束面试失败")) {
+          endInterview.disabled = false;
+          endInterview.title = "结束面试并生成评分报告";
+          setControls();
+        }
       }
 
       function renderLiveMessage(message) {
@@ -2206,25 +2229,28 @@
           }
         }
         const startMs = Math.round((state.micSentSamples / micSampleRate) * 1000);
+        const endMs = Math.round(((state.micSentSamples + samples.length) / micSampleRate) * 1000);
+        const payload = {
+          type: "audio_chunk",
+          session_id: state.interview.id,
+          seq: state.seq,
+          audio: samplesToBase64Pcm16(samples),
+          speaker: "candidate",
+          format: "pcm16",
+          sample_rate_hz: micSampleRate,
+          channels: 1,
+          start_ms: startMs,
+          end_ms: endMs,
+          is_final: true,
+          confidence: 0.95,
+          ...eventQuestionMeta(),
+        };
+        if (!sendLiveSocketPayload(payload, "麦克风")) {
+          stopMicCapture({ flush: false });
+          return;
+        }
+        state.seq += 1;
         state.micSentSamples += samples.length;
-        const endMs = Math.round((state.micSentSamples / micSampleRate) * 1000);
-        state.socket.send(
-          JSON.stringify({
-            type: "audio_chunk",
-            session_id: state.interview.id,
-            seq: state.seq++,
-            audio: samplesToBase64Pcm16(samples),
-            speaker: "candidate",
-            format: "pcm16",
-            sample_rate_hz: micSampleRate,
-            channels: 1,
-            start_ms: startMs,
-            end_ms: endMs,
-            is_final: true,
-            confidence: 0.95,
-            ...eventQuestionMeta(),
-          })
-        );
       }
 
       function hasVoiceEnergy(samples) {
@@ -2351,7 +2377,7 @@
         return `麦克风启动失败：${error}`;
       }
 
-      function stopMicCapture() {
+      function stopMicCapture(options = {}) {
         if (state.micStarting) {
           nextMicStartToken();
           state.micStarting = false;
@@ -2360,7 +2386,7 @@
           setControls();
           return;
         }
-        if (state.micSamples.length > 0) {
+        if (options.flush !== false && state.micSamples.length > 0) {
           sendMicSamples(state.micSamples.splice(0, state.micSamples.length));
         }
         state.micRecording = false;

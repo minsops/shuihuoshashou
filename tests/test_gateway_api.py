@@ -356,8 +356,13 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "实时通道未连接。请点击重连通道" in response.text
     assert "liveChannelReadyForInput" in response.text
     assert "实时通道未连接，请点击重连通道。" in response.text
+    assert "sendLiveSocketPayload" in response.text
+    assert "发送失败" in response.text
+    assert "请点击重连通道后重试" in response.text
     assert "requestEndInterview" in response.text
-    assert 'JSON.stringify({ type: "end" })' in response.text
+    assert 'sendLiveSocketPayload({ type: "end" }, "结束面试失败")' in response.text
+    assert "state.seq += 1" in response.text
+    assert "stopMicCapture({ flush: false })" in response.text
     assert "readErrorMessage" in response.text
     assert "formatApiDetailItem" in response.text
     assert "item.loc" in response.text
