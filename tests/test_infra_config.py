@@ -89,6 +89,14 @@ def test_readme_documents_current_default_llm_model() -> None:
     assert "`mimo2.5pro`" not in readme
 
 
+def test_readme_documents_local_ocr_and_nls_asr_setup() -> None:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert "`pip install -e '.[ocr]'`" in readme
+    assert "`ASR_PROVIDER=aliyun_nls_ws`" in readme
+    assert "阿里云智能语音交互 NLS WebSocket ASR" in readme
+
+
 def test_env_example_lists_runtime_integration_knobs() -> None:
     env_example = (ROOT / ".env.example").read_text(encoding="utf-8")
 

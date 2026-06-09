@@ -214,9 +214,9 @@ curl -s http://127.0.0.1:8001/api/config/status
 
 WebSocket `audio_chunk` 事件可以包含 `speaker`、`channel`/`audio_channel`/`track`、`is_final`、`start_ms`、`end_ms` 和 `confidence`。如果省略 `speaker`，列在 `ASR_INTERVIEWER_CHANNELS` 中的 channel 会映射为 `interviewer`，列在 `ASR_CANDIDATE_CHANNELS` 中的 channel 会映射为 `candidate`。只有 final candidate segment 会触发追问。下行事件包括 `transcript`、`probe`、`credibility`、可选 `signal`、`report`，以及 async 模式下的 `task_queued`。
 
-网页实时面板的“开始麦克风”按钮会请求浏览器麦克风权限，把候选人语音降采样为 16k 单声道 PCM16，并通过同一个 `audio_chunk` 协议发送。默认 `ASR_PROVIDER=stub` 只能验证链路；要获得真实转写，可配置 `ASR_PROVIDER=http` 对接普通 HTTP ASR endpoint，或配置 `ASR_PROVIDER=aliyun_ws` 对接阿里云 Paraformer 实时 WebSocket ASR。
+网页实时面板的“开始麦克风”按钮会请求浏览器麦克风权限，把候选人语音降采样为 16k 单声道 PCM16，并通过同一个 `audio_chunk` 协议发送。默认 `ASR_PROVIDER=stub` 只能验证链路；要获得真实转写，可配置 `ASR_PROVIDER=http` 对接普通 HTTP ASR endpoint，配置 `ASR_PROVIDER=aliyun_ws` 对接阿里云 DashScope Paraformer 实时 WebSocket ASR，或配置 `ASR_PROVIDER=aliyun_nls_ws` 对接阿里云智能语音交互 NLS WebSocket ASR。
 
-资料区的 JD 和简历上传支持纯文本、Markdown、JSON、CSV、PDF、Word `.docx`/`.doc` 和常见图片格式。后端会先抽取文本；如果当前 `LLM_PROVIDER=openai_compatible` 且配置了 DeepSeek v4 pro API key，会再调用 DeepSeek 对抽取内容做去噪和正文提取。图片版简历依赖 OCR：macOS 本地可安装 `ocrmac`，否则接口会返回明确的 OCR 依赖错误。
+资料区的 JD 和简历上传支持纯文本、Markdown、JSON、CSV、PDF、Word `.docx`/`.doc` 和常见图片格式。后端会先抽取文本；如果当前 `LLM_PROVIDER=openai_compatible` 且配置了 DeepSeek v4 pro API key，会再调用 DeepSeek 对抽取内容做去噪和正文提取。图片版简历依赖 OCR：macOS 本地运行 `pip install -e '.[ocr]'` 安装 `ocrmac`，否则接口会返回明确的 OCR 依赖错误。
 
 同一 seq 的重复 final ASR chunk 会去重，并返回 `asr_warning`，不会重复生成追问。ASR 返回 `unknown` speaker 时，session manager 会先尝试从已观察到的本地音频簇解析，再回退到短间隔连续性。`audio_chunk` 如果包含 `session_id`，必须与 WebSocket interview id 一致；不一致时返回 `asr_warning` 并跳过。
 
