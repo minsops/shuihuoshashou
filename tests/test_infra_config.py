@@ -113,6 +113,14 @@ def test_readme_distinguishes_real_llm_smoke_from_mock_mode() -> None:
     assert "对应的 auth header 不能为空" in readme
 
 
+def test_readme_explains_demo_gateway_key_input() -> None:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert "`Gateway Key` 输入框" in readme
+    assert "只保存在当前浏览器会话中" in readme
+    assert "页面会自动带到 API、WebSocket 和报告下载链接" in readme
+
+
 def test_readme_explains_empty_asr_smoke_result_semantics() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
