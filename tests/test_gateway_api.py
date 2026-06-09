@@ -277,6 +277,8 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert 'id="runtimeStatus" role="status" aria-live="polite"' in response.text
     assert 'id="modelStatus" role="status" aria-live="polite"' in response.text
     assert 'id="asrStatus" role="status" aria-live="polite"' in response.text
+    assert 'aria-label="Gateway Key"' in response.text
+    assert 'autocapitalize="off"' in response.text
     assert "maxLiveFeedEvents = 120" in response.text
     assert "trimLiveFeedEvents" in response.text
     assert "setStatusTitleFromMessage" in response.text
@@ -378,6 +380,10 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert 'id="liveFeed" role="log" aria-live="polite" aria-relevant="additions text"' in (
         response.text
     )
+    assert 'id="sendAnswer" aria-describedby="controlHint"' in response.text
+    assert 'id="startMic" aria-describedby="controlHint"' in response.text
+    assert 'id="reconnectSocket" aria-describedby="controlHint"' in response.text
+    assert 'id="endInterview" aria-describedby="controlHint"' in response.text
     assert "controlHintText" in response.text
     assert "controlHintTone" in response.text
     assert "controlHint.className" in response.text

@@ -637,7 +637,15 @@
         <button class="secondary" type="button" id="refreshStatus">刷新状态</button>
         <button class="secondary" type="button" id="checkModel">检查模型</button>
         <button class="secondary" type="button" id="checkAsr">检查 ASR</button>
-        <input id="gatewayKey" type="password" autocomplete="off" placeholder="Gateway Key" />
+        <input
+          id="gatewayKey"
+          type="password"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+          aria-label="Gateway Key"
+          placeholder="Gateway Key"
+        />
         <button class="secondary" type="button" id="saveGatewayKey">保存 Key</button>
         <button class="secondary" type="button" id="loadSample">样例资料</button>
         <a class="button secondary" href="/docs" target="_blank">API 文档</a>
@@ -730,12 +738,12 @@
             <textarea class="answer-field" name="answer" id="answerText" required>我主要负责优化项目架构，做了很多可靠性提升，最终效果比较明显。</textarea>
           </label>
           <div class="toolbar">
-            <button type="submit" id="sendAnswer" disabled>发送回答</button>
-            <button class="secondary" type="button" id="startMic" disabled>开始麦克风</button>
-            <button class="secondary" type="button" id="stopMic" disabled>停止麦克风</button>
-            <button class="secondary" type="button" id="reconnectSocket" disabled>重连通道</button>
-            <button class="secondary" type="button" id="manualProbe" disabled>根据回答追问</button>
-            <button class="danger" type="button" id="endInterview" disabled>结束并评分</button>
+            <button type="submit" id="sendAnswer" aria-describedby="controlHint" disabled>发送回答</button>
+            <button class="secondary" type="button" id="startMic" aria-describedby="controlHint" disabled>开始麦克风</button>
+            <button class="secondary" type="button" id="stopMic" aria-describedby="controlHint" disabled>停止麦克风</button>
+            <button class="secondary" type="button" id="reconnectSocket" aria-describedby="controlHint" disabled>重连通道</button>
+            <button class="secondary" type="button" id="manualProbe" aria-describedby="controlHint" disabled>根据回答追问</button>
+            <button class="danger" type="button" id="endInterview" aria-describedby="controlHint" disabled>结束并评分</button>
             <span class="status-pill" id="micStatus" role="status" aria-live="polite"><span class="status-dot"></span><span>麦克风未开启</span></span>
           </div>
           <p class="control-hint" id="controlHint" role="status" aria-live="polite">请先创建实时面试并等待实时通道连接。</p>
