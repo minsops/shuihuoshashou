@@ -1783,11 +1783,19 @@
 
       function handleSocketMessage(event) {
         try {
-          const message = JSON.parse(event.data);
+          const message = parseLiveSocketMessage(event.data);
           validateLiveMessage(message);
           renderLiveMessage(message);
         } catch (error) {
           appendEvent("实时通道", `实时消息格式异常：${escapeHtml(errorText(error))}`, "red");
+        }
+      }
+
+      function parseLiveSocketMessage(data) {
+        try {
+          return JSON.parse(data);
+        } catch (error) {
+          throw new Error(`实时消息不是有效 JSON：${String(data || "").slice(0, 160)}`);
         }
       }
 

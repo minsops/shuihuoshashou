@@ -348,6 +348,8 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "连接前无法确认本地 gateway" in response.text
     assert "WebSocket 初始化失败" in response.text
     assert "handleSocketMessage" in response.text
+    assert "parseLiveSocketMessage" in response.text
+    assert "实时消息不是有效 JSON" in response.text
     assert "validateLiveMessage" in response.text
     assert "实时消息格式异常" in response.text
     assert "实时消息结构异常" in response.text
