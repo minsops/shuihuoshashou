@@ -91,8 +91,12 @@
       }
 
       button:disabled {
-        cursor: wait;
+        cursor: not-allowed;
         opacity: 0.52;
+      }
+
+      button[data-busy="true"] {
+        cursor: wait;
       }
 
       .topbar {
@@ -916,6 +920,16 @@
         node.innerHTML = `<span class="status-dot"></span><span>${escapeHtml(text)}</span>`;
       }
 
+      function setButtonBusy(button, busy) {
+        if (busy) {
+          button.dataset.busy = "true";
+          button.setAttribute("aria-busy", "true");
+        } else {
+          delete button.dataset.busy;
+          button.removeAttribute("aria-busy");
+        }
+      }
+
       function setControls() {
         const socketState = state.socket ? state.socket.readyState : WebSocket.CLOSED;
         const connected = socketState === WebSocket.OPEN;
@@ -935,6 +949,9 @@
           Boolean(state.interview) ||
           connected ||
           connecting;
+        setButtonBusy(prepareInterview, state.preparingInterview);
+        setButtonBusy(startMic, state.micStarting);
+        setButtonBusy(endInterview, state.endingInterview);
         setControlHints(connected, connecting);
         controlHint.textContent = controlHintText(connected, connecting);
         controlHint.className = `control-hint ${controlHintTone(connected, connecting)}`.trim();
@@ -1310,6 +1327,7 @@
         state.asrCheckToken += 1;
         state.lastRuntimeCheckAt = Date.now();
         refreshStatus.disabled = true;
+        setButtonBusy(refreshStatus, true);
         refreshStatus.title = "正在刷新服务、模型和 ASR 状态";
         setPill(runtimeStatus, "检查中", "live");
         setPill(modelStatus, "模型检查中", "live");
@@ -1356,6 +1374,7 @@
         } finally {
           if (!runtimeCheckStillCurrent(checkToken)) return;
           refreshStatus.disabled = false;
+          setButtonBusy(refreshStatus, false);
           refreshStatus.title = "重新检查服务、模型和 ASR 状态";
         }
       }
@@ -1386,6 +1405,7 @@
         const checkToken = state.modelCheckToken + 1;
         state.modelCheckToken = checkToken;
         checkModel.disabled = true;
+        setButtonBusy(checkModel, true);
         checkModel.title = "正在调用真实模型检查连接";
         setPill(modelStatus, "模型连接检查中", "live");
         try {
@@ -1411,6 +1431,7 @@
         } finally {
           if (modelCheckStillCurrent(checkToken)) {
             checkModel.disabled = false;
+            setButtonBusy(checkModel, false);
             checkModel.title = "手动调用真实模型检查连接";
           }
         }
@@ -1420,6 +1441,7 @@
         const checkToken = state.asrCheckToken + 1;
         state.asrCheckToken = checkToken;
         checkAsr.disabled = true;
+        setButtonBusy(checkAsr, true);
         checkAsr.title = "正在检查 ASR 配置、依赖和 Token";
         setPill(asrStatus, "ASR 检查中", "live");
         try {
@@ -1445,6 +1467,7 @@
         } finally {
           if (asrCheckStillCurrent(checkToken)) {
             checkAsr.disabled = false;
+            setButtonBusy(checkAsr, false);
             checkAsr.title = "手动检查 ASR 配置、依赖和 Token";
           }
         }
@@ -2378,6 +2401,7 @@
         state.reportRefreshInFlight = true;
         if (button && !autoRefresh) {
           button.disabled = true;
+          setButtonBusy(button, true);
           button.textContent = "刷新中";
         }
         try {
@@ -2405,6 +2429,7 @@
             reportLinks.contains(button)
           ) {
             button.disabled = false;
+            setButtonBusy(button, false);
             button.textContent = originalLabel || "刷新报告";
           }
         }
@@ -2440,6 +2465,7 @@
         const originalTitle = button ? button.title : "";
         if (button) {
           button.disabled = true;
+          setButtonBusy(button, true);
           button.textContent = "下载中";
           button.title = `正在下载 ${reportFormatLabel(format)} 报告`;
         }
@@ -2470,6 +2496,7 @@
           state.reportDownloadInFlight.delete(downloadKey);
           if (button && reportLinks.contains(button)) {
             button.disabled = false;
+            setButtonBusy(button, false);
             button.textContent = originalLabel || reportFormatLabel(format);
             button.title = originalTitle;
           }
