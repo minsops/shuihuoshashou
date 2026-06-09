@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -251,6 +253,20 @@ def test_check_aliyun_asr_smoke_script_fails_without_transcript(
     exit_code = asyncio.run(check_aliyun_asr._run(pcm_path))
 
     assert exit_code == 1
+
+
+def test_check_aliyun_asr_help_clarifies_allow_empty_result() -> None:
+    script = Path(__file__).resolve().parents[1] / "scripts" / "check_aliyun_asr.py"
+    result = subprocess.run(
+        [sys.executable, str(script), "--help"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    help_text = " ".join(result.stdout.split())
+    assert "Exit 0 when the ASR session completes but no transcript text is returned." in help_text
+    assert "Treat a completed ASR session with no transcript text as success." not in help_text
 
 
 def test_check_aliyun_asr_allow_empty_result_does_not_claim_transcript_verified(

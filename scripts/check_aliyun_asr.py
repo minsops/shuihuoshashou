@@ -6,10 +6,14 @@ import os
 import sys
 from pathlib import Path
 
-from libs.common.config import Settings
-from services.asr_service.aliyun_engine import AliyunASRSession
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
-DEFAULT_PCM_PATH = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "sample_16k_mono.pcm"
+from libs.common.config import Settings  # noqa: E402
+from services.asr_service.aliyun_engine import AliyunASRSession  # noqa: E402
+
+DEFAULT_PCM_PATH = ROOT / "tests" / "fixtures" / "sample_16k_mono.pcm"
 
 
 async def _run(pcm_path: Path, *, allow_empty_result: bool = False) -> int:
@@ -67,7 +71,7 @@ def main() -> int:
     parser.add_argument(
         "--allow-empty-result",
         action="store_true",
-        help="Treat a completed ASR session with no transcript text as success.",
+        help="Exit 0 when the ASR session completes but no transcript text is returned.",
     )
     args = parser.parse_args()
     return asyncio.run(_run(args.pcm_path, allow_empty_result=args.allow_empty_result))

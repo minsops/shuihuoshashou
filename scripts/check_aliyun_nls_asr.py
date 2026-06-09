@@ -87,7 +87,7 @@ def main() -> int:
     parser.add_argument(
         "--allow-empty-result",
         action="store_true",
-        help="Treat a completed ASR session with no transcript text as success.",
+        help="Exit 0 when the ASR session completes but no transcript text is returned.",
     )
     args = parser.parse_args()
     return asyncio.run(_run(args.pcm_path, allow_empty_result=args.allow_empty_result))
