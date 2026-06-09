@@ -127,9 +127,18 @@ def _extract_pdf(data: bytes) -> str:
         from pypdf import PdfReader
     except ImportError as exc:
         raise ValueError("PDF parsing requires pypdf; install project dependencies first") from exc
-    reader = PdfReader(io.BytesIO(data))
-    texts = [(page.extract_text() or "").strip() for page in reader.pages]
-    return _require_text("\n".join(text for text in texts if text))
+    try:
+        reader = PdfReader(io.BytesIO(data))
+        texts = [(page.extract_text() or "").strip() for page in reader.pages]
+    except Exception as exc:
+        raise ValueError("pdf document is invalid or unreadable") from exc
+    text = "\n".join(text for text in texts if text).strip()
+    if not text:
+        raise ValueError(
+            "pdf text could not be extracted; upload a text PDF/DOCX, enable OCR for image "
+            "documents, or paste the resume text directly"
+        )
+    return text
 
 
 def _extract_image_text(data: bytes, suffix: str) -> str:

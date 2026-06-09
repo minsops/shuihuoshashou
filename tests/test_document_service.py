@@ -93,6 +93,34 @@ def test_parse_pdf_document(tmp_path: Path, monkeypatch) -> None:
     assert "FastAPI" in result.text
 
 
+def test_parse_blank_pdf_has_scan_hint(monkeypatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "mock")
+    get_settings.cache_clear()
+    from pypdf import PdfWriter
+
+    buffer = io.BytesIO()
+    writer = PdfWriter()
+    writer.add_blank_page(width=200, height=200)
+    writer.write(buffer)
+
+    with pytest.raises(ValueError) as exc:
+        parse_document("resume.pdf", buffer.getvalue(), kind="resume", content_type="application/pdf")
+
+    message = str(exc.value)
+    assert "pdf text could not be extracted" in message
+    assert "enable OCR for image documents" in message
+
+
+def test_parse_invalid_pdf_has_actionable_error(monkeypatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "mock")
+    get_settings.cache_clear()
+
+    with pytest.raises(ValueError) as exc:
+        parse_document("resume.pdf", b"not-a-pdf", kind="resume", content_type="application/pdf")
+
+    assert str(exc.value) == "pdf document is invalid or unreadable"
+
+
 def test_parse_document_uses_mime_type_without_extension(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("LLM_PROVIDER", "mock")
     get_settings.cache_clear()
