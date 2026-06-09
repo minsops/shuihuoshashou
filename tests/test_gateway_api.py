@@ -279,6 +279,14 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert 'id="asrStatus" role="status" aria-live="polite"' in response.text
     assert 'aria-label="Gateway Key"' in response.text
     assert 'autocapitalize="off"' in response.text
+    assert 'title="刷新本地服务、模型和 ASR 配置状态"' in response.text
+    assert 'title="调用真实模型检查连接"' in response.text
+    assert 'title="检查 ASR 配置、依赖和 Token"' in response.text
+    assert 'title="保存当前浏览器会话使用的 Gateway Key"' in response.text
+    assert 'title="填入一组可直接试用的 JD、简历和回答"' in response.text
+    assert 'title="打开本地 API 文档"' in response.text
+    assert 'title="创建实时面试通道"' in response.text
+    assert 'title="清空当前面试状态并重新开始"' in response.text
     assert "maxLiveFeedEvents = 120" in response.text
     assert "trimLiveFeedEvents" in response.text
     assert "setStatusTitleFromMessage" in response.text

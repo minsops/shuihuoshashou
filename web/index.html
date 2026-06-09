@@ -658,9 +658,9 @@
         <span class="status-pill" id="runtimeStatus" role="status" aria-live="polite"><span class="status-dot"></span><span>检查中</span></span>
         <span class="status-pill" id="modelStatus" role="status" aria-live="polite"><span class="status-dot"></span><span>模型检查中</span></span>
         <span class="status-pill" id="asrStatus" role="status" aria-live="polite"><span class="status-dot"></span><span>ASR 检查中</span></span>
-        <button class="secondary" type="button" id="refreshStatus">刷新状态</button>
-        <button class="secondary" type="button" id="checkModel">检查模型</button>
-        <button class="secondary" type="button" id="checkAsr">检查 ASR</button>
+        <button class="secondary" type="button" id="refreshStatus" title="刷新本地服务、模型和 ASR 配置状态">刷新状态</button>
+        <button class="secondary" type="button" id="checkModel" title="调用真实模型检查连接">检查模型</button>
+        <button class="secondary" type="button" id="checkAsr" title="检查 ASR 配置、依赖和 Token">检查 ASR</button>
         <input
           id="gatewayKey"
           type="password"
@@ -670,9 +670,9 @@
           aria-label="Gateway Key"
           placeholder="Gateway Key"
         />
-        <button class="secondary" type="button" id="saveGatewayKey">保存 Key</button>
-        <button class="secondary" type="button" id="loadSample">样例资料</button>
-        <a class="button secondary" href="/docs" target="_blank">API 文档</a>
+        <button class="secondary" type="button" id="saveGatewayKey" title="保存当前浏览器会话使用的 Gateway Key">保存 Key</button>
+        <button class="secondary" type="button" id="loadSample" title="填入一组可直接试用的 JD、简历和回答">样例资料</button>
+        <a class="button secondary" href="/docs" target="_blank" title="打开本地 API 文档">API 文档</a>
       </div>
     </header>
 
@@ -725,8 +725,8 @@
             <span class="small upload-status" id="resumeFileStatus" role="status" aria-live="polite">支持 PDF、Word、图片和文本文件。</span>
           </label>
           <div class="toolbar">
-            <button type="submit" id="prepareInterview">创建实时面试</button>
-            <button class="secondary" type="button" id="resetSession">重置</button>
+            <button type="submit" id="prepareInterview" title="创建实时面试通道">创建实时面试</button>
+            <button class="secondary" type="button" id="resetSession" title="清空当前面试状态并重新开始">重置</button>
           </div>
           <div class="dimension-list" id="competencyList">
             <div class="empty">创建面试后显示岗位能力维度</div>
