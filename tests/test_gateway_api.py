@@ -413,9 +413,14 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "面试已结束，请重置后创建新的面试" in response.text
     assert "正在结束面试并生成评分报告" in response.text
     assert "请等待后台评分完成" in response.text
-    assert "后台评分任务已排队，请稍后刷新报告" in response.text
+    assert "后台评分任务已排队，系统会自动刷新报告" in response.text
     assert 'id="refreshReport"' in response.text
     assert "refreshQueuedReport" in response.text
+    assert "scheduleQueuedReportPolling" in response.text
+    assert "clearQueuedReportPolling" in response.text
+    assert "queuedReportMaxPollAttempts = 30" in response.text
+    assert "queuedReportPollIntervalMs = 3000" in response.text
+    assert "reportRefreshInFlight" in response.text
     assert 'button.textContent = "刷新中"' in response.text
     assert 'button.textContent = originalLabel || "刷新报告"' in response.text
     assert "fetchGatewayJson(`/api/interviews/${interviewId}/report`)" in response.text

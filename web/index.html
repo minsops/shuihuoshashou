@@ -779,6 +779,9 @@
         selectedCompetency: null,
         interviewEnded: false,
         reportReady: false,
+        reportPollTimer: null,
+        reportPollAttempts: 0,
+        reportRefreshInFlight: false,
         startedAt: 0,
         micStream: null,
         micContext: null,
@@ -808,6 +811,8 @@
       const micVoiceRmsThreshold = 0.012;
       const maxDocumentUploadBytes = 25 * 1024 * 1024;
       const maxLiveFeedEvents = 120;
+      const queuedReportPollIntervalMs = 3000;
+      const queuedReportMaxPollAttempts = 30;
       const supportedDocumentSuffixes = new Set([
         ".txt",
         ".md",
@@ -1616,6 +1621,7 @@
         }
         if (!validateSetupForm(form)) return;
         state.preparingInterview = true;
+        clearQueuedReportPolling();
         closeSocket();
         stopMicCapture();
         state.interviewEnded = false;
@@ -2019,19 +2025,45 @@
       }
 
       function renderQueuedReportState(interviewId) {
+        clearQueuedReportPolling();
         reportLinks.innerHTML = `
           <button class="secondary" type="button" id="refreshReport" data-report-id="${escapeHtml(interviewId)}">刷新报告</button>
         `;
         reportLinks.querySelector("#refreshReport").addEventListener("click", (event) => {
           refreshQueuedReport(event.currentTarget.dataset.reportId);
         });
-        reportPanel.innerHTML = '<div class="empty">后台评分任务已排队，请稍后刷新报告。</div>';
+        reportPanel.innerHTML = '<div class="empty">后台评分任务已排队，系统会自动刷新报告。</div>';
+        scheduleQueuedReportPolling(interviewId);
       }
 
-      async function refreshQueuedReport(interviewId) {
+      function clearQueuedReportPolling() {
+        if (state.reportPollTimer) {
+          window.clearTimeout(state.reportPollTimer);
+          state.reportPollTimer = null;
+        }
+        state.reportPollAttempts = 0;
+      }
+
+      function scheduleQueuedReportPolling(interviewId) {
+        if (!interviewId || state.reportReady || state.reportPollTimer) return;
+        if (state.reportPollAttempts >= queuedReportMaxPollAttempts) {
+          appendEvent("报告刷新", "后台评分仍未完成，请稍后手动刷新报告。");
+          return;
+        }
+        state.reportPollAttempts += 1;
+        state.reportPollTimer = window.setTimeout(() => {
+          state.reportPollTimer = null;
+          refreshQueuedReport(interviewId, { auto: true });
+        }, queuedReportPollIntervalMs);
+      }
+
+      async function refreshQueuedReport(interviewId, options = {}) {
+        if (state.reportRefreshInFlight) return;
+        state.reportRefreshInFlight = true;
         const button = reportLinks.querySelector("#refreshReport");
         const originalLabel = button ? button.textContent : "";
-        if (button) {
+        const autoRefresh = options.auto === true;
+        if (button && !autoRefresh) {
           button.disabled = true;
           button.textContent = "刷新中";
         }
@@ -2044,12 +2076,14 @@
           if (gatewayAuthError(error)) {
             showGatewayKeyRequired("报告刷新");
           } else if (reportPendingError(error)) {
-            appendEvent("报告刷新", "报告仍在生成中，请稍后再刷新。");
+            if (!autoRefresh) appendEvent("报告刷新", "报告仍在生成中，请稍后再刷新。");
+            scheduleQueuedReportPolling(interviewId);
           } else {
             appendEvent("报告刷新失败", escapeHtml(errorText(error)), "red");
           }
         } finally {
-          if (button && reportLinks.contains(button)) {
+          state.reportRefreshInFlight = false;
+          if (button && !autoRefresh && reportLinks.contains(button)) {
             button.disabled = false;
             button.textContent = originalLabel || "刷新报告";
           }
@@ -2061,6 +2095,7 @@
       }
 
       function markReportReady() {
+        clearQueuedReportPolling();
         state.reportReady = true;
         setPill(liveStatus, "报告已生成", "ready");
       }
@@ -2360,6 +2395,7 @@
       function resetSessionState() {
         stopMicCapture();
         closeSocket();
+        clearQueuedReportPolling();
         nextMicStartToken();
         state.job = null;
         state.candidate = null;
