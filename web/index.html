@@ -1066,9 +1066,7 @@
           setPill(asrStatus, asr.text, asr.ready ? "ready" : "");
         } catch (error) {
           if (gatewayAuthError(error)) {
-            setPill(modelStatus, "需要 Gateway Key", "");
-            setPill(asrStatus, "需要 Gateway Key", "");
-            appendEvent("服务检查", "Gateway 已启用鉴权，请在顶部 Gateway Key 输入框保存 key。", "red");
+            showGatewayKeyRequired("服务检查", { model: true, asr: true });
           } else {
             setPill(modelStatus, "模型状态未知", "");
             setPill(asrStatus, "ASR 状态未知", "");
@@ -1084,6 +1082,12 @@
         return text.includes("401") || text.includes("unauthorized");
       }
 
+      function showGatewayKeyRequired(title, targets = {}) {
+        if (targets.model) setPill(modelStatus, "需要 Gateway Key", "");
+        if (targets.asr) setPill(asrStatus, "需要 Gateway Key", "");
+        appendEvent(title, "Gateway 已启用鉴权，请在顶部 Gateway Key 输入框保存 key。", "red");
+      }
+
       async function checkLlmConnection() {
         checkModel.disabled = true;
         checkModel.title = "正在调用真实模型检查连接";
@@ -1094,8 +1098,12 @@
           setPill(modelStatus, result.ok ? "模型连接正常" : "模型连接异常", result.ok ? "ready" : "");
           appendEvent("模型检查", escapeHtml(result.message), result.ok ? "green" : "red");
         } catch (error) {
-          setPill(modelStatus, "模型连接异常", "");
-          appendEvent("模型检查", escapeHtml(errorText(error)), "red");
+          if (gatewayAuthError(error)) {
+            showGatewayKeyRequired("模型检查", { model: true });
+          } else {
+            setPill(modelStatus, "模型连接异常", "");
+            appendEvent("模型检查", escapeHtml(errorText(error)), "red");
+          }
         } finally {
           checkModel.disabled = false;
           checkModel.title = "手动调用真实模型检查连接";
@@ -1112,8 +1120,12 @@
           setPill(asrStatus, result.ok ? "ASR 就绪" : "ASR 异常", result.ok ? "ready" : "");
           appendEvent("ASR 检查", escapeHtml(result.message), result.ok ? "green" : "red");
         } catch (error) {
-          setPill(asrStatus, "ASR 异常", "");
-          appendEvent("ASR 检查", escapeHtml(errorText(error)), "red");
+          if (gatewayAuthError(error)) {
+            showGatewayKeyRequired("ASR 检查", { asr: true });
+          } else {
+            setPill(asrStatus, "ASR 异常", "");
+            appendEvent("ASR 检查", escapeHtml(errorText(error)), "red");
+          }
         } finally {
           checkAsr.disabled = false;
           checkAsr.title = "手动检查 ASR 配置、依赖和 Token";

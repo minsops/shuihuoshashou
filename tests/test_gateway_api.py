@@ -306,6 +306,9 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "new WebSocket(wsUrl(`/ws/interview/${interviewId}`))" in response.text
     assert "gatewayUrl(`/api/interviews/${report.interview_id}/report.html`)" in response.text
     assert "gatewayAuthError" in response.text
+    assert "showGatewayKeyRequired" in response.text
+    assert 'showGatewayKeyRequired("模型检查", { model: true })' in response.text
+    assert 'showGatewayKeyRequired("ASR 检查", { asr: true })' in response.text
     assert "需要 Gateway Key" in response.text
     assert "Gateway 已启用鉴权" in response.text
     assert "interviewEnded" in response.text
