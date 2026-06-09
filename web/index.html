@@ -949,16 +949,8 @@
         }
         try {
           const config = await fetch("/api/config/status").then((response) => response.json());
-          const configured =
-            config.llm_provider === "openai_compatible" &&
-            config.llm_base_url_configured &&
-            config.llm_api_key_configured;
-          const modelName = config.llm_model || "未知模型";
-          setPill(
-            modelStatus,
-            configured ? `模型 ${modelName} 已配置` : "模型未配置完整",
-            configured ? "ready" : ""
-          );
+          const model = modelStatusFromConfig(config);
+          setPill(modelStatus, model.text, model.ready ? "ready" : "");
           const asr = asrStatusFromConfig(config);
           setPill(asrStatus, asr.text, asr.ready ? "ready" : "");
         } catch (error) {
@@ -968,6 +960,21 @@
           refreshStatus.disabled = false;
           refreshStatus.title = "重新检查服务、模型和 ASR 状态";
         }
+      }
+
+      function modelStatusFromConfig(config) {
+        if (config.llm_provider === "mock") {
+          return { text: "模型模拟模式", ready: false };
+        }
+        if (config.llm_provider === "openai_compatible") {
+          const ready = config.llm_base_url_configured && config.llm_api_key_configured;
+          const modelName = config.llm_model || "未知模型";
+          return {
+            text: ready ? `模型 ${modelName} 已配置` : "模型未配置完整",
+            ready,
+          };
+        }
+        return { text: "模型状态未知", ready: false };
       }
 
       function asrStatusFromConfig(config) {
