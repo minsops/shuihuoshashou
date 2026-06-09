@@ -246,6 +246,8 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "停止麦克风" in response.text
     assert "重连通道" in response.text
     assert "刷新状态" in response.text
+    assert "模型未配置完整" in response.text
+    assert "模型 ${modelName} 已配置" in response.text
     assert "audio_chunk" in response.text
     assert "pcm16" in response.text
     assert "端口不是本服务" in response.text

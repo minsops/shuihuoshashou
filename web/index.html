@@ -949,15 +949,15 @@
         }
         try {
           const config = await fetch("/api/config/status").then((response) => response.json());
-          const connected =
+          const configured =
             config.llm_provider === "openai_compatible" &&
             config.llm_base_url_configured &&
             config.llm_api_key_configured;
           const modelName = config.llm_model || "未知模型";
           setPill(
             modelStatus,
-            connected ? `模型 ${modelName} 已连接` : "模型未连接",
-            connected ? "ready" : ""
+            configured ? `模型 ${modelName} 已配置` : "模型未配置完整",
+            configured ? "ready" : ""
           );
           const asr = asrStatusFromConfig(config);
           setPill(asrStatus, asr.text, asr.ready ? "ready" : "");
