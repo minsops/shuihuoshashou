@@ -45,6 +45,7 @@ from libs.schemas import (
     TranscriptSegment,
 )
 from libs.llm_client import LLMMessage, get_llm_client
+from services.asr_service.nls_token import AliyunNLSTokenProvider
 from services.aigc_detect_service.service import detect_interview
 from services.asr_service.service import (
     ASREngine,
@@ -346,9 +347,125 @@ async def check_llm_connection() -> dict[str, str | bool]:
 
 def _safe_public_error(message: str) -> str:
     cleaned = " ".join(message.split())
-    if cleaned.startswith("HTTP "):
-        return cleaned.split(":", maxsplit=1)[0]
+    for secret in _configured_secret_values():
+        cleaned = cleaned.replace(secret, "***")
+    if "HTTP " in cleaned:
+        return cleaned[cleaned.index("HTTP ") :].split(":", maxsplit=1)[0]
     return cleaned[:240] or "unknown LLM error"
+
+
+def _configured_secret_values() -> list[str]:
+    try:
+        settings = get_settings()
+    except Exception:
+        return []
+    return [
+        secret
+        for secret in {
+            settings.llm_api_key,
+            settings.asr_api_key,
+            settings.aliyun_asr_api_key,
+            settings.aliyun_nls_token,
+            settings.aliyun_ak_secret,
+            settings.speaker_diarization_api_key,
+            settings.aigc_detector_api_key,
+            settings.gateway_api_key,
+        }
+        if len(secret.strip()) >= 4
+    ]
+
+
+@app.post("/api/config/asr/check")
+async def check_asr_readiness() -> dict[str, str | bool]:
+    settings = get_settings()
+    status = get_runtime_status()
+    if status.asr_provider == "stub":
+        return {
+            "ok": False,
+            "mode": "stub",
+            "message": "当前是 ASR 模拟模式，没有调用真实语音识别。",
+        }
+    if status.asr_provider == "http":
+        if not status.asr_base_url_configured:
+            return {
+                "ok": False,
+                "mode": "incomplete",
+                "message": "HTTP ASR 配置不完整，请检查 ASR_BASE_URL。",
+            }
+        return {
+            "ok": True,
+            "mode": "configured",
+            "message": "HTTP ASR 基本配置存在；此检查未发送测试音频。",
+        }
+    if status.asr_provider == "aliyun_ws":
+        try:
+            import websockets  # noqa: F401
+        except ImportError:
+            return {
+                "ok": False,
+                "mode": "missing_dependency",
+                "message": "ASR WebSocket 依赖缺失，请重新安装依赖。",
+            }
+        if not status.aliyun_asr_api_key_configured or not status.aliyun_asr_endpoint_configured:
+            return {
+                "ok": False,
+                "mode": "incomplete",
+                "message": "阿里云 DashScope ASR 配置不完整，请检查 API Key 和 Endpoint。",
+            }
+        return {
+            "ok": True,
+            "mode": "configured",
+            "message": "阿里云 DashScope ASR 基本配置存在；此检查未打开识别会话。",
+        }
+    if status.asr_provider == "aliyun_nls_ws":
+        try:
+            import websockets  # noqa: F401
+        except ImportError:
+            return {
+                "ok": False,
+                "mode": "missing_dependency",
+                "message": "ASR WebSocket 依赖缺失，请重新安装依赖。",
+            }
+        if not status.aliyun_nls_app_key_configured or not status.aliyun_nls_endpoint_configured:
+            return {
+                "ok": False,
+                "mode": "incomplete",
+                "message": "阿里云 NLS ASR 配置不完整，请检查 AppKey 和 Endpoint。",
+            }
+        if status.aliyun_nls_token_auto_configured:
+            try:
+                token = await asyncio.to_thread(
+                    AliyunNLSTokenProvider(
+                        access_key_id=settings.aliyun_ak_id,
+                        access_key_secret=settings.aliyun_ak_secret,
+                        endpoint=settings.aliyun_nls_token_endpoint,
+                        region_id=settings.aliyun_nls_token_region,
+                    ).get_token
+                )
+            except Exception as exc:
+                return {
+                    "ok": False,
+                    "mode": "token_error",
+                    "message": _safe_public_error(f"NLS Token 创建失败: {exc}"),
+                }
+            if token.strip():
+                return {
+                    "ok": True,
+                    "mode": "token_ready",
+                    "message": "阿里云 NLS ASR 就绪：WebSocket 依赖存在，自动 Token 可生成。",
+                }
+        if status.aliyun_nls_token_configured:
+            return {
+                "ok": True,
+                "mode": "fixed_token",
+                "message": "阿里云 NLS ASR 基本配置存在：固定 Token 已配置；此检查未验证 Token 有效期。",
+            }
+        return {
+            "ok": False,
+            "mode": "incomplete",
+            "message": "阿里云 NLS ASR 缺少 Token，请配置固定 Token 或 AK 自动 Token。",
+        }
+    return {"ok": False, "mode": "unknown", "message": "ASR provider 状态未知。"}
 
 
 @app.get("/", response_class=HTMLResponse)

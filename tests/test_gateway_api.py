@@ -294,6 +294,10 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "checkLlmConnection" in response.text
     assert "/api/config/llm/check" in response.text
     assert "手动调用真实模型检查连接" in response.text
+    assert 'id="checkAsr"' in response.text
+    assert "checkAsrReadiness" in response.text
+    assert "/api/config/asr/check" in response.text
+    assert "手动检查 ASR 配置、依赖和 Token" in response.text
     assert "interviewEnded" in response.text
     assert "面试已结束，请重置后创建新的面试" in response.text
     assert "正在结束面试并生成评分报告" in response.text
@@ -480,6 +484,74 @@ def test_gateway_llm_check_sanitizes_upstream_error(tmp_path: Path, monkeypatch)
 
     assert response.status_code == 200
     assert response.json() == {"ok": False, "mode": "error", "message": "HTTP 401"}
+
+
+def test_gateway_asr_check_reports_stub_mode(tmp_path: Path, monkeypatch) -> None:
+    client = _client(tmp_path, monkeypatch)
+
+    response = client.post("/api/config/asr/check")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "ok": False,
+        "mode": "stub",
+        "message": "当前是 ASR 模拟模式，没有调用真实语音识别。",
+    }
+
+
+def test_gateway_asr_check_validates_nls_auto_token(tmp_path: Path, monkeypatch) -> None:
+    client = _client(tmp_path, monkeypatch)
+    monkeypatch.setenv("ASR_PROVIDER", "aliyun_nls_ws")
+    monkeypatch.setenv("ALIYUN_NLS_APP_KEY", "app-key")
+    monkeypatch.setenv("ALIYUN_NLS_TOKEN", "")
+    monkeypatch.setenv("ALIYUN_AK_ID", "ak-id")
+    monkeypatch.setenv("ALIYUN_AK_SECRET", "ak-secret")
+    get_settings.cache_clear()
+
+    class FakeTokenProvider:
+        def __init__(self, **kwargs):
+            assert kwargs["access_key_id"] == "ak-id"
+
+        def get_token(self):
+            return "generated-token"
+
+    monkeypatch.setattr("services.gateway.app.AliyunNLSTokenProvider", FakeTokenProvider)
+
+    response = client.post("/api/config/asr/check")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "ok": True,
+        "mode": "token_ready",
+        "message": "阿里云 NLS ASR 就绪：WebSocket 依赖存在，自动 Token 可生成。",
+    }
+
+
+def test_gateway_asr_check_sanitizes_nls_token_error(tmp_path: Path, monkeypatch) -> None:
+    client = _client(tmp_path, monkeypatch)
+    monkeypatch.setenv("ASR_PROVIDER", "aliyun_nls_ws")
+    monkeypatch.setenv("ALIYUN_NLS_APP_KEY", "app-key")
+    monkeypatch.setenv("ALIYUN_NLS_TOKEN", "")
+    monkeypatch.setenv("ALIYUN_AK_ID", "ak-id")
+    monkeypatch.setenv("ALIYUN_AK_SECRET", "ak-secret")
+    get_settings.cache_clear()
+
+    class FakeTokenProvider:
+        def __init__(self, **kwargs):
+            pass
+
+        def get_token(self):
+            raise RuntimeError("CreateToken failed for ak-secret")
+
+    monkeypatch.setattr("services.gateway.app.AliyunNLSTokenProvider", FakeTokenProvider)
+
+    response = client.post("/api/config/asr/check")
+
+    assert response.status_code == 200
+    assert response.json()["ok"] is False
+    assert response.json()["mode"] == "token_error"
+    assert "ak-secret" not in response.text
+    assert "***" in response.text
 
 
 def test_gateway_config_status_redacts_database_password(

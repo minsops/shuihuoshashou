@@ -571,6 +571,7 @@
         <span class="status-pill" id="asrStatus"><span class="status-dot"></span><span>ASR 检查中</span></span>
         <button class="secondary" type="button" id="refreshStatus">刷新状态</button>
         <button class="secondary" type="button" id="checkModel">检查模型</button>
+        <button class="secondary" type="button" id="checkAsr">检查 ASR</button>
         <button class="secondary" type="button" id="loadSample">样例资料</button>
         <a class="button secondary" href="/docs" target="_blank">API 文档</a>
       </div>
@@ -728,6 +729,7 @@
       const asrStatus = document.querySelector("#asrStatus");
       const refreshStatus = document.querySelector("#refreshStatus");
       const checkModel = document.querySelector("#checkModel");
+      const checkAsr = document.querySelector("#checkAsr");
       const liveStatus = document.querySelector("#liveStatus");
       const micStatus = document.querySelector("#micStatus");
       const competencyList = document.querySelector("#competencyList");
@@ -1041,6 +1043,24 @@
         } finally {
           checkModel.disabled = false;
           checkModel.title = "手动调用真实模型检查连接";
+        }
+      }
+
+      async function checkAsrReadiness() {
+        checkAsr.disabled = true;
+        checkAsr.title = "正在检查 ASR 配置、依赖和 Token";
+        setPill(asrStatus, "ASR 检查中", "live");
+        try {
+          await discoverGateway();
+          const result = await fetchGatewayJson("/api/config/asr/check", { method: "POST" });
+          setPill(asrStatus, result.ok ? "ASR 就绪" : "ASR 异常", result.ok ? "ready" : "");
+          appendEvent("ASR 检查", escapeHtml(result.message), result.ok ? "green" : "red");
+        } catch (error) {
+          setPill(asrStatus, "ASR 异常", "");
+          appendEvent("ASR 检查", escapeHtml(errorText(error)), "red");
+        } finally {
+          checkAsr.disabled = false;
+          checkAsr.title = "手动检查 ASR 配置、依赖和 Token";
         }
       }
 
@@ -1771,6 +1791,7 @@
 
       refreshStatus.addEventListener("click", checkRuntime);
       checkModel.addEventListener("click", checkLlmConnection);
+      checkAsr.addEventListener("click", checkAsrReadiness);
       document.querySelector("#loadSample").addEventListener("click", loadSample);
       document.querySelector("#resetSession").addEventListener("click", resetSessionState);
       startMic.addEventListener("click", startMicCapture);
