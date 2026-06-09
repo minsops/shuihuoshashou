@@ -158,6 +158,11 @@
         gap: var(--space-xs);
       }
 
+      .top-actions input {
+        width: 160px;
+        min-height: 38px;
+      }
+
       .workspace {
         display: grid;
         grid-template-columns: minmax(320px, 0.8fr) minmax(420px, 1.15fr) minmax(320px, 0.9fr);
@@ -534,6 +539,10 @@
           align-items: flex-start;
         }
 
+        .top-actions input {
+          width: min(100%, 220px);
+        }
+
         .topbar,
         .workspace,
         .split,
@@ -572,6 +581,8 @@
         <button class="secondary" type="button" id="refreshStatus">刷新状态</button>
         <button class="secondary" type="button" id="checkModel">检查模型</button>
         <button class="secondary" type="button" id="checkAsr">检查 ASR</button>
+        <input id="gatewayKey" type="password" autocomplete="off" placeholder="Gateway Key" />
+        <button class="secondary" type="button" id="saveGatewayKey">保存 Key</button>
         <button class="secondary" type="button" id="loadSample">样例资料</button>
         <a class="button secondary" href="/docs" target="_blank">API 文档</a>
       </div>
@@ -730,6 +741,8 @@
       const refreshStatus = document.querySelector("#refreshStatus");
       const checkModel = document.querySelector("#checkModel");
       const checkAsr = document.querySelector("#checkAsr");
+      const gatewayKey = document.querySelector("#gatewayKey");
+      const saveGatewayKey = document.querySelector("#saveGatewayKey");
       const liveStatus = document.querySelector("#liveStatus");
       const micStatus = document.querySelector("#micStatus");
       const competencyList = document.querySelector("#competencyList");
@@ -777,6 +790,7 @@
           window.location.origin && window.location.origin !== "null"
             ? window.location.origin
             : "http://127.0.0.1:8001",
+        gatewayApiKey: sessionStorage.getItem("gatewayApiKey") || "",
       };
 
       const micSampleRate = 16000;
@@ -930,8 +944,24 @@
         return `${state.apiOrigin}${normalizedPath}`;
       }
 
-      function wsUrl(path) {
+      function authQueryParams() {
+        return state.gatewayApiKey ? { api_key: state.gatewayApiKey } : {};
+      }
+
+      function gatewayUrl(path) {
         const url = new URL(apiUrl(path));
+        Object.entries(authQueryParams()).forEach(([key, value]) => {
+          url.searchParams.set(key, value);
+        });
+        return url.toString();
+      }
+
+      function gatewayHeaders(headers = {}) {
+        return state.gatewayApiKey ? { ...headers, "X-API-Key": state.gatewayApiKey } : headers;
+      }
+
+      function wsUrl(path) {
+        const url = new URL(gatewayUrl(path));
         url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
         return url.toString();
       }
@@ -977,7 +1007,10 @@
       }
 
       async function fetchGateway(path, options = {}) {
-        const response = await fetchWithTimeout(apiUrl(path), options);
+        const response = await fetchWithTimeout(gatewayUrl(path), {
+          ...options,
+          headers: gatewayHeaders(options.headers || {}),
+        });
         if (!response.ok) throw new Error(await readErrorMessage(response));
         return response;
       }
@@ -994,6 +1027,18 @@
           body: JSON.stringify(payload),
         });
         return response.json();
+      }
+
+      function saveGatewayApiKey() {
+        state.gatewayApiKey = gatewayKey.value.trim();
+        if (state.gatewayApiKey) {
+          sessionStorage.setItem("gatewayApiKey", state.gatewayApiKey);
+          appendEvent("Gateway Key", "已保存到当前浏览器会话。", "green");
+        } else {
+          sessionStorage.removeItem("gatewayApiKey");
+          appendEvent("Gateway Key", "已清除当前浏览器会话中的 key。");
+        }
+        checkRuntime();
       }
 
       async function checkRuntime() {
@@ -1503,9 +1548,9 @@
       function renderReport(report) {
         const score = report.score;
         reportLinks.innerHTML = `
-          <a class="button secondary" href="${escapeHtml(apiUrl(`/api/interviews/${report.interview_id}/report.html`))}" target="_blank">HTML</a>
-          <a class="button secondary" href="${escapeHtml(apiUrl(`/api/interviews/${report.interview_id}/report.pdf`))}" target="_blank">PDF</a>
-          <a class="button secondary" href="${escapeHtml(apiUrl(`/api/interviews/${report.interview_id}/report.json`))}" target="_blank">JSON</a>
+          <a class="button secondary" href="${escapeHtml(gatewayUrl(`/api/interviews/${report.interview_id}/report.html`))}" target="_blank">HTML</a>
+          <a class="button secondary" href="${escapeHtml(gatewayUrl(`/api/interviews/${report.interview_id}/report.pdf`))}" target="_blank">PDF</a>
+          <a class="button secondary" href="${escapeHtml(gatewayUrl(`/api/interviews/${report.interview_id}/report.json`))}" target="_blank">JSON</a>
         `;
         const rows = score.dimensions
           .map(
@@ -1792,6 +1837,10 @@
       refreshStatus.addEventListener("click", checkRuntime);
       checkModel.addEventListener("click", checkLlmConnection);
       checkAsr.addEventListener("click", checkAsrReadiness);
+      saveGatewayKey.addEventListener("click", saveGatewayApiKey);
+      gatewayKey.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") saveGatewayApiKey();
+      });
       document.querySelector("#loadSample").addEventListener("click", loadSample);
       document.querySelector("#resetSession").addEventListener("click", resetSessionState);
       startMic.addEventListener("click", startMicCapture);
@@ -1808,6 +1857,7 @@
         }
       });
 
+      gatewayKey.value = state.gatewayApiKey;
       checkRuntime();
       loadSample();
       setControls();

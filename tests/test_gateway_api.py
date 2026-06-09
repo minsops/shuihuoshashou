@@ -298,6 +298,13 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "checkAsrReadiness" in response.text
     assert "/api/config/asr/check" in response.text
     assert "手动检查 ASR 配置、依赖和 Token" in response.text
+    assert 'id="gatewayKey"' in response.text
+    assert 'id="saveGatewayKey"' in response.text
+    assert "sessionStorage.getItem(\"gatewayApiKey\")" in response.text
+    assert '"X-API-Key": state.gatewayApiKey' in response.text
+    assert "url.searchParams.set(key, value)" in response.text
+    assert "new WebSocket(wsUrl(`/ws/interview/${interviewId}`))" in response.text
+    assert "gatewayUrl(`/api/interviews/${report.interview_id}/report.html`)" in response.text
     assert "interviewEnded" in response.text
     assert "面试已结束，请重置后创建新的面试" in response.text
     assert "正在结束面试并生成评分报告" in response.text
