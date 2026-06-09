@@ -896,6 +896,7 @@
       }
 
       function controlHintText(connected, connecting) {
+        if (state.reportReady) return "报告已生成。可以下载 HTML、PDF、JSON 或转写，或重置后开始新的面试。";
         if (state.interviewEnded) return "面试已结束。请重置后创建新的面试。";
         if (state.micRecording) return "麦克风采集中。可以停止麦克风，或结束面试生成评分报告。";
         if (connected) return "实时通道已连接。可以发送文字回答，或点击开始麦克风进行语音转写。";
