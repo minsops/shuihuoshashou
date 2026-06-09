@@ -264,6 +264,9 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "页面正在尝试连接" in response.text
     assert "失败详情" in response.text
     assert "当前 gateway" in response.text
+    assert "gatewayOriginFromResponse" in response.text
+    assert "new URL(response.url).origin" in response.text
+    assert "resolvedOrigin" in response.text
     assert "ASR 检查中" in response.text
     assert "ASR 阿里云 NLS 已配置" in response.text
     assert "ASR 阿里云 NLS 已配置（自动 Token）" in response.text

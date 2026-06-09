@@ -991,6 +991,14 @@
         return `${state.apiOrigin}${normalizedPath}`;
       }
 
+      function gatewayOriginFromResponse(response, fallbackOrigin) {
+        try {
+          return new URL(response.url).origin;
+        } catch (error) {
+          return fallbackOrigin;
+        }
+      }
+
       function authQueryParams() {
         return state.gatewayApiKey ? { api_key: state.gatewayApiKey } : {};
       }
@@ -1055,9 +1063,14 @@
               continue;
             }
             const previousOrigin = state.apiOrigin;
-            state.apiOrigin = origin;
-            if (previousOrigin !== origin) {
-              appendEvent("服务检查", `已自动切换到本地 gateway：${escapeHtml(origin)}`, "green");
+            const resolvedOrigin = gatewayOriginFromResponse(response, origin);
+            state.apiOrigin = resolvedOrigin;
+            if (previousOrigin !== resolvedOrigin) {
+              appendEvent(
+                "服务检查",
+                `已自动切换到本地 gateway：${escapeHtml(resolvedOrigin)}`,
+                "green"
+              );
             }
             return status;
           } catch (error) {
