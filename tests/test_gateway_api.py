@@ -288,6 +288,9 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "payload.detail" in response.text
     assert "input.disabled = true" in response.text
     assert "input.value = \"\"" in response.text
+    assert "maxDocumentUploadBytes = 25 * 1024 * 1024" in response.text
+    assert "文件超过 25MB" in response.text
+    assert "请压缩、拆分或直接粘贴关键内容" in response.text
     assert "资料上传提示" in response.text
     assert "result.warning" in response.text
     assert "未提取到可用文本" in response.text

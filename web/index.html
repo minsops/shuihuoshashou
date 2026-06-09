@@ -798,6 +798,7 @@
       const micSampleRate = 16000;
       const micChunkSamples = micSampleRate;
       const micVoiceRmsThreshold = 0.012;
+      const maxDocumentUploadBytes = 25 * 1024 * 1024;
       const fallbackGatewayOrigins = ["http://127.0.0.1:8001", "http://localhost:8001"];
 
       function escapeHtml(value) {
@@ -1220,6 +1221,15 @@
 
       async function parseDocumentFile(file, input, target, label, kind) {
         if (!file) return;
+        if (file.size > maxDocumentUploadBytes) {
+          appendEvent(
+            "资料上传失败",
+            `${escapeHtml(label)} 文件超过 25MB，请压缩、拆分或直接粘贴关键内容。`,
+            "red"
+          );
+          input.value = "";
+          return;
+        }
         appendEvent("资料上传", `${escapeHtml(label)} 正在解析：${escapeHtml(file.name)}`);
         input.disabled = true;
         try {
