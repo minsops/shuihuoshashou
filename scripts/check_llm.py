@@ -55,6 +55,9 @@ async def main() -> int:
     if response == fallback and status.llm_provider != "mock":
         print("LLM smoke test fell back. Check provider protocol, base URL, auth, and response path.")
         return 1
+    if status.llm_provider == "mock":
+        print("LLM mock mode ok. No real model endpoint was called.")
+        return 0
     print("LLM smoke test ok.")
     return 0
 

@@ -99,7 +99,7 @@ export LLM_AUTH_SCHEME="Bearer"
 export LLM_RESPONSE_CONTENT_PATH="choices.0.message.content"
 ```
 
-配置后运行 `python scripts/check_llm.py`，看到 `LLM smoke test ok.` 表示大模型链路已经接通。
+配置后运行 `python scripts/check_llm.py`。看到 `LLM smoke test ok.` 表示真实大模型链路已经接通；如果输出 `LLM mock mode ok. No real model endpoint was called.`，说明当前仍在本地 mock 模式，没有调用真实模型 endpoint。
 
 部署环境建议设置 `GATEWAY_API_KEY`，要求 `/api/*` 和 WebSocket 流量携带 `X-API-Key: ...` 或 `Authorization: Bearer ...`。本地 demo 默认不启用。
 
@@ -180,6 +180,8 @@ python scripts/diagnose_llm_network.py
 LLM_API_KEY=your-key python scripts/diagnose_llm_auth.py
 curl -s http://127.0.0.1:8001/api/config/status
 ```
+
+`check_llm.py` 在 `LLM_PROVIDER=mock` 时只验证本地 fallback 链路，会输出 `LLM mock mode ok. No real model endpoint was called.`；只有 `LLM_PROVIDER=openai_compatible` 且 key/base URL 配好后，`LLM smoke test ok.` 才代表真实模型调用成功。
 
 `/api/config/status` 只返回非密钥 provider path、响应映射 path、timeout、OTLP exporter 是否存在，以及密钥是否已配置；不会返回 API key。数据库 URL 会隐藏密码。Provider/backend selector、数字阈值和必要 companion URL 会在 settings 加载时校验，配置不支持或不完整时会在启动或 smoke test 阶段尽早失败。
 
