@@ -442,6 +442,10 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert 'data-report-format="transcript.json"' in response.text
     assert ">转写</button>" in response.text
     assert "downloadReportArtifact" in response.text
+    assert "reportDownloadInFlight" in response.text
+    assert "state.reportDownloadInFlight.has(downloadKey)" in response.text
+    assert "state.reportDownloadInFlight.delete(downloadKey)" in response.text
+    assert "正在下载中，请稍候" in response.text
     assert "fetchGateway(`/api/interviews/${interviewId}/report.${format}`)" in response.text
     assert 'button.textContent = "下载中"' in response.text
     assert "正在下载 ${reportFormatLabel(format)} 报告" in response.text

@@ -784,6 +784,7 @@
         reportPollAttempts: 0,
         reportRefreshEpoch: 0,
         reportRefreshInFlight: false,
+        reportDownloadInFlight: new Set(),
         startedAt: 0,
         micStream: null,
         micContext: null,
@@ -2236,6 +2237,12 @@
           appendEvent("报告下载失败", "报告 ID 或格式缺失，请刷新报告后重试。", "red");
           return;
         }
+        const downloadKey = `${interviewId}:${format}`;
+        if (state.reportDownloadInFlight.has(downloadKey)) {
+          appendEvent("报告下载", `${escapeHtml(reportFormatLabel(format))} 正在下载中，请稍候。`);
+          return;
+        }
+        state.reportDownloadInFlight.add(downloadKey);
         const button = reportLinks.querySelector(`[data-report-format="${format}"]`);
         const originalLabel = button ? button.textContent : "";
         const originalTitle = button ? button.title : "";
@@ -2263,6 +2270,7 @@
             appendEvent("报告下载失败", escapeHtml(errorText(error)), "red");
           }
         } finally {
+          state.reportDownloadInFlight.delete(downloadKey);
           if (button && reportLinks.contains(button)) {
             button.disabled = false;
             button.textContent = originalLabel || reportFormatLabel(format);
@@ -2554,6 +2562,7 @@
         state.interviewEnded = false;
         state.endingInterview = false;
         state.reportReady = false;
+        state.reportDownloadInFlight.clear();
         state.selectedQuestionSource = "interviewer";
         state.selectedProbeTarget = null;
         state.selectedCompetency = null;
