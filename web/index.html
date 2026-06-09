@@ -886,8 +886,14 @@
         }
       }
 
+      function liveChannelUnavailableReason(connecting) {
+        if (connecting) return "实时通道连接中";
+        if (state.interview) return "实时通道未连接，请点击重连通道";
+        return "请先创建实时面试并等待实时通道连接";
+      }
+
       function setControlHints(connected, connecting) {
-        const reason = connecting ? "实时通道连接中" : "请先创建实时面试并等待实时通道连接";
+        const reason = liveChannelUnavailableReason(connecting);
         const endedReason = "面试已结束，请重置后创建新的面试";
         sendAnswer.title = state.interviewEnded
           ? endedReason
