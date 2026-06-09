@@ -784,15 +784,44 @@
       }
 
       function setControls() {
-        const connected = Boolean(state.socket && state.socket.readyState === WebSocket.OPEN);
+        const socketState = state.socket ? state.socket.readyState : WebSocket.CLOSED;
+        const connected = socketState === WebSocket.OPEN;
+        const connecting = socketState === WebSocket.CONNECTING;
         sendAnswer.disabled = !connected;
         startMic.disabled = !connected || state.micRecording;
         stopMic.disabled = !connected || !state.micRecording;
         manualProbe.disabled = !connected;
         endInterview.disabled = !connected;
-        prepareInterview.disabled = connected;
-        setPill(liveStatus, connected ? `已连接 ${state.interview.id.slice(0, 8)}` : "未连接", connected ? "live" : "");
-        setPill(micStatus, state.micRecording ? "麦克风采集中" : "麦克风未开启", state.micRecording ? "live" : "");
+        prepareInterview.disabled = connected || connecting;
+        setControlHints(connected, connecting);
+        if (connected) {
+          setPill(liveStatus, `已连接 ${state.interview.id.slice(0, 8)}`, "live");
+        } else if (connecting) {
+          setPill(liveStatus, "连接中", "live");
+        } else if (state.interview) {
+          setPill(liveStatus, "通道未连接", "");
+        } else {
+          setPill(liveStatus, "未建面试", "");
+        }
+        if (state.micRecording) {
+          setPill(micStatus, "麦克风采集中", "live");
+        } else if (connecting) {
+          setPill(micStatus, "等待实时通道", "live");
+        } else if (!connected) {
+          setPill(micStatus, "先创建实时面试", "");
+        } else {
+          setPill(micStatus, "麦克风未开启", "");
+        }
+      }
+
+      function setControlHints(connected, connecting) {
+        const reason = connecting ? "实时通道连接中" : "请先创建实时面试并等待实时通道连接";
+        sendAnswer.title = connected ? "发送文本回答并触发追问" : reason;
+        startMic.title = connected ? "开始浏览器麦克风采集" : reason;
+        stopMic.title = state.micRecording ? "停止麦克风采集" : "麦克风尚未开启";
+        manualProbe.title = connected ? "基于当前回答立即生成追问" : reason;
+        endInterview.title = connected ? "结束面试并生成评分报告" : reason;
+        prepareInterview.title = connected || connecting ? "当前面试通道已创建" : "创建实时面试通道";
       }
 
       function appendEvent(title, body, tone = "") {
@@ -1049,6 +1078,7 @@
       function openSocket(interviewId) {
         const protocol = window.location.protocol === "https:" ? "wss" : "ws";
         state.socket = new WebSocket(`${protocol}://${window.location.host}/ws/interview/${interviewId}`);
+        setControls();
         state.socket.addEventListener("open", () => {
           setControls();
           appendEvent("实时通道", "WebSocket 已打开。");
@@ -1057,6 +1087,10 @@
           stopMicCapture();
           setControls();
           appendEvent("实时通道", "WebSocket 已关闭。");
+        });
+        state.socket.addEventListener("error", () => {
+          setControls();
+          appendEvent("实时通道", "WebSocket 连接失败，请检查服务是否仍在运行。", "red");
         });
         state.socket.addEventListener("message", (event) => {
           renderLiveMessage(JSON.parse(event.data));

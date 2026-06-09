@@ -251,6 +251,9 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "ASR 阿里云 NLS 已配置" in response.text
     assert "ASR 长时间没有收到有效语音" in response.text
     assert "原始原因" in response.text
+    assert "先创建实时面试" in response.text
+    assert "实时通道连接中" in response.text
+    assert "通道未连接" in response.text
 
 
 def test_gateway_health_identifies_service(tmp_path: Path, monkeypatch) -> None:
