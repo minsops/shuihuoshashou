@@ -1020,6 +1020,16 @@
         return text;
       }
 
+      async function readJsonResponse(response, fallbackMessage = "接口响应不是有效 JSON") {
+        const text = await response.text();
+        if (!text.trim()) throw new Error(`${fallbackMessage}：响应为空。`);
+        try {
+          return JSON.parse(text);
+        } catch (error) {
+          throw new Error(`${fallbackMessage}：${text.slice(0, 160)}`);
+        }
+      }
+
       function formatApiDetailItem(item) {
         if (typeof item === "string") return item.trim();
         if (!item || typeof item !== "object") return String(item || "").trim();
@@ -1127,7 +1137,7 @@
               failures.push(`${origin}: HTTP ${response.status}`);
               continue;
             }
-            const status = await response.json();
+            const status = await readJsonResponse(response, "服务健康检查响应不是有效 JSON");
             if (status.service !== "shuihuo-killer-gateway") {
               failures.push(`${origin}: 不是水货杀手 gateway`);
               continue;
@@ -1166,7 +1176,7 @@
 
       async function fetchGatewayJson(path, options = {}) {
         const response = await fetchGateway(path, options);
-        return response.json();
+        return readJsonResponse(response);
       }
 
       async function postJson(url, payload) {
@@ -1175,7 +1185,7 @@
           headers: { "content-type": "application/json" },
           body: JSON.stringify(payload),
         });
-        return response.json();
+        return readJsonResponse(response);
       }
 
       function saveGatewayApiKey() {
@@ -1448,7 +1458,7 @@
             body: await file.arrayBuffer(),
             timeoutMs: documentParseTimeoutMs,
           });
-          const result = await response.json();
+          const result = await readJsonResponse(response, "资料解析响应不是有效 JSON");
           const parsedText = String(result.text || "").trim();
           if (!documentParseStillCurrent(input, documentParseToken)) {
             setUploadInputStatus(input, `${label} 解析已取消：${file.name}`);

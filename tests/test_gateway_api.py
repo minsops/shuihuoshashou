@@ -373,6 +373,10 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "state.seq += 1" in response.text
     assert "stopMicCapture({ flush: false })" in response.text
     assert "readErrorMessage" in response.text
+    assert "readJsonResponse" in response.text
+    assert "接口响应不是有效 JSON" in response.text
+    assert "服务健康检查响应不是有效 JSON" in response.text
+    assert "资料解析响应不是有效 JSON" in response.text
     assert "formatApiDetailItem" in response.text
     assert "item.loc" in response.text
     assert "payload.detail" in response.text
