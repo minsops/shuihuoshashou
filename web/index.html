@@ -1619,6 +1619,7 @@
           <button class="secondary" type="button" data-report-format="html" data-report-id="${escapeHtml(report.interview_id)}">HTML</button>
           <button class="secondary" type="button" data-report-format="pdf" data-report-id="${escapeHtml(report.interview_id)}">PDF</button>
           <button class="secondary" type="button" data-report-format="json" data-report-id="${escapeHtml(report.interview_id)}">JSON</button>
+          <button class="secondary" type="button" data-report-format="transcript.json" data-report-id="${escapeHtml(report.interview_id)}">转写</button>
         `;
         reportLinks.querySelectorAll("[data-report-format]").forEach((button) => {
           button.addEventListener("click", () => {

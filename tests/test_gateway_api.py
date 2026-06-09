@@ -318,6 +318,8 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert 'gateway-key.${base64UrlEncode(state.gatewayApiKey)}' in response.text
     assert "new WebSocket(wsUrl(`/ws/interview/${interviewId}`), websocketProtocols())" in response.text
     assert 'data-report-format="html"' in response.text
+    assert 'data-report-format="transcript.json"' in response.text
+    assert ">转写</button>" in response.text
     assert "downloadReportArtifact" in response.text
     assert "fetchGateway(`/api/interviews/${interviewId}/report.${format}`)" in response.text
     assert "reportFilename" in response.text
