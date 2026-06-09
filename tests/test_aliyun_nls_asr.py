@@ -12,6 +12,7 @@ from libs.schemas import TranscriptSegment
 from scripts import create_aliyun_nls_token
 from scripts import check_aliyun_nls_asr
 from scripts.create_aliyun_nls_token import AliyunNLSToken
+from services.asr_service import nls_token
 from services.asr_service.nls_engine import AliyunNLSSession
 
 
@@ -320,7 +321,7 @@ def test_create_aliyun_nls_token_builds_signed_request(monkeypatch) -> None:
         calls["timeout"] = timeout
         return FakeResponse()
 
-    monkeypatch.setattr(create_aliyun_nls_token, "urlopen", fake_urlopen)
+    monkeypatch.setattr(nls_token, "urlopen", fake_urlopen)
 
     token = create_aliyun_nls_token.create_token(
         "ak-id",
@@ -338,3 +339,42 @@ def test_create_aliyun_nls_token_builds_signed_request(monkeypatch) -> None:
     assert query["RegionId"] == ["cn-shanghai"]
     assert query["SignatureMethod"] == ["HMAC-SHA1"]
     assert "Signature" in query
+
+
+def test_nls_session_creates_token_from_ak_when_token_is_empty(monkeypatch) -> None:
+    created: dict[str, str] = {}
+
+    def fake_create_token(
+        access_key_id: str,
+        access_key_secret: str,
+        *,
+        endpoint: str,
+        region_id: str,
+    ) -> AliyunNLSToken:
+        created["access_key_id"] = access_key_id
+        created["access_key_secret"] = access_key_secret
+        created["endpoint"] = endpoint
+        created["region_id"] = region_id
+        return AliyunNLSToken(id="created-token")
+
+    monkeypatch.setattr("services.asr_service.nls_engine.create_token", fake_create_token)
+    session = AliyunNLSSession(
+        "session-1",
+        settings=Settings(
+            asr_provider="aliyun_nls_ws",
+            aliyun_nls_app_key="app-key",
+            aliyun_nls_token="",
+            aliyun_ak_id="ak-id",
+            aliyun_ak_secret="ak-secret",
+            aliyun_nls_token_endpoint="https://example.aliyun.com/",
+            aliyun_nls_token_region="cn-test",
+        ),
+    )
+
+    assert session._resolve_token() == "created-token"
+    assert created == {
+        "access_key_id": "ak-id",
+        "access_key_secret": "ak-secret",
+        "endpoint": "https://example.aliyun.com/",
+        "region_id": "cn-test",
+    }

@@ -75,12 +75,40 @@ def test_settings_accepts_aliyun_nls_ws_asr_provider() -> None:
     assert settings.aliyun_nls_format == "pcm"
 
 
+def test_settings_accepts_aliyun_nls_ws_with_auto_token_credentials() -> None:
+    settings = Settings(
+        asr_provider="aliyun_nls_ws",
+        aliyun_nls_app_key="nls-app-key",
+        aliyun_nls_token="",
+        aliyun_ak_id="ak-id",
+        aliyun_ak_secret="ak-secret",
+    )
+
+    assert settings.asr_provider == "aliyun_nls_ws"
+    assert settings.aliyun_ak_id == "ak-id"
+    assert settings.aliyun_nls_token_endpoint == "https://nls-meta.cn-shanghai.aliyuncs.com/"
+    assert settings.aliyun_nls_token_region == "cn-shanghai"
+
+
 def test_settings_rejects_missing_provider_dependencies() -> None:
     cases = [
         {"asr_provider": "http", "asr_base_url": ""},
         {"asr_provider": "aliyun_ws", "aliyun_asr_api_key": ""},
         {"asr_provider": "aliyun_nls_ws", "aliyun_nls_app_key": "", "aliyun_nls_token": "t"},
-        {"asr_provider": "aliyun_nls_ws", "aliyun_nls_app_key": "a", "aliyun_nls_token": ""},
+        {
+            "asr_provider": "aliyun_nls_ws",
+            "aliyun_nls_app_key": "a",
+            "aliyun_nls_token": "",
+            "aliyun_ak_id": "",
+            "aliyun_ak_secret": "",
+        },
+        {
+            "asr_provider": "aliyun_nls_ws",
+            "aliyun_nls_app_key": "a",
+            "aliyun_nls_token": "",
+            "aliyun_ak_id": "ak-id",
+            "aliyun_ak_secret": "",
+        },
         {
             "speaker_diarization_provider": "http",
             "speaker_diarization_base_url": "",

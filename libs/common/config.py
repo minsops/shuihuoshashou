@@ -51,6 +51,10 @@ class Settings(BaseSettings):
     aliyun_nls_endpoint: str = "wss://nls-gateway-cn-shanghai.aliyuncs.com/ws/v1"
     aliyun_nls_sample_rate: int = Field(default=16000, gt=0)
     aliyun_nls_format: str = "pcm"
+    aliyun_ak_id: str = ""
+    aliyun_ak_secret: str = ""
+    aliyun_nls_token_endpoint: str = "https://nls-meta.cn-shanghai.aliyuncs.com/"
+    aliyun_nls_token_region: str = "cn-shanghai"
     probe_min_answer_chars: int = Field(default=20, ge=0)
     probe_min_interval_ms: int = Field(default=1000, ge=0)
     probe_require_topic_match: bool = True
@@ -108,8 +112,13 @@ class Settings(BaseSettings):
         if self.asr_provider == "aliyun_nls_ws":
             if not self.aliyun_nls_app_key.strip():
                 raise ValueError("ASR_PROVIDER=aliyun_nls_ws requires ALIYUN_NLS_APP_KEY")
-            if not self.aliyun_nls_token.strip():
-                raise ValueError("ASR_PROVIDER=aliyun_nls_ws requires ALIYUN_NLS_TOKEN")
+            if not self.aliyun_nls_token.strip() and not (
+                self.aliyun_ak_id.strip() and self.aliyun_ak_secret.strip()
+            ):
+                raise ValueError(
+                    "ASR_PROVIDER=aliyun_nls_ws requires ALIYUN_NLS_TOKEN, "
+                    "or ALIYUN_AK_ID and ALIYUN_AK_SECRET"
+                )
         if (
             self.speaker_diarization_provider == "http"
             and not self.speaker_diarization_base_url.strip()

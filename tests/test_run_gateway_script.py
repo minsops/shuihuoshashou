@@ -69,6 +69,7 @@ def test_gateway_script_runtime_summary_hides_secrets() -> None:
         asr_provider="aliyun_nls_ws",
         aliyun_nls_app_key_configured=True,
         aliyun_nls_token_configured=True,
+        aliyun_nls_token_auto_configured=False,
         aliyun_nls_endpoint_configured=True,
         aliyun_asr_api_key_configured=False,
         aliyun_asr_endpoint_configured=False,
@@ -97,6 +98,7 @@ def test_gateway_script_runtime_summary_marks_mock_modes() -> None:
         asr_provider="stub",
         aliyun_nls_app_key_configured=False,
         aliyun_nls_token_configured=False,
+        aliyun_nls_token_auto_configured=False,
         aliyun_nls_endpoint_configured=True,
         aliyun_asr_api_key_configured=False,
         aliyun_asr_endpoint_configured=True,
@@ -111,6 +113,29 @@ def test_gateway_script_runtime_summary_marks_mock_modes() -> None:
     assert "ASR: stub (mock)" in summary
     assert "Model: mock / mimo-v2.5-pro (configured)" not in summary
     assert "ASR: stub (configured)" not in summary
+
+
+def test_gateway_script_runtime_summary_accepts_nls_auto_token() -> None:
+    run_gateway = _load_run_gateway()
+    status = SimpleNamespace(
+        llm_provider="mock",
+        llm_model="mimo-v2.5-pro",
+        llm_base_url_configured=True,
+        llm_api_key_configured=False,
+        asr_provider="aliyun_nls_ws",
+        aliyun_nls_app_key_configured=True,
+        aliyun_nls_token_configured=False,
+        aliyun_nls_token_auto_configured=True,
+        aliyun_nls_endpoint_configured=True,
+        aliyun_asr_api_key_configured=False,
+        aliyun_asr_endpoint_configured=False,
+        asr_base_url_configured=False,
+        database_url="sqlite:///data/shuihuo_killer.db",
+    )
+
+    assert "ASR: aliyun_nls_ws (configured)" in "\n".join(
+        run_gateway.runtime_summary_lines(status)
+    )
 
 
 def test_gateway_script_reports_runtime_config_error(monkeypatch, capsys) -> None:

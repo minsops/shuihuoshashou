@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from libs.common.config import Settings, get_settings
 from libs.schemas import TranscriptSegment
+from services.asr_service.nls_token import create_token
 from services.asr_service.service import ASREngine, Speaker
 
 
@@ -87,11 +88,25 @@ class AliyunNLSSession:
 
         endpoint = self.settings.aliyun_nls_endpoint
         separator = "&" if "?" in endpoint else "?"
-        url = f"{endpoint}{separator}{urlencode({'token': self.settings.aliyun_nls_token})}"
+        token = self._resolve_token()
+        url = f"{endpoint}{separator}{urlencode({'token': token})}"
         try:
             return await websockets.connect(url, proxy=None, ssl=_ssl_context())
         except TypeError:
             return await websockets.connect(url, ssl=_ssl_context())
+
+    def _resolve_token(self) -> str:
+        token = self.settings.aliyun_nls_token.strip()
+        if token:
+            return token
+        if not (self.settings.aliyun_ak_id.strip() and self.settings.aliyun_ak_secret.strip()):
+            raise RuntimeError("aliyun_nls_token_missing")
+        return create_token(
+            self.settings.aliyun_ak_id,
+            self.settings.aliyun_ak_secret,
+            endpoint=self.settings.aliyun_nls_token_endpoint,
+            region_id=self.settings.aliyun_nls_token_region,
+        ).id
 
     async def _reader_loop(self) -> None:
         try:

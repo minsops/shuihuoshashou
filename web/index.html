@@ -979,12 +979,18 @@
 
       function asrStatusFromConfig(config) {
         if (config.asr_provider === "aliyun_nls_ws") {
+          const tokenReady =
+            config.aliyun_nls_token_configured || config.aliyun_nls_token_auto_configured;
           const ready =
             config.aliyun_nls_app_key_configured &&
-            config.aliyun_nls_token_configured &&
+            tokenReady &&
             config.aliyun_nls_endpoint_configured;
           return {
-            text: ready ? "ASR 阿里云 NLS 已配置" : "ASR 阿里云 NLS 未配置完整",
+            text: ready
+              ? tokenReady && !config.aliyun_nls_token_configured
+                ? "ASR 阿里云 NLS 已配置（自动 Token）"
+                : "ASR 阿里云 NLS 已配置"
+              : "ASR 阿里云 NLS 未配置完整",
             ready,
           };
         }

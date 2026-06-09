@@ -43,6 +43,7 @@ class RuntimeStatus(BaseModel):
     aliyun_asr_language_hints_configured: bool
     aliyun_nls_app_key_configured: bool
     aliyun_nls_token_configured: bool
+    aliyun_nls_token_auto_configured: bool
     aliyun_nls_endpoint_configured: bool
     aliyun_nls_sample_rate: int
     aliyun_nls_format: str
@@ -123,6 +124,7 @@ def get_runtime_status() -> RuntimeStatus:
         aliyun_asr_language_hints_configured=bool(settings.aliyun_asr_language_hints.strip()),
         aliyun_nls_app_key_configured=bool(settings.aliyun_nls_app_key),
         aliyun_nls_token_configured=bool(settings.aliyun_nls_token),
+        aliyun_nls_token_auto_configured=bool(settings.aliyun_ak_id and settings.aliyun_ak_secret),
         aliyun_nls_endpoint_configured=bool(settings.aliyun_nls_endpoint),
         aliyun_nls_sample_rate=settings.aliyun_nls_sample_rate,
         aliyun_nls_format=settings.aliyun_nls_format,

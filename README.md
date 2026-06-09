@@ -238,7 +238,7 @@ ALIYUN_ASR_API_KEY=your-dashscope-key python scripts/check_aliyun_asr.py
 
 脚本默认发送 `tests/fixtures/sample_16k_mono.pcm`；也可以用 `--pcm-path` 指向自己的 16k 单声道 PCM16 语音文件。若阿里云会话完成但没有返回任何转写文本，脚本会返回失败。只有显式传入 `--allow-empty-result` 时，空转写才会按成功退出；此时脚本会输出 `session completed, but no transcript text was verified`，表示只验证了 WebSocket 会话完成，没有验证识别文本有效。
 
-如果只有智能语音交互 NLS 的 AppKey，可以改用 `ASR_PROVIDER=aliyun_nls_ws`。该模式需要同时配置临时 Token：
+如果只有智能语音交互 NLS 的 AppKey，可以改用 `ASR_PROVIDER=aliyun_nls_ws`。该模式支持两种鉴权方式：直接配置临时 Token，或配置阿里云 AccessKey 让 gateway/smoke 脚本自动创建 NLS Token。
 
 ```bash
 ASR_PROVIDER=aliyun_nls_ws
@@ -246,13 +246,13 @@ ALIYUN_NLS_APP_KEY=your-nls-appkey
 ALIYUN_NLS_TOKEN=your-nls-token
 ```
 
-NLS AppKey 用于 StartTranscription payload，NLS Token 用于 WebSocket URL 鉴权；只配置 AppKey 不能连接。
+NLS AppKey 用于 StartTranscription payload，NLS Token 用于 WebSocket URL 鉴权；只配置 AppKey 不能连接。固定 Token 优先级最高；如果 `ALIYUN_NLS_TOKEN` 为空，但 `ALIYUN_AK_ID` 和 `ALIYUN_AK_SECRET` 已配置，gateway 会在连接 NLS WebSocket 前自动创建 Token。
 
 ```bash
 ALIYUN_NLS_APP_KEY=your-nls-appkey ALIYUN_NLS_TOKEN=your-nls-token python scripts/check_aliyun_nls_asr.py
 ```
 
-如果没有现成 Token，但有阿里云 AccessKey，可以先生成 Token，或让 smoke 脚本自动生成：
+如果没有现成 Token，但有阿里云 AccessKey，可以先生成 Token，或让 gateway/smoke 脚本自动生成：
 
 ```bash
 ALIYUN_AK_ID=your-access-key-id ALIYUN_AK_SECRET=your-access-key-secret python scripts/create_aliyun_nls_token.py

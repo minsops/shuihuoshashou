@@ -69,7 +69,7 @@ def runtime_summary_lines(status) -> list[str]:
     if status.asr_provider == "aliyun_nls_ws":
         asr_ready = (
             status.aliyun_nls_app_key_configured
-            and status.aliyun_nls_token_configured
+            and (status.aliyun_nls_token_configured or status.aliyun_nls_token_auto_configured)
             and status.aliyun_nls_endpoint_configured
         )
     elif status.asr_provider == "aliyun_ws":

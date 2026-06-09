@@ -42,6 +42,8 @@ def _client(
     if asr_provider != "aliyun_nls_ws":
         monkeypatch.setenv("ALIYUN_NLS_APP_KEY", "")
         monkeypatch.setenv("ALIYUN_NLS_TOKEN", "")
+        monkeypatch.setenv("ALIYUN_AK_ID", "")
+        monkeypatch.setenv("ALIYUN_AK_SECRET", "")
     monkeypatch.setenv("OFFLINE_TASK_BACKEND", "local")
     get_settings.cache_clear()
     event_bus.reset()
@@ -258,6 +260,7 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "无法连接到本地 gateway" in response.text
     assert "ASR 检查中" in response.text
     assert "ASR 阿里云 NLS 已配置" in response.text
+    assert "ASR 阿里云 NLS 已配置（自动 Token）" in response.text
     assert "ASR 长时间没有收到有效语音" in response.text
     assert "避免 ASR 空闲断开" in response.text
     assert "原始原因" in response.text
@@ -330,6 +333,7 @@ def test_gateway_config_status_hides_secrets(tmp_path: Path, monkeypatch) -> Non
     assert payload["aliyun_asr_language_hints_configured"] is True
     assert payload["aliyun_nls_app_key_configured"] is False
     assert payload["aliyun_nls_token_configured"] is False
+    assert payload["aliyun_nls_token_auto_configured"] is False
     assert payload["aliyun_nls_endpoint_configured"] is True
     assert payload["aliyun_nls_sample_rate"] == 16000
     assert payload["aliyun_nls_format"] == "pcm"

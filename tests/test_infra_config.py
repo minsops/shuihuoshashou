@@ -47,6 +47,10 @@ def test_docker_compose_declares_required_infrastructure() -> None:
         "PROBE_REQUIRE_TOPIC_MATCH: ${PROBE_REQUIRE_TOPIC_MATCH:-true}",
         "RATE_LIMIT_BACKEND: ${RATE_LIMIT_BACKEND:-local}",
         "REDIS_RATE_LIMIT_PREFIX: ${REDIS_RATE_LIMIT_PREFIX:-shuihuo:rate_limit}",
+        "ALIYUN_AK_ID: ${ALIYUN_AK_ID:-}",
+        "ALIYUN_AK_SECRET: ${ALIYUN_AK_SECRET:-}",
+        "ALIYUN_NLS_TOKEN_ENDPOINT: ${ALIYUN_NLS_TOKEN_ENDPOINT:-https://nls-meta.cn-shanghai.aliyuncs.com/}",
+        "ALIYUN_NLS_TOKEN_REGION: ${ALIYUN_NLS_TOKEN_REGION:-cn-shanghai}",
     ]:
         assert key in compose
     assert 'profiles: ["worker"]' in compose
@@ -113,6 +117,14 @@ def test_readme_explains_empty_asr_smoke_result_semantics() -> None:
     assert "只验证了 WebSocket 会话完成，没有验证识别文本有效" in readme
 
 
+def test_readme_explains_aliyun_nls_auto_token_mode() -> None:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert "固定 Token 优先级最高" in readme
+    assert "gateway 会在连接 NLS WebSocket 前自动创建 Token" in readme
+    assert "ALIYUN_AK_ID=your-access-key-id" in readme
+
+
 def test_env_example_lists_runtime_integration_knobs() -> None:
     env_example = (ROOT / ".env.example").read_text(encoding="utf-8")
 
@@ -145,6 +157,10 @@ def test_env_example_lists_runtime_integration_knobs() -> None:
         "AIGC_DETECTOR_BASE_URL=",
         "AIGC_AI_PROB_THRESHOLD=",
         "AIGC_TEMPLATE_SIMILARITY_THRESHOLD=",
+        "ALIYUN_AK_ID=",
+        "ALIYUN_AK_SECRET=",
+        "ALIYUN_NLS_TOKEN_ENDPOINT=",
+        "ALIYUN_NLS_TOKEN_REGION=",
     ]:
         assert key in env_example
 
