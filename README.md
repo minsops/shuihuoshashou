@@ -88,6 +88,8 @@ export LLM_RATE_LIMIT_REQUESTS_PER_MINUTE=60
 
 ASR、speaker diarization 和 AIGC detector 的响应字段映射 path 同样必须是非空点分路径，例如 `text`、`payload.result` 或 `data.ai_generated_prob`。
 
+配置真实 API key 时，对应的 auth header 不能为空，例如 `LLM_AUTH_HEADER`、`ASR_AUTH_HEADER`、`SPEAKER_DIARIZATION_AUTH_HEADER` 或 `AIGC_DETECTOR_AUTH_HEADER`。
+
 默认值遵循 MiMo OpenAI 兼容 chat completions 协议。如果供应商变更 endpoint、鉴权 header、响应 JSON 结构或重试策略，只需要修改上面的 `LLM_*` 环境变量。LLM JSON 解析会经过 Pydantic 校验；HTTP、JSON 或 schema 失败时默认重试一次，然后回退到确定性本地行为。配置的响应路径可以解析到 JSON 字符串，也可以解析到已经解码的 JSON 对象。
 
 设置 `LLM_RATE_LIMIT_ENABLED=true` 可以在请求离开进程前按模型限流；限流调用默认本地 fallback，除非诊断代码明确要求 `raise_on_error`。

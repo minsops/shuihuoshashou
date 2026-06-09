@@ -63,6 +63,53 @@ def test_settings_rejects_invalid_integration_response_paths(
         Settings(**{field: "payload..value"})
 
 
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        (
+            {
+                "llm_provider": "openai_compatible",
+                "llm_api_key": "key",
+                "llm_auth_header": "",
+            },
+            "LLM_AUTH_HEADER",
+        ),
+        (
+            {
+                "asr_provider": "http",
+                "asr_base_url": "https://asr.example.com",
+                "asr_api_key": "key",
+                "asr_auth_header": "",
+            },
+            "ASR_AUTH_HEADER",
+        ),
+        (
+            {
+                "speaker_diarization_provider": "http",
+                "speaker_diarization_base_url": "https://diarize.example.com",
+                "speaker_diarization_api_key": "key",
+                "speaker_diarization_auth_header": "",
+            },
+            "SPEAKER_DIARIZATION_AUTH_HEADER",
+        ),
+        (
+            {
+                "aigc_detector_provider": "http",
+                "aigc_detector_base_url": "https://aigc.example.com",
+                "aigc_detector_api_key": "key",
+                "aigc_detector_auth_header": "",
+            },
+            "AIGC_DETECTOR_AUTH_HEADER",
+        ),
+    ],
+)
+def test_settings_rejects_blank_auth_header_when_api_key_is_configured(
+    kwargs: dict[str, str], message: str
+) -> None:
+    with pytest.raises(ValidationError, match=message):
+        Settings(**kwargs)
+
+
 def test_settings_accepts_declared_production_backends() -> None:
     settings = Settings(
         llm_provider="openai_compatible",

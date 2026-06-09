@@ -108,6 +108,18 @@ class Settings(BaseSettings):
     def runtime_dependencies_are_configured(self) -> "Settings":
         if self.asr_provider == "http" and not self.asr_base_url.strip():
             raise ValueError("ASR_PROVIDER=http requires ASR_BASE_URL")
+        if (
+            self.llm_provider == "openai_compatible"
+            and self.llm_api_key.strip()
+            and not self.llm_auth_header.strip()
+        ):
+            raise ValueError("LLM_AUTH_HEADER is required when LLM_API_KEY is configured")
+        if (
+            self.asr_provider == "http"
+            and self.asr_api_key.strip()
+            and not self.asr_auth_header.strip()
+        ):
+            raise ValueError("ASR_AUTH_HEADER is required when ASR_API_KEY is configured")
         if self.asr_provider == "aliyun_ws" and not self.aliyun_asr_api_key.strip():
             raise ValueError("ASR_PROVIDER=aliyun_ws requires ALIYUN_ASR_API_KEY")
         if self.asr_provider == "aliyun_nls_ws":
@@ -127,8 +139,25 @@ class Settings(BaseSettings):
             raise ValueError(
                 "SPEAKER_DIARIZATION_PROVIDER=http requires SPEAKER_DIARIZATION_BASE_URL"
             )
+        if (
+            self.speaker_diarization_provider == "http"
+            and self.speaker_diarization_api_key.strip()
+            and not self.speaker_diarization_auth_header.strip()
+        ):
+            raise ValueError(
+                "SPEAKER_DIARIZATION_AUTH_HEADER is required when "
+                "SPEAKER_DIARIZATION_API_KEY is configured"
+            )
         if self.aigc_detector_provider == "http" and not self.aigc_detector_base_url.strip():
             raise ValueError("AIGC_DETECTOR_PROVIDER=http requires AIGC_DETECTOR_BASE_URL")
+        if (
+            self.aigc_detector_provider == "http"
+            and self.aigc_detector_api_key.strip()
+            and not self.aigc_detector_auth_header.strip()
+        ):
+            raise ValueError(
+                "AIGC_DETECTOR_AUTH_HEADER is required when AIGC_DETECTOR_API_KEY is configured"
+            )
         if self.rate_limit_backend == "redis" and not self.redis_url.strip():
             raise ValueError("RATE_LIMIT_BACKEND=redis requires REDIS_URL")
         if self.offline_task_backend == "redis_stream" and not self.redis_url.strip():

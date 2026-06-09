@@ -110,6 +110,7 @@ def test_readme_distinguishes_real_llm_smoke_from_mock_mode() -> None:
     assert "`LLM_EXTRA_BODY_JSON` 只能填写 JSON object" in readme
     assert "`LLM_RESPONSE_CONTENT_PATH` 必须是非空点分路径" in readme
     assert "响应字段映射 path 同样必须是非空点分路径" in readme
+    assert "对应的 auth header 不能为空" in readme
 
 
 def test_readme_explains_empty_asr_smoke_result_semantics() -> None:
