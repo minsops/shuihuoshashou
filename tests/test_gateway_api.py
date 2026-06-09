@@ -318,9 +318,10 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "new URL(response.url).origin" in response.text
     assert "resolvedOrigin" in response.text
     assert "ASR 检查中" in response.text
-    assert "ASR 阿里云 NLS 已配置，未检查" in response.text
-    assert "ASR 阿里云 NLS 已配置（自动 Token），未检查" in response.text
-    assert "点击“检查 ASR”后才会验证依赖和 Token" in response.text
+    assert "ASR 阿里云 NLS 已配置，未测试" in response.text
+    assert "ASR 阿里云 NLS 已配置（自动 Token），未测试" in response.text
+    assert "ASR 配置已填写但尚未验证依赖、Token 和音频链路" in response.text
+    assert "点击“检查 ASR”后才会确认" in response.text
     assert "asrCheckStatusText" in response.text
     assert "ASR Token 可生成，未跑音频" in response.text
     assert "ASR 固定 Token 已配置，未验有效期" in response.text
