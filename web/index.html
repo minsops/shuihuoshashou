@@ -788,6 +788,7 @@
         micSentSamples: 0,
         micSpeechStarted: false,
         micWaitingForVoiceNotice: false,
+        micStarting: false,
         micRecording: false,
         micError: "",
         apiOrigin:
@@ -847,7 +848,7 @@
         const connecting = socketState === WebSocket.CONNECTING;
         const active = connected && !state.interviewEnded;
         sendAnswer.disabled = !active;
-        startMic.disabled = !active || state.micRecording;
+        startMic.disabled = !active || state.micRecording || state.micStarting;
         stopMic.disabled = !connected || !state.micRecording;
         reconnectSocket.disabled = !state.interview || connected || connecting || state.interviewEnded;
         manualProbe.disabled = !active;
@@ -869,7 +870,9 @@
         } else {
           setPill(liveStatus, "未建面试", "");
         }
-        if (state.micRecording) {
+        if (state.micStarting) {
+          setPill(micStatus, "麦克风启动中", "live");
+        } else if (state.micRecording) {
           setPill(micStatus, "麦克风采集中", "live");
         } else if (connecting) {
           setPill(micStatus, "等待实时通道", "live");
@@ -902,6 +905,8 @@
             : reason;
         startMic.title = state.interviewEnded
           ? endedReason
+          : state.micStarting
+            ? "正在请求麦克风权限并初始化音频采集"
           : connected
             ? "开始浏览器麦克风采集"
             : reason;
@@ -931,6 +936,7 @@
       function controlHintText(connected, connecting) {
         if (state.reportReady) return "报告已生成。可以下载 HTML、PDF、JSON 或转写，或重置后开始新的面试。";
         if (state.interviewEnded) return "面试已结束。请重置后创建新的面试。";
+        if (state.micStarting) return "麦克风启动中。请在浏览器权限弹窗中允许麦克风，并等待初始化完成。";
         if (state.micRecording) return "麦克风采集中。可以停止麦克风，或结束面试生成评分报告。";
         if (state.micError) return `${state.micError} 可以修复后再次点击开始麦克风。`;
         if (connected) return "实时通道已连接。可以发送文字回答，或点击开始麦克风进行语音转写。";
@@ -1984,11 +1990,21 @@
           appendEvent("麦克风", "面试已结束，请重置后创建新的面试。", "red");
           return;
         }
-        if (state.micRecording || !state.socket || state.socket.readyState !== WebSocket.OPEN) return;
+        if (
+          state.micStarting ||
+          state.micRecording ||
+          !state.socket ||
+          state.socket.readyState !== WebSocket.OPEN
+        ) {
+          return;
+        }
+        state.micStarting = true;
         state.micError = "";
+        setControls();
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
           state.micError = "麦克风不可用";
           appendEvent("麦克风", "当前浏览器不支持麦克风采集。", "red");
+          state.micStarting = false;
           setControls();
           return;
         }
@@ -1996,6 +2012,7 @@
         if (!AudioContextCtor) {
           state.micError = "音频采集不可用";
           appendEvent("麦克风", "当前浏览器不支持 Web Audio，无法采集和转换麦克风音频。", "red");
+          state.micStarting = false;
           setControls();
           return;
         }
@@ -2016,6 +2033,7 @@
           state.micSpeechStarted = false;
           state.micWaitingForVoiceNotice = false;
           state.micError = "";
+          state.micStarting = false;
           state.micRecording = true;
           state.micProcessor.onaudioprocess = (event) => {
             const input = event.inputBuffer.getChannelData(0);
@@ -2032,6 +2050,11 @@
           state.micError = reason;
           appendEvent("麦克风", escapeHtml(reason), "red");
           stopMicCapture();
+        } finally {
+          if (state.micStarting) {
+            state.micStarting = false;
+            setControls();
+          }
         }
       }
 
@@ -2104,6 +2127,7 @@
         state.selectedQuestionSource = "interviewer";
         state.selectedProbeTarget = null;
         state.selectedCompetency = null;
+        state.micStarting = false;
         state.micError = "";
         metricJob.textContent = "待创建";
         metricCandidate.textContent = "待创建";
