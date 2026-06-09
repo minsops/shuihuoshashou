@@ -151,13 +151,27 @@ class Settings(BaseSettings):
                 raise ValueError("LLM_EXTRA_BODY_JSON must be valid JSON") from exc
             if not isinstance(extra_body, dict):
                 raise ValueError("LLM_EXTRA_BODY_JSON must decode to an object")
-        if not self.llm_response_content_path.strip() or any(
-            not part.strip() for part in self.llm_response_content_path.split(".")
-        ):
-            raise ValueError("LLM_RESPONSE_CONTENT_PATH must be a non-empty dot path")
+        for env_name, value in {
+            "LLM_RESPONSE_CONTENT_PATH": self.llm_response_content_path,
+            "ASR_TEXT_PATH": self.asr_text_path,
+            "ASR_SPEAKER_PATH": self.asr_speaker_path,
+            "ASR_START_MS_PATH": self.asr_start_ms_path,
+            "ASR_END_MS_PATH": self.asr_end_ms_path,
+            "ASR_IS_FINAL_PATH": self.asr_is_final_path,
+            "ASR_CONFIDENCE_PATH": self.asr_confidence_path,
+            "SPEAKER_DIARIZATION_SPEAKER_PATH": self.speaker_diarization_speaker_path,
+            "AIGC_DETECTOR_PROBABILITY_PATH": self.aigc_detector_probability_path,
+            "AIGC_DETECTOR_FLAGGED_PATH": self.aigc_detector_flagged_path,
+        }.items():
+            if _invalid_dot_path(value):
+                raise ValueError(f"{env_name} must be a non-empty dot path")
         return self
 
 
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+def _invalid_dot_path(value: str) -> bool:
+    return not value.strip() or any(not part.strip() for part in value.split("."))

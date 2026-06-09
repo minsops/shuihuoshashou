@@ -42,6 +42,27 @@ def test_settings_rejects_invalid_llm_response_content_path() -> None:
             Settings(llm_response_content_path=path)
 
 
+@pytest.mark.parametrize(
+    ("field", "env_name"),
+    [
+        ("asr_text_path", "ASR_TEXT_PATH"),
+        ("asr_speaker_path", "ASR_SPEAKER_PATH"),
+        ("asr_start_ms_path", "ASR_START_MS_PATH"),
+        ("asr_end_ms_path", "ASR_END_MS_PATH"),
+        ("asr_is_final_path", "ASR_IS_FINAL_PATH"),
+        ("asr_confidence_path", "ASR_CONFIDENCE_PATH"),
+        ("speaker_diarization_speaker_path", "SPEAKER_DIARIZATION_SPEAKER_PATH"),
+        ("aigc_detector_probability_path", "AIGC_DETECTOR_PROBABILITY_PATH"),
+        ("aigc_detector_flagged_path", "AIGC_DETECTOR_FLAGGED_PATH"),
+    ],
+)
+def test_settings_rejects_invalid_integration_response_paths(
+    field: str, env_name: str
+) -> None:
+    with pytest.raises(ValidationError, match=env_name):
+        Settings(**{field: "payload..value"})
+
+
 def test_settings_accepts_declared_production_backends() -> None:
     settings = Settings(
         llm_provider="openai_compatible",
