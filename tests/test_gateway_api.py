@@ -340,6 +340,7 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "需要 Gateway Key" in response.text
     assert "Gateway 已启用鉴权" in response.text
     assert "interviewEnded" in response.text
+    assert "reportReady" in response.text
     assert "面试已结束，请重置后创建新的面试" in response.text
     assert "正在结束面试并生成评分报告" in response.text
     assert "请等待后台评分完成" in response.text

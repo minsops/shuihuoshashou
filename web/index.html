@@ -778,6 +778,7 @@
         selectedProbeTarget: null,
         selectedCompetency: null,
         interviewEnded: false,
+        reportReady: false,
         startedAt: 0,
         micStream: null,
         micContext: null,
@@ -830,7 +831,9 @@
           state.preparingInterview || Boolean(state.interview) || connected || connecting;
         setControlHints(connected, connecting);
         controlHint.textContent = controlHintText(connected, connecting);
-        if (state.interviewEnded) {
+        if (state.reportReady) {
+          setPill(liveStatus, "报告已生成", "ready");
+        } else if (state.interviewEnded) {
           setPill(liveStatus, "面试已结束", "ready");
         } else if (connected) {
           setPill(liveStatus, `已连接 ${state.interview.id.slice(0, 8)}`, "live");
@@ -1384,6 +1387,7 @@
         closeSocket();
         stopMicCapture();
         state.interviewEnded = false;
+        state.reportReady = false;
         state.seq = 1;
         state.turns = 0;
         state.startedAt = Date.now();
@@ -1740,6 +1744,7 @@
       }
 
       function markReportReady() {
+        state.reportReady = true;
         setPill(liveStatus, "报告已生成", "ready");
       }
 
@@ -1984,6 +1989,7 @@
         state.seq = 1;
         state.turns = 0;
         state.interviewEnded = false;
+        state.reportReady = false;
         state.selectedQuestionSource = "interviewer";
         state.selectedProbeTarget = null;
         state.selectedCompetency = null;
