@@ -568,6 +568,7 @@
       <div class="top-actions">
         <span class="status-pill" id="runtimeStatus"><span class="status-dot"></span><span>检查中</span></span>
         <span class="status-pill" id="modelStatus"><span class="status-dot"></span><span>模型检查中</span></span>
+        <span class="status-pill" id="asrStatus"><span class="status-dot"></span><span>ASR 检查中</span></span>
         <button class="secondary" type="button" id="loadSample">样例资料</button>
         <a class="button secondary" href="/docs" target="_blank">API 文档</a>
       </div>
@@ -721,6 +722,7 @@
       const setupStatus = document.querySelector("#setupStatus");
       const runtimeStatus = document.querySelector("#runtimeStatus");
       const modelStatus = document.querySelector("#modelStatus");
+      const asrStatus = document.querySelector("#asrStatus");
       const liveStatus = document.querySelector("#liveStatus");
       const micStatus = document.querySelector("#micStatus");
       const competencyList = document.querySelector("#competencyList");
@@ -843,9 +845,41 @@
             connected ? `模型 ${modelName} 已连接` : "模型未连接",
             connected ? "ready" : ""
           );
+          const asr = asrStatusFromConfig(config);
+          setPill(asrStatus, asr.text, asr.ready ? "ready" : "");
         } catch (error) {
           setPill(modelStatus, "模型状态未知", "");
+          setPill(asrStatus, "ASR 状态未知", "");
         }
+      }
+
+      function asrStatusFromConfig(config) {
+        if (config.asr_provider === "aliyun_nls_ws") {
+          const ready =
+            config.aliyun_nls_app_key_configured &&
+            config.aliyun_nls_token_configured &&
+            config.aliyun_nls_endpoint_configured;
+          return {
+            text: ready ? "ASR 阿里云 NLS 已配置" : "ASR 阿里云 NLS 未配置完整",
+            ready,
+          };
+        }
+        if (config.asr_provider === "aliyun_ws") {
+          const ready =
+            config.aliyun_asr_api_key_configured && config.aliyun_asr_endpoint_configured;
+          return {
+            text: ready ? "ASR 阿里云 DashScope 已配置" : "ASR 阿里云 DashScope 未配置完整",
+            ready,
+          };
+        }
+        if (config.asr_provider === "http") {
+          const ready = config.asr_base_url_configured;
+          return { text: ready ? "ASR HTTP 已配置" : "ASR HTTP 未配置完整", ready };
+        }
+        if (config.asr_provider === "stub") {
+          return { text: "ASR 模拟模式", ready: false };
+        }
+        return { text: "ASR 状态未知", ready: false };
       }
 
       async function parseDocumentFile(file, target, label, kind) {

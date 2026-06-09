@@ -247,6 +247,8 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "audio_chunk" in response.text
     assert "pcm16" in response.text
     assert "端口不是本服务" in response.text
+    assert "ASR 检查中" in response.text
+    assert "ASR 阿里云 NLS 已配置" in response.text
 
 
 def test_gateway_health_identifies_service(tmp_path: Path, monkeypatch) -> None:
