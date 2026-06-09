@@ -757,6 +757,7 @@
         selectedQuestionSource: "interviewer",
         selectedProbeTarget: null,
         selectedCompetency: null,
+        interviewEnded: false,
         startedAt: 0,
         micStream: null,
         micContext: null,
@@ -791,15 +792,18 @@
         const socketState = state.socket ? state.socket.readyState : WebSocket.CLOSED;
         const connected = socketState === WebSocket.OPEN;
         const connecting = socketState === WebSocket.CONNECTING;
-        sendAnswer.disabled = !connected;
-        startMic.disabled = !connected || state.micRecording;
+        const active = connected && !state.interviewEnded;
+        sendAnswer.disabled = !active;
+        startMic.disabled = !active || state.micRecording;
         stopMic.disabled = !connected || !state.micRecording;
-        reconnectSocket.disabled = !state.interview || connected || connecting;
-        manualProbe.disabled = !connected;
-        endInterview.disabled = !connected;
+        reconnectSocket.disabled = !state.interview || connected || connecting || state.interviewEnded;
+        manualProbe.disabled = !active;
+        endInterview.disabled = !active;
         prepareInterview.disabled = Boolean(state.interview) || connected || connecting;
         setControlHints(connected, connecting);
-        if (connected) {
+        if (state.interviewEnded) {
+          setPill(liveStatus, "面试已结束", "ready");
+        } else if (connected) {
           setPill(liveStatus, `已连接 ${state.interview.id.slice(0, 8)}`, "live");
         } else if (connecting) {
           setPill(liveStatus, "连接中", "live");
@@ -812,6 +816,8 @@
           setPill(micStatus, "麦克风采集中", "live");
         } else if (connecting) {
           setPill(micStatus, "等待实时通道", "live");
+        } else if (state.interviewEnded) {
+          setPill(micStatus, "面试已结束", "ready");
         } else if (!connected) {
           setPill(micStatus, "先创建实时面试", "");
         } else {
@@ -821,12 +827,33 @@
 
       function setControlHints(connected, connecting) {
         const reason = connecting ? "实时通道连接中" : "请先创建实时面试并等待实时通道连接";
-        sendAnswer.title = connected ? "发送文本回答并触发追问" : reason;
-        startMic.title = connected ? "开始浏览器麦克风采集" : reason;
+        const endedReason = "面试已结束，请重置后创建新的面试";
+        sendAnswer.title = state.interviewEnded
+          ? endedReason
+          : connected
+            ? "发送文本回答并触发追问"
+            : reason;
+        startMic.title = state.interviewEnded
+          ? endedReason
+          : connected
+            ? "开始浏览器麦克风采集"
+            : reason;
         stopMic.title = state.micRecording ? "停止麦克风采集" : "麦克风尚未开启";
-        reconnectSocket.title = state.interview ? "重新连接当前面试实时通道" : "请先创建实时面试";
-        manualProbe.title = connected ? "基于当前回答立即生成追问" : reason;
-        endInterview.title = connected ? "结束面试并生成评分报告" : reason;
+        reconnectSocket.title = state.interviewEnded
+          ? endedReason
+          : state.interview
+            ? "重新连接当前面试实时通道"
+            : "请先创建实时面试";
+        manualProbe.title = state.interviewEnded
+          ? endedReason
+          : connected
+            ? "基于当前回答立即生成追问"
+            : reason;
+        endInterview.title = state.interviewEnded
+          ? endedReason
+          : connected
+            ? "结束面试并生成评分报告"
+            : reason;
         prepareInterview.title = state.interview ? "当前已有面试，请重置后再创建新的面试" : "创建实时面试通道";
       }
 
@@ -1084,6 +1111,7 @@
       async function prepareSession(form) {
         closeSocket();
         stopMicCapture();
+        state.interviewEnded = false;
         state.seq = 1;
         state.turns = 0;
         state.startedAt = Date.now();
@@ -1151,6 +1179,10 @@
           appendEvent("实时通道", "请先创建实时面试。", "red");
           return;
         }
+        if (state.interviewEnded) {
+          appendEvent("实时通道", "面试已结束，请重置后创建新的面试。", "red");
+          return;
+        }
         if (state.socket && state.socket.readyState === WebSocket.OPEN) {
           appendEvent("实时通道", "当前实时通道已经连接。");
           return;
@@ -1192,6 +1224,10 @@
 
       function sendTurn(manual = false) {
         if (!state.socket || state.socket.readyState !== WebSocket.OPEN) return;
+        if (state.interviewEnded) {
+          appendEvent("面试已结束", "请重置后创建新的面试。", "red");
+          return;
+        }
         const answer = answerText.value.trim();
         const question = currentQuestion.value.trim();
         if (!answer || !question) {
@@ -1249,6 +1285,7 @@
           appendEvent("ASR", formatAsrWarning(message.payload.reason), "red");
         } else if (message.type === "report") {
           stopMicCapture();
+          state.interviewEnded = true;
           renderReport(message.payload);
           appendEvent("评分完成", `总分 ${escapeHtml(message.payload.score.total_score)}`, "green");
         } else if (message.type === "task_queued") {
@@ -1437,6 +1474,10 @@
       }
 
       async function startMicCapture() {
+        if (state.interviewEnded) {
+          appendEvent("麦克风", "面试已结束，请重置后创建新的面试。", "red");
+          return;
+        }
         if (state.micRecording || !state.socket || state.socket.readyState !== WebSocket.OPEN) return;
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
           appendEvent("麦克风", "当前浏览器不支持麦克风采集。", "red");
@@ -1561,6 +1602,7 @@
         state.interview = null;
         state.seq = 1;
         state.turns = 0;
+        state.interviewEnded = false;
         state.selectedQuestionSource = "interviewer";
         state.selectedProbeTarget = null;
         state.selectedCompetency = null;
@@ -1580,6 +1622,9 @@
       endInterview.addEventListener("click", () => {
         stopMicCapture();
         if (state.socket && state.socket.readyState === WebSocket.OPEN) {
+          endInterview.disabled = true;
+          endInterview.title = "正在结束面试并生成评分报告";
+          setPill(liveStatus, "评分中", "live");
           state.socket.send(JSON.stringify({ type: "end" }));
         }
       });

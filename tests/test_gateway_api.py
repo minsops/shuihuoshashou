@@ -264,6 +264,9 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "当前已有面试，请重置后再创建新的面试" in response.text
     assert "重新检查服务、模型和 ASR 状态" in response.text
     assert 'refreshStatus.addEventListener("click", checkRuntime)' in response.text
+    assert "interviewEnded" in response.text
+    assert "面试已结束，请重置后创建新的面试" in response.text
+    assert "正在结束面试并生成评分报告" in response.text
 
 
 def test_gateway_health_identifies_service(tmp_path: Path, monkeypatch) -> None:
