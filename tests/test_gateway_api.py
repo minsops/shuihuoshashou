@@ -254,7 +254,10 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "模型 ${modelName} 已配置" in response.text
     assert "audio_chunk" in response.text
     assert "pcm16" in response.text
-    assert "端口不是本服务" in response.text
+    assert "discoverGateway" in response.text
+    assert "fallbackGatewayOrigins" in response.text
+    assert "fetchGatewayJson" in response.text
+    assert "wsUrl(`/ws/interview/${interviewId}`)" in response.text
     assert "python scripts/run_gateway.py" in response.text
     assert "http://127.0.0.1:8001/" in response.text
     assert "无法连接到本地 gateway" in response.text
@@ -308,6 +311,25 @@ def test_gateway_health_identifies_service(tmp_path: Path, monkeypatch) -> None:
         "service": "shuihuo-killer-gateway",
         "version": "0.1.0",
     }
+
+
+def test_gateway_allows_local_dev_cors_origins(tmp_path: Path, monkeypatch) -> None:
+    client = _client(tmp_path, monkeypatch)
+
+    response = client.get("/health", headers={"Origin": "http://127.0.0.1:8000"})
+    preflight = client.options(
+        "/api/jobs",
+        headers={
+            "Origin": "http://127.0.0.1:8000",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://127.0.0.1:8000"
+    assert preflight.status_code == 200
+    assert preflight.headers["access-control-allow-origin"] == "http://127.0.0.1:8000"
 
 
 def test_gateway_config_status_hides_secrets(tmp_path: Path, monkeypatch) -> None:

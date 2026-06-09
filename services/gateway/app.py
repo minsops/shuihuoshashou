@@ -10,8 +10,9 @@ from time import perf_counter
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
-from starlette.datastructures import Headers
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, Response
+from starlette.datastructures import Headers
 
 from libs.common.config import get_settings
 from libs.common.database import init_db
@@ -96,6 +97,7 @@ FALSE_FINALITY_VALUES = {
 TRUE_FINALITY_VALUES = {"1", "true", "yes", "on", "final", "finalized", "complete", "completed"}
 ALIYUN_AUDIO_CONTEXT_LIMIT = 200
 STREAMING_ASR_PROVIDERS = {"aliyun_ws", "aliyun_nls_ws"}
+LOCAL_DEV_ORIGIN_REGEX = r"^https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$"
 
 
 class _LockedWebSocketSender:
@@ -129,6 +131,12 @@ async def lifespan(fastapi_app: FastAPI):
 
 
 app = FastAPI(title="Shuihuo Killer", version="0.1.0", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=LOCAL_DEV_ORIGIN_REGEX,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
 WEB_INDEX = Path(__file__).resolve().parents[2] / "web" / "index.html"
 
 

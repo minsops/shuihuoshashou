@@ -769,11 +769,16 @@
         micSpeechStarted: false,
         micWaitingForVoiceNotice: false,
         micRecording: false,
+        apiOrigin:
+          window.location.origin && window.location.origin !== "null"
+            ? window.location.origin
+            : "http://127.0.0.1:8001",
       };
 
       const micSampleRate = 16000;
       const micChunkSamples = micSampleRate;
       const micVoiceRmsThreshold = 0.012;
+      const fallbackGatewayOrigins = ["http://127.0.0.1:8001", "http://localhost:8001"];
 
       function escapeHtml(value) {
         return String(value)
@@ -907,16 +912,83 @@
       }
 
       function gatewayHelpText() {
-        return "请确认已运行 python scripts/run_gateway.py，并打开 http://127.0.0.1:8001/，或使用启动脚本输出的实际地址。";
+        return "请确认已运行 python scripts/run_gateway.py；页面会自动尝试连接 http://127.0.0.1:8001/。";
+      }
+
+      function gatewayOrigins() {
+        return [state.apiOrigin, ...fallbackGatewayOrigins].filter(
+          (origin, index, origins) => origin && origins.indexOf(origin) === index
+        );
+      }
+
+      function apiUrl(path) {
+        const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+        return `${state.apiOrigin}${normalizedPath}`;
+      }
+
+      function wsUrl(path) {
+        const url = new URL(apiUrl(path));
+        url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+        return url.toString();
+      }
+
+      async function fetchWithTimeout(url, options = {}, timeoutMs = 3500) {
+        const controller = new AbortController();
+        const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+        try {
+          return await fetch(url, {
+            ...options,
+            signal: controller.signal,
+          });
+        } finally {
+          window.clearTimeout(timer);
+        }
+      }
+
+      async function discoverGateway() {
+        const failures = [];
+        for (const origin of gatewayOrigins()) {
+          try {
+            const response = await fetchWithTimeout(`${origin}/health`, { cache: "no-store" });
+            if (!response.ok) {
+              failures.push(`${origin}: HTTP ${response.status}`);
+              continue;
+            }
+            const status = await response.json();
+            if (status.service !== "shuihuo-killer-gateway") {
+              failures.push(`${origin}: 不是水货杀手 gateway`);
+              continue;
+            }
+            const previousOrigin = state.apiOrigin;
+            state.apiOrigin = origin;
+            if (previousOrigin !== origin) {
+              appendEvent("服务检查", `已自动切换到本地 gateway：${escapeHtml(origin)}`, "green");
+            }
+            return status;
+          } catch (error) {
+            failures.push(`${origin}: ${errorText(error)}`);
+          }
+        }
+        throw new Error(failures.join("；") || "gateway unreachable");
+      }
+
+      async function fetchGateway(path, options = {}) {
+        const response = await fetchWithTimeout(apiUrl(path), options);
+        if (!response.ok) throw new Error(await readErrorMessage(response));
+        return response;
+      }
+
+      async function fetchGatewayJson(path, options = {}) {
+        const response = await fetchGateway(path, options);
+        return response.json();
       }
 
       async function postJson(url, payload) {
-        const response = await fetch(url, {
+        const response = await fetchGateway(url, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify(payload),
         });
-        if (!response.ok) throw new Error(await readErrorMessage(response));
         return response.json();
       }
 
@@ -927,28 +999,18 @@
         setPill(modelStatus, "模型检查中", "live");
         setPill(asrStatus, "ASR 检查中", "live");
         try {
-          const response = await fetch("/health");
-          if (!response.ok) {
-            setPill(runtimeStatus, `服务接口异常 ${response.status}`, "");
-          } else {
-            const status = await response.json();
-            if (status.service !== "shuihuo-killer-gateway") {
-              setPill(runtimeStatus, "端口不是本服务", "");
-              appendEvent("服务检查", `当前端口不是水货杀手 gateway。${gatewayHelpText()}`, "red");
-            } else {
-              setPill(
-                runtimeStatus,
-                status.status === "ok" ? "服务正常" : "服务异常",
-                status.status === "ok" ? "ready" : ""
-              );
-            }
-          }
+          const status = await discoverGateway();
+          setPill(
+            runtimeStatus,
+            status.status === "ok" ? "服务正常" : "服务异常",
+            status.status === "ok" ? "ready" : ""
+          );
         } catch (error) {
           setPill(runtimeStatus, "服务不可达", "");
           appendEvent("服务检查", `无法连接到本地 gateway。${gatewayHelpText()}`, "red");
         }
         try {
-          const config = await fetch("/api/config/status").then((response) => response.json());
+          const config = await fetchGatewayJson("/api/config/status");
           const model = modelStatusFromConfig(config);
           setPill(modelStatus, model.text, model.ready ? "ready" : "");
           const asr = asrStatusFromConfig(config);
@@ -1018,12 +1080,11 @@
         input.disabled = true;
         try {
           const params = new URLSearchParams({ kind, filename: file.name });
-          const response = await fetch(`/api/documents/parse?${params.toString()}`, {
+          const response = await fetchGateway(`/api/documents/parse?${params.toString()}`, {
             method: "POST",
             headers: { "content-type": file.type || "application/octet-stream" },
             body: await file.arrayBuffer(),
           });
-          if (!response.ok) throw new Error(await readErrorMessage(response));
           const result = await response.json();
           target.value = result.text.trim() ? result.text : target.value;
           let modelNote = "";
@@ -1201,8 +1262,7 @@
       }
 
       function openSocket(interviewId) {
-        const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-        state.socket = new WebSocket(`${protocol}://${window.location.host}/ws/interview/${interviewId}`);
+        state.socket = new WebSocket(wsUrl(`/ws/interview/${interviewId}`));
         setControls();
         state.socket.addEventListener("open", () => {
           setControls();
@@ -1403,9 +1463,9 @@
       function renderReport(report) {
         const score = report.score;
         reportLinks.innerHTML = `
-          <a class="button secondary" href="/api/interviews/${report.interview_id}/report.html" target="_blank">HTML</a>
-          <a class="button secondary" href="/api/interviews/${report.interview_id}/report.pdf" target="_blank">PDF</a>
-          <a class="button secondary" href="/api/interviews/${report.interview_id}/report.json" target="_blank">JSON</a>
+          <a class="button secondary" href="${escapeHtml(apiUrl(`/api/interviews/${report.interview_id}/report.html`))}" target="_blank">HTML</a>
+          <a class="button secondary" href="${escapeHtml(apiUrl(`/api/interviews/${report.interview_id}/report.pdf`))}" target="_blank">PDF</a>
+          <a class="button secondary" href="${escapeHtml(apiUrl(`/api/interviews/${report.interview_id}/report.json`))}" target="_blank">JSON</a>
         `;
         const rows = score.dimensions
           .map(
