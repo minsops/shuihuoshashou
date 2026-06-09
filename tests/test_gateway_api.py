@@ -442,11 +442,13 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "/api/config/llm/check" in response.text
     assert "timeoutMs: externalCheckTimeoutMs" in response.text
     assert "if (!modelCheckStillCurrent(checkToken)) return" in response.text
+    assert "if (modelCheckStillCurrent(checkToken))" in response.text
     assert "手动调用真实模型检查连接" in response.text
     assert 'id="checkAsr"' in response.text
     assert "checkAsrReadiness" in response.text
     assert "/api/config/asr/check" in response.text
     assert "if (!asrCheckStillCurrent(checkToken)) return" in response.text
+    assert "if (asrCheckStillCurrent(checkToken))" in response.text
     assert "手动检查 ASR 配置、依赖和 Token" in response.text
     assert 'id="gatewayKey"' in response.text
     assert 'id="saveGatewayKey"' in response.text

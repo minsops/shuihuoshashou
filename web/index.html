@@ -1337,8 +1337,10 @@
             appendEvent("模型检查", escapeHtml(message), "red");
           }
         } finally {
-          checkModel.disabled = false;
-          checkModel.title = "手动调用真实模型检查连接";
+          if (modelCheckStillCurrent(checkToken)) {
+            checkModel.disabled = false;
+            checkModel.title = "手动调用真实模型检查连接";
+          }
         }
       }
 
@@ -1369,8 +1371,10 @@
             appendEvent("ASR 检查", escapeHtml(message), "red");
           }
         } finally {
-          checkAsr.disabled = false;
-          checkAsr.title = "手动检查 ASR 配置、依赖和 Token";
+          if (asrCheckStillCurrent(checkToken)) {
+            checkAsr.disabled = false;
+            checkAsr.title = "手动检查 ASR 配置、依赖和 Token";
+          }
         }
       }
 
