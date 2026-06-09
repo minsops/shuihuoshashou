@@ -297,6 +297,7 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "正在请求麦克风权限并初始化音频采集" in response.text
     assert "micStartToken" in response.text
     assert "micStartStillCurrent" in response.text
+    assert "if (!micStartStillCurrent(micStartToken)) return" in response.text
     assert "麦克风启动已取消" in response.text
     assert "micError" in response.text
     assert "修复后再次点击开始麦克风" in response.text

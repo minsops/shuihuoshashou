@@ -2594,6 +2594,7 @@
           appendEvent("麦克风", "麦克风已开启，请开始说话。");
           setControls();
         } catch (error) {
+          if (!micStartStillCurrent(micStartToken)) return;
           const reason = micErrorMessage(error);
           state.micError = reason;
           appendEvent("麦克风", escapeHtml(reason), "red");
