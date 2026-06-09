@@ -1892,7 +1892,13 @@
           return;
         }
         stopMicCapture();
-        await openSocketWithLatestGateway(state.interview.id);
+        const reconnectInterviewId = state.interview.id;
+        const reconnectStillCurrent = () =>
+          Boolean(state.interview) &&
+          state.interview.id === reconnectInterviewId &&
+          !state.interviewEnded;
+        await openSocketWithLatestGateway(reconnectInterviewId, reconnectStillCurrent);
+        if (!reconnectStillCurrent()) return;
         appendEvent("实时通道", "正在重新连接当前面试。");
       }
 

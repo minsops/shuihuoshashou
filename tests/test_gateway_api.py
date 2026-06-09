@@ -432,6 +432,8 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert 'currentQuestion.addEventListener("input", resetQuestionMetaForManualEdit)' in response.text
     assert 'parseDocumentFile(event.target.files[0], event.target, resumeText, "简历", "resume")' in response.text
     assert "reconnectLiveChannel" in response.text
+    assert "reconnectInterviewId" in response.text
+    assert "reconnectStillCurrent" in response.text
     assert "重新连接当前面试实时通道" in response.text
     assert "当前已有面试，请重置后再创建新的面试" in response.text
     assert "资料正在解析，完成后再创建实时面试。" in response.text
