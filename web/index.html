@@ -1564,6 +1564,7 @@
           stopMicCapture();
           state.interviewEnded = true;
           renderReport(message.payload);
+          markReportReady();
           appendEvent("评分完成", `总分 ${escapeHtml(message.payload.score.total_score)}`, "green");
         } else if (message.type === "task_queued") {
           stopMicCapture();
@@ -1716,6 +1717,7 @@
         try {
           const report = await fetchGatewayJson(`/api/interviews/${interviewId}/report`);
           renderReport(report);
+          markReportReady();
           appendEvent("评分完成", `总分 ${escapeHtml(report.score.total_score)}`, "green");
         } catch (error) {
           if (gatewayAuthError(error)) {
@@ -1735,6 +1737,10 @@
 
       function reportPendingError(error) {
         return errorText(error).toLowerCase().includes("report not found");
+      }
+
+      function markReportReady() {
+        setPill(liveStatus, "报告已生成", "ready");
       }
 
       async function downloadReportArtifact(interviewId, format) {
