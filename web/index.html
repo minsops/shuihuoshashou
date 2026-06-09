@@ -1611,6 +1611,12 @@
         answerText.focus();
       }
 
+      function resetQuestionMetaForManualEdit() {
+        state.selectedQuestionSource = "interviewer";
+        state.selectedProbeTarget = null;
+        state.selectedCompetency = null;
+      }
+
       async function prepareSession(form) {
         if (state.preparingInterview) {
           appendEvent("面试创建", "正在创建实时面试，请稍候。");
@@ -2438,6 +2444,7 @@
           "候选人自述 5 年 Python 后端经验，最近负责 AI 面试评估系统，涉及 FastAPI 网关、LLM JSON 解析、重试降级、报告生成和可观测性指标。";
         currentQuestion.value =
           "请讲一个最近负责的 LLM 后端项目，说明你本人写了哪些模块，核心技术取舍是什么，上线后哪些指标发生了变化？";
+        resetQuestionMetaForManualEdit();
         answerText.value =
           "我主要写了 FastAPI 网关和模型调用编排，处理过 JSON 解析失败、超时重试和报告生成。我把失败重试从固定次数改成按错误类型分流，P95 延迟从 3.8 秒降到 2.4 秒。";
         appendEvent("样例资料", "已填入一组 JD、简历和首问回答。");
@@ -2510,6 +2517,7 @@
       reconnectSocket.addEventListener("click", reconnectLiveChannel);
       manualProbe.addEventListener("click", () => sendTurn(true));
       endInterview.addEventListener("click", requestEndInterview);
+      currentQuestion.addEventListener("input", resetQuestionMetaForManualEdit);
       document.addEventListener("visibilitychange", refreshRuntimeIfVisible);
       window.addEventListener("focus", refreshRuntimeIfVisible);
       window.addEventListener("online", refreshRuntimeIfVisible);

@@ -403,6 +403,8 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "未提取到可用文本" in response.text
     assert "文字版 PDF、DOCX" in response.text
     assert "DeepSeek 清洗未完成" in response.text
+    assert "resetQuestionMetaForManualEdit" in response.text
+    assert 'currentQuestion.addEventListener("input", resetQuestionMetaForManualEdit)' in response.text
     assert 'parseDocumentFile(event.target.files[0], event.target, resumeText, "简历", "resume")' in response.text
     assert "reconnectLiveChannel" in response.text
     assert "重新连接当前面试实时通道" in response.text
