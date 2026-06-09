@@ -569,6 +569,7 @@
         <span class="status-pill" id="runtimeStatus"><span class="status-dot"></span><span>检查中</span></span>
         <span class="status-pill" id="modelStatus"><span class="status-dot"></span><span>模型检查中</span></span>
         <span class="status-pill" id="asrStatus"><span class="status-dot"></span><span>ASR 检查中</span></span>
+        <button class="secondary" type="button" id="refreshStatus">刷新状态</button>
         <button class="secondary" type="button" id="loadSample">样例资料</button>
         <a class="button secondary" href="/docs" target="_blank">API 文档</a>
       </div>
@@ -724,6 +725,7 @@
       const runtimeStatus = document.querySelector("#runtimeStatus");
       const modelStatus = document.querySelector("#modelStatus");
       const asrStatus = document.querySelector("#asrStatus");
+      const refreshStatus = document.querySelector("#refreshStatus");
       const liveStatus = document.querySelector("#liveStatus");
       const micStatus = document.querySelector("#micStatus");
       const competencyList = document.querySelector("#competencyList");
@@ -882,18 +884,27 @@
       }
 
       async function checkRuntime() {
+        refreshStatus.disabled = true;
+        refreshStatus.title = "正在刷新服务、模型和 ASR 状态";
+        setPill(runtimeStatus, "检查中", "live");
+        setPill(modelStatus, "模型检查中", "live");
+        setPill(asrStatus, "ASR 检查中", "live");
         try {
           const response = await fetch("/health");
           if (!response.ok) {
             setPill(runtimeStatus, `服务接口异常 ${response.status}`, "");
-            return;
+          } else {
+            const status = await response.json();
+            if (status.service !== "shuihuo-killer-gateway") {
+              setPill(runtimeStatus, "端口不是本服务", "");
+            } else {
+              setPill(
+                runtimeStatus,
+                status.status === "ok" ? "服务正常" : "服务异常",
+                status.status === "ok" ? "ready" : ""
+              );
+            }
           }
-          const status = await response.json();
-          if (status.service !== "shuihuo-killer-gateway") {
-            setPill(runtimeStatus, "端口不是本服务", "");
-            return;
-          }
-          setPill(runtimeStatus, status.status === "ok" ? "服务正常" : "服务异常", status.status === "ok" ? "ready" : "");
         } catch (error) {
           setPill(runtimeStatus, "服务不可达", "");
         }
@@ -914,6 +925,9 @@
         } catch (error) {
           setPill(modelStatus, "模型状态未知", "");
           setPill(asrStatus, "ASR 状态未知", "");
+        } finally {
+          refreshStatus.disabled = false;
+          refreshStatus.title = "重新检查服务、模型和 ASR 状态";
         }
       }
 
@@ -1537,6 +1551,7 @@
         parseDocumentFile(event.target.files[0], resumeText, "简历", "resume");
       });
 
+      refreshStatus.addEventListener("click", checkRuntime);
       document.querySelector("#loadSample").addEventListener("click", loadSample);
       document.querySelector("#resetSession").addEventListener("click", () => {
         stopMicCapture();
