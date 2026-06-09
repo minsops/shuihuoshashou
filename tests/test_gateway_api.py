@@ -262,6 +262,12 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "ASR 阿里云 NLS 已配置" in response.text
     assert "ASR 阿里云 NLS 已配置（自动 Token）" in response.text
     assert "ASR 长时间没有收到有效语音" in response.text
+    assert "ASR Token 已失效或被拒绝" in response.text
+    assert "ALIYUN_NLS_TOKEN 或阿里云 AccessKey 权限" in response.text
+    assert "ALIYUN_ASR_API_KEY 是否是百炼/DashScope API Key" in response.text
+    assert "NLS Token 创建失败" in response.text
+    assert "ASR WebSocket 依赖缺失" in response.text
+    assert "ASR 没有返回识别文本" in response.text
     assert "避免 ASR 空闲断开" in response.text
     assert "原始原因" in response.text
     assert "先创建实时面试" in response.text
