@@ -257,6 +257,8 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "audioContextConstructor" in response.text
     assert "window.webkitAudioContext" in response.text
     assert "当前浏览器不支持 Web Audio" in response.text
+    assert "micError" in response.text
+    assert "修复后再次点击开始麦克风" in response.text
     assert "discoverGateway" in response.text
     assert "fallbackGatewayOrigins" in response.text
     assert "fetchGatewayJson" in response.text

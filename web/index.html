@@ -789,6 +789,7 @@
         micSpeechStarted: false,
         micWaitingForVoiceNotice: false,
         micRecording: false,
+        micError: "",
         apiOrigin:
           window.location.origin && window.location.origin !== "null"
             ? window.location.origin
@@ -874,6 +875,8 @@
           setPill(micStatus, "等待实时通道", "live");
         } else if (state.interviewEnded) {
           setPill(micStatus, "面试已结束", "ready");
+        } else if (state.micError) {
+          setPill(micStatus, state.micError, "");
         } else if (state.interview) {
           setPill(micStatus, "等待重连通道", "");
         } else if (!connected) {
@@ -923,6 +926,7 @@
         if (state.reportReady) return "报告已生成。可以下载 HTML、PDF、JSON 或转写，或重置后开始新的面试。";
         if (state.interviewEnded) return "面试已结束。请重置后创建新的面试。";
         if (state.micRecording) return "麦克风采集中。可以停止麦克风，或结束面试生成评分报告。";
+        if (state.micError) return `${state.micError} 可以修复后再次点击开始麦克风。`;
         if (connected) return "实时通道已连接。可以发送文字回答，或点击开始麦克风进行语音转写。";
         if (connecting) return "实时通道连接中，请稍候。连接成功后按钮会自动启用。";
         if (state.interview) return "实时通道未连接。请点击重连通道，或重置后重新创建面试。";
@@ -1975,15 +1979,18 @@
           return;
         }
         if (state.micRecording || !state.socket || state.socket.readyState !== WebSocket.OPEN) return;
+        state.micError = "";
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          state.micError = "麦克风不可用";
           appendEvent("麦克风", "当前浏览器不支持麦克风采集。", "red");
-          setPill(micStatus, "麦克风不可用", "");
+          setControls();
           return;
         }
         const AudioContextCtor = audioContextConstructor();
         if (!AudioContextCtor) {
+          state.micError = "音频采集不可用";
           appendEvent("麦克风", "当前浏览器不支持 Web Audio，无法采集和转换麦克风音频。", "red");
-          setPill(micStatus, "音频采集不可用", "");
+          setControls();
           return;
         }
         try {
@@ -2002,6 +2009,7 @@
           state.micSentSamples = 0;
           state.micSpeechStarted = false;
           state.micWaitingForVoiceNotice = false;
+          state.micError = "";
           state.micRecording = true;
           state.micProcessor.onaudioprocess = (event) => {
             const input = event.inputBuffer.getChannelData(0);
@@ -2015,8 +2023,8 @@
           setControls();
         } catch (error) {
           const reason = micErrorMessage(error);
+          state.micError = reason;
           appendEvent("麦克风", escapeHtml(reason), "red");
-          setPill(micStatus, reason, "");
           stopMicCapture();
         }
       }
@@ -2090,6 +2098,7 @@
         state.selectedQuestionSource = "interviewer";
         state.selectedProbeTarget = null;
         state.selectedCompetency = null;
+        state.micError = "";
         metricJob.textContent = "待创建";
         metricCandidate.textContent = "待创建";
         metricTurns.textContent = "0";
