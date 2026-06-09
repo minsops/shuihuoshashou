@@ -1457,11 +1457,22 @@
       }
 
       function setDependentStatusWaitingForGateway(error) {
-        const message = gatewayFailureTitle(error);
+        setModelStatusWaitingForGateway(error);
+        setAsrStatusWaitingForGateway(error);
+      }
+
+      function setModelStatusWaitingForGateway(error) {
         setPill(modelStatus, "模型等待本地服务", "");
-        setStatusTitleFromMessage(modelStatus, message);
+        setStatusTitleFromMessage(modelStatus, gatewayFailureTitle(error));
+      }
+
+      function setAsrStatusWaitingForGateway(error) {
         setPill(asrStatus, "ASR 等待本地服务", "");
-        setStatusTitleFromMessage(asrStatus, message);
+        setStatusTitleFromMessage(asrStatus, gatewayFailureTitle(error));
+      }
+
+      function gatewayUnavailableEventBody(error) {
+        return `${escapeHtml(gatewayHelpText())}<br><span class="small">失败详情：${escapeHtml(errorText(error))}</span>`;
       }
 
       function gatewayAuthError(error) {
@@ -1494,7 +1505,14 @@
         checkModel.title = "正在调用真实模型检查连接";
         setPill(modelStatus, "模型连接检查中", "live");
         try {
-          await discoverGateway();
+          try {
+            await discoverGateway();
+          } catch (error) {
+            if (!modelCheckStillCurrent(checkToken)) return;
+            setModelStatusWaitingForGateway(error);
+            appendEvent("模型检查", gatewayUnavailableEventBody(error), "red");
+            return;
+          }
           const result = await fetchGatewayJson("/api/config/llm/check", {
             method: "POST",
             timeoutMs: externalCheckTimeoutMs,
@@ -1530,7 +1548,14 @@
         checkAsr.title = "正在检查 ASR 配置、依赖和 Token";
         setPill(asrStatus, "ASR 检查中", "live");
         try {
-          await discoverGateway();
+          try {
+            await discoverGateway();
+          } catch (error) {
+            if (!asrCheckStillCurrent(checkToken)) return;
+            setAsrStatusWaitingForGateway(error);
+            appendEvent("ASR 检查", gatewayUnavailableEventBody(error), "red");
+            return;
+          }
           const result = await fetchGatewayJson("/api/config/asr/check", {
             method: "POST",
             timeoutMs: externalCheckTimeoutMs,
