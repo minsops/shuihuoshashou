@@ -541,6 +541,10 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "new WebSocket(socketUrl, websocketProtocols())" in response.text
     assert 'data-report-format="html"' in response.text
     assert 'data-report-format="transcript.json"' in response.text
+    assert 'title="下载 HTML 报告"' in response.text
+    assert 'title="下载 PDF 报告"' in response.text
+    assert 'title="下载 JSON 报告"' in response.text
+    assert 'title="下载转写记录"' in response.text
     assert ">转写</button>" in response.text
     assert "downloadReportArtifact" in response.text
     assert "reportDownloadStillCurrent" in response.text
@@ -598,6 +602,7 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "reportRefreshStillCurrent(refreshEpoch, interviewId) &&" in response.text
     assert 'button.textContent = "刷新中"' in response.text
     assert 'button.textContent = originalLabel || "刷新报告"' in response.text
+    assert 'title="手动刷新评分报告"' in response.text
     assert "报告刷新正在进行中，请稍候" in response.text
     assert "fetchGatewayJson(`/api/interviews/${interviewId}/report`)" in response.text
     assert "reportPendingError" in response.text

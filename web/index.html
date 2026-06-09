@@ -2338,10 +2338,10 @@
         const riskNotes = Array.isArray(score.risk_notes) ? score.risk_notes : [];
         const transcriptTurns = Array.isArray(report.transcript) ? report.transcript : [];
         reportLinks.innerHTML = `
-          <button class="secondary" type="button" data-report-format="html" data-report-id="${escapeHtml(reportId)}">HTML</button>
-          <button class="secondary" type="button" data-report-format="pdf" data-report-id="${escapeHtml(reportId)}">PDF</button>
-          <button class="secondary" type="button" data-report-format="json" data-report-id="${escapeHtml(reportId)}">JSON</button>
-          <button class="secondary" type="button" data-report-format="transcript.json" data-report-id="${escapeHtml(reportId)}">转写</button>
+          <button class="secondary" type="button" data-report-format="html" data-report-id="${escapeHtml(reportId)}" title="下载 HTML 报告">HTML</button>
+          <button class="secondary" type="button" data-report-format="pdf" data-report-id="${escapeHtml(reportId)}" title="下载 PDF 报告">PDF</button>
+          <button class="secondary" type="button" data-report-format="json" data-report-id="${escapeHtml(reportId)}" title="下载 JSON 报告">JSON</button>
+          <button class="secondary" type="button" data-report-format="transcript.json" data-report-id="${escapeHtml(reportId)}" title="下载转写记录">转写</button>
         `;
         reportLinks.querySelectorAll("[data-report-format]").forEach((button) => {
           button.addEventListener("click", () => {
@@ -2429,7 +2429,7 @@
         clearQueuedReportPolling();
         const refreshEpoch = state.reportRefreshEpoch;
         reportLinks.innerHTML = `
-          <button class="secondary" type="button" id="refreshReport" data-report-id="${escapeHtml(interviewId)}">刷新报告</button>
+          <button class="secondary" type="button" id="refreshReport" data-report-id="${escapeHtml(interviewId)}" title="手动刷新评分报告">刷新报告</button>
         `;
         reportLinks.querySelector("#refreshReport").addEventListener("click", (event) => {
           refreshQueuedReport(event.currentTarget.dataset.reportId, { refreshEpoch });
