@@ -8,14 +8,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_scripts_with_side_effects_support_help_without_running() -> None:
-    for script_name in [
-        "check_llm.py",
-        "diagnose_llm_auth.py",
-        "diagnose_llm_network.py",
-        "run_offline_demo.py",
-    ]:
-        script = ROOT / "scripts" / script_name
+def test_all_utility_scripts_support_help_without_running() -> None:
+    scripts = sorted((ROOT / "scripts").glob("*.py"))
+    assert scripts
+    for script in scripts:
         result = subprocess.run(
             [sys.executable, str(script), "--help"],
             check=True,
