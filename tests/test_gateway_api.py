@@ -263,6 +263,9 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "readErrorMessage" in response.text
     assert "item.loc" in response.text
     assert "payload.detail" in response.text
+    assert "input.disabled = true" in response.text
+    assert "input.value = \"\"" in response.text
+    assert 'parseDocumentFile(event.target.files[0], event.target, resumeText, "简历", "resume")' in response.text
     assert "reconnectLiveChannel" in response.text
     assert "重新连接当前面试实时通道" in response.text
     assert "当前已有面试，请重置后再创建新的面试" in response.text

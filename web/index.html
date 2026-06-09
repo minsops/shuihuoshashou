@@ -999,9 +999,10 @@
         return { text: "ASR 状态未知", ready: false };
       }
 
-      async function parseDocumentFile(file, target, label, kind) {
+      async function parseDocumentFile(file, input, target, label, kind) {
         if (!file) return;
         appendEvent("资料上传", `${escapeHtml(label)} 正在解析：${escapeHtml(file.name)}`);
+        input.disabled = true;
         try {
           const params = new URLSearchParams({ kind, filename: file.name });
           const response = await fetch(`/api/documents/parse?${params.toString()}`, {
@@ -1023,6 +1024,9 @@
           );
         } catch (error) {
           appendEvent("资料上传失败", escapeHtml(errorText(error)), "red");
+        } finally {
+          input.disabled = false;
+          input.value = "";
         }
       }
 
@@ -1638,11 +1642,11 @@
       });
 
       document.querySelector("#jdFile").addEventListener("change", (event) => {
-        parseDocumentFile(event.target.files[0], jdText, "JD", "jd");
+        parseDocumentFile(event.target.files[0], event.target, jdText, "JD", "jd");
       });
 
       document.querySelector("#resumeFile").addEventListener("change", (event) => {
-        parseDocumentFile(event.target.files[0], resumeText, "简历", "resume");
+        parseDocumentFile(event.target.files[0], event.target, resumeText, "简历", "resume");
       });
 
       refreshStatus.addEventListener("click", checkRuntime);
