@@ -229,18 +229,30 @@ class AliyunNLSWSASREngine(ASREngine):
         session = self._sessions.get(session_id)
         if session is not None and not session.finished:
             return session
-        session = AliyunNLSSession(
+        session = self._new_session(session_id)
+        try:
+            await session.connect()
+        except Exception as exc:
+            if self._token_provider is not None and _nls_token_failure(exc):
+                self._token_provider.invalidate()
+                session = self._new_session(session_id)
+                try:
+                    await session.connect()
+                except Exception:
+                    self._sessions.pop(session_id, None)
+                    raise
+            else:
+                self._sessions.pop(session_id, None)
+                raise
+        self._sessions[session_id] = session
+        return session
+
+    def _new_session(self, session_id: str) -> AliyunNLSSession:
+        return AliyunNLSSession(
             session_id,
             settings=self.settings,
             token_provider=self._token_provider,
         )
-        try:
-            await session.connect()
-        except Exception:
-            self._sessions.pop(session_id, None)
-            raise
-        self._sessions[session_id] = session
-        return session
 
     async def close_session(self, session_id: str) -> None:
         session = self._sessions.pop(session_id, None)
@@ -266,6 +278,11 @@ class AliyunNLSWSASREngine(ASREngine):
         if item is None:
             raise RuntimeError(session.error_reason or "aliyun_asr_no_result")
         return item
+
+
+def _nls_token_failure(exc: Exception) -> bool:
+    reason = str(exc).lower()
+    return "40000002" in reason or "bad token" in reason or "invalid token" in reason
 
 
 def _nls_event_ok(data: dict[str, Any], event_name: str) -> bool:

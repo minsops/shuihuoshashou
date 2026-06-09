@@ -392,6 +392,27 @@ def test_nls_token_provider_refreshes_expiring_token() -> None:
     assert created == ["created-token-1", "created-token-2"]
 
 
+def test_nls_token_provider_invalidate_forces_refresh() -> None:
+    created: list[str] = []
+
+    def fake_create_token(*args, **kwargs) -> AliyunNLSToken:
+        del args, kwargs
+        created.append(f"created-token-{len(created) + 1}")
+        return AliyunNLSToken(id=created[-1], expire_time=2000)
+
+    provider = nls_token.AliyunNLSTokenProvider(
+        access_key_id="ak-id",
+        access_key_secret="ak-secret",
+        create_token_func=fake_create_token,
+        now_func=lambda: 1000,
+    )
+
+    assert provider.get_token() == "created-token-1"
+    provider.invalidate()
+    assert provider.get_token() == "created-token-2"
+    assert created == ["created-token-1", "created-token-2"]
+
+
 def test_nls_session_gets_auto_token_from_provider() -> None:
     class FakeTokenProvider:
         def __init__(self) -> None:
@@ -441,3 +462,44 @@ def test_nls_engine_shares_auto_token_provider_across_sessions(monkeypatch) -> N
     assert engine._token_provider is not None
     assert first._token_provider is engine._token_provider
     assert second._token_provider is engine._token_provider
+
+
+def test_nls_engine_retries_once_after_auto_token_failure(monkeypatch) -> None:
+    connect_calls = 0
+
+    class FakeTokenProvider:
+        def __init__(self) -> None:
+            self.invalidations = 0
+
+        def get_token(self) -> str:
+            return "created-token"
+
+        def invalidate(self) -> None:
+            self.invalidations += 1
+
+    async def fake_connect(self) -> None:
+        nonlocal connect_calls
+        connect_calls += 1
+        if connect_calls == 1:
+            raise RuntimeError("aliyun_asr_task_failed:40000002:bad token")
+        self.started = True
+
+    monkeypatch.setattr(AliyunNLSSession, "connect", fake_connect)
+    provider = FakeTokenProvider()
+    engine = AliyunNLSWSASREngine(
+        settings=Settings(
+            asr_provider="aliyun_nls_ws",
+            aliyun_nls_app_key="app-key",
+            aliyun_nls_token="",
+            aliyun_ak_id="ak-id",
+            aliyun_ak_secret="ak-secret",
+        )
+    )
+    engine._token_provider = provider
+
+    session = asyncio.run(engine.get_or_create_session("session-1"))
+
+    assert session.started is True
+    assert provider.invalidations == 1
+    assert connect_calls == 2
+    assert engine._sessions["session-1"] is session

@@ -59,6 +59,10 @@ class AliyunNLSTokenProvider:
             )
             return self._cached_token.id
 
+    def invalidate(self) -> None:
+        with self._lock:
+            self._cached_token = None
+
     def _is_fresh(self, token: AliyunNLSToken) -> bool:
         if token.expire_time is None:
             return False
