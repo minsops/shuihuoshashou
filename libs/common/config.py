@@ -1,3 +1,4 @@
+import json
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -143,6 +144,13 @@ class Settings(BaseSettings):
             raise ValueError(
                 "OBJECT_STORAGE_ACCESS_KEY and OBJECT_STORAGE_SECRET_KEY must be configured together"
             )
+        if self.llm_extra_body_json.strip():
+            try:
+                extra_body = json.loads(self.llm_extra_body_json)
+            except json.JSONDecodeError as exc:
+                raise ValueError("LLM_EXTRA_BODY_JSON must be valid JSON") from exc
+            if not isinstance(extra_body, dict):
+                raise ValueError("LLM_EXTRA_BODY_JSON must decode to an object")
         return self
 
 

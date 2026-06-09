@@ -34,6 +34,7 @@ async def _call_with_transport(transport: httpx.MockTransport) -> ProbeResponse:
 
 def test_llm_client_uses_configurable_protocol(monkeypatch) -> None:
     monkeypatch.setenv("LLM_PROVIDER", "openai_compatible")
+    monkeypatch.setenv("LLM_MODEL", "mimo-v2.5-pro")
     monkeypatch.setenv("LLM_BASE_URL", "https://llm.example.test/api")
     monkeypatch.setenv("LLM_API_PATH", "/v2/chat")
     monkeypatch.setenv("LLM_API_KEY", "secret")

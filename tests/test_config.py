@@ -28,6 +28,14 @@ def test_settings_rejects_out_of_range_runtime_thresholds() -> None:
         Settings(probe_min_interval_ms=-1)
 
 
+def test_settings_rejects_invalid_llm_extra_body_json() -> None:
+    with pytest.raises(ValidationError, match="LLM_EXTRA_BODY_JSON must be valid JSON"):
+        Settings(llm_extra_body_json="{bad-json")
+
+    with pytest.raises(ValidationError, match="LLM_EXTRA_BODY_JSON must decode to an object"):
+        Settings(llm_extra_body_json='["not", "an", "object"]')
+
+
 def test_settings_accepts_declared_production_backends() -> None:
     settings = Settings(
         llm_provider="openai_compatible",

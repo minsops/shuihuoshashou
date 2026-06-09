@@ -107,6 +107,7 @@ def test_readme_distinguishes_real_llm_smoke_from_mock_mode() -> None:
     assert "LLM smoke test ok." in readme
     assert "LLM mock mode ok. No real model endpoint was called." in readme
     assert "只有 `LLM_PROVIDER=openai_compatible`" in readme
+    assert "`LLM_EXTRA_BODY_JSON` 只能填写 JSON object" in readme
 
 
 def test_readme_explains_empty_asr_smoke_result_semantics() -> None:
