@@ -123,6 +123,14 @@ def test_readme_explains_demo_gateway_key_input() -> None:
     assert "避免把 key 写进 URL" in readme
 
 
+def test_readme_explains_document_upload_formats() -> None:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert "LOG、PDF、Word `.docx`/`.doc`" in readme
+    assert "单个文件最大 25MB" in readme
+    assert "`text/*`、`image/*`、`application/pdf`、Word MIME type" in readme
+
+
 def test_readme_explains_empty_asr_smoke_result_semantics() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
