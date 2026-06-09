@@ -2180,7 +2180,13 @@
       async function downloadReportArtifact(interviewId, format) {
         if (!interviewId || !format) return;
         const button = reportLinks.querySelector(`[data-report-format="${format}"]`);
-        if (button) button.disabled = true;
+        const originalLabel = button ? button.textContent : "";
+        const originalTitle = button ? button.title : "";
+        if (button) {
+          button.disabled = true;
+          button.textContent = "下载中";
+          button.title = `正在下载 ${reportFormatLabel(format)} 报告`;
+        }
         try {
           const response = await fetchGateway(`/api/interviews/${interviewId}/report.${format}`);
           const blob = await response.blob();
@@ -2200,7 +2206,11 @@
             appendEvent("报告下载失败", escapeHtml(errorText(error)), "red");
           }
         } finally {
-          if (button) button.disabled = false;
+          if (button && reportLinks.contains(button)) {
+            button.disabled = false;
+            button.textContent = originalLabel || reportFormatLabel(format);
+            button.title = originalTitle;
+          }
         }
       }
 
