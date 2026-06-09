@@ -1965,6 +1965,10 @@
         return Math.sqrt(sum / samples.length) >= micVoiceRmsThreshold;
       }
 
+      function audioContextConstructor() {
+        return window.AudioContext || window.webkitAudioContext;
+      }
+
       async function startMicCapture() {
         if (state.interviewEnded) {
           appendEvent("麦克风", "面试已结束，请重置后创建新的面试。", "red");
@@ -1976,6 +1980,12 @@
           setPill(micStatus, "麦克风不可用", "");
           return;
         }
+        const AudioContextCtor = audioContextConstructor();
+        if (!AudioContextCtor) {
+          appendEvent("麦克风", "当前浏览器不支持 Web Audio，无法采集和转换麦克风音频。", "red");
+          setPill(micStatus, "音频采集不可用", "");
+          return;
+        }
         try {
           state.micStream = await navigator.mediaDevices.getUserMedia({
             audio: {
@@ -1985,7 +1995,7 @@
               autoGainControl: true,
             },
           });
-          state.micContext = new AudioContext();
+          state.micContext = new AudioContextCtor();
           state.micSource = state.micContext.createMediaStreamSource(state.micStream);
           state.micProcessor = state.micContext.createScriptProcessor(4096, 1, 1);
           state.micSamples = [];

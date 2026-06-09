@@ -254,6 +254,9 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "模型 ${modelName} 已配置" in response.text
     assert "audio_chunk" in response.text
     assert "pcm16" in response.text
+    assert "audioContextConstructor" in response.text
+    assert "window.webkitAudioContext" in response.text
+    assert "当前浏览器不支持 Web Audio" in response.text
     assert "discoverGateway" in response.text
     assert "fallbackGatewayOrigins" in response.text
     assert "fetchGatewayJson" in response.text
