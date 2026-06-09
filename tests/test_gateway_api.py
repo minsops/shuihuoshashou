@@ -291,6 +291,11 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "payload.detail" in response.text
     assert "input.disabled = true" in response.text
     assert "input.value = \"\"" in response.text
+    assert ".log,.pdf" in response.text
+    assert "supportedDocumentSuffixes" in response.text
+    assert "fileSuffix(file.name)" in response.text
+    assert "文件格式暂不支持" in response.text
+    assert "txt、md、json、csv、log、pdf、docx、doc 或图片" in response.text
     assert "maxDocumentUploadBytes = 25 * 1024 * 1024" in response.text
     assert "文件超过 25MB" in response.text
     assert "请压缩、拆分或直接粘贴关键内容" in response.text
