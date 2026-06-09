@@ -349,6 +349,9 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "WebSocket 已关闭。可点击重连通道继续当前面试。" in response.text
     assert "恢复后点击重连通道继续当前面试" in response.text
     assert "openSocketWithLatestGateway" in response.text
+    assert "socketToken" in response.text
+    assert "socketStillCurrent" in response.text
+    assert "if (!socketStillCurrent(socketToken)) return" in response.text
     assert "连接前无法确认本地 gateway" in response.text
     assert "WebSocket 初始化失败" in response.text
     assert "handleSocketMessage" in response.text

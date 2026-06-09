@@ -771,6 +771,7 @@
         candidate: null,
         interview: null,
         socket: null,
+        socketToken: 0,
         preparingInterview: false,
         prepareSessionToken: 0,
         seq: 1,
@@ -1801,9 +1802,12 @@
 
       function openSocket(interviewId) {
         const socketUrl = wsUrl(`/ws/interview/${interviewId}`);
+        const socketToken = state.socketToken + 1;
+        state.socketToken = socketToken;
         try {
           state.socket = new WebSocket(socketUrl, websocketProtocols());
         } catch (error) {
+          if (!socketStillCurrent(socketToken)) return;
           state.socket = null;
           setControls();
           appendEvent("实时通道", `WebSocket 初始化失败：${escapeHtml(errorText(error))}`, "red");
@@ -1811,15 +1815,18 @@
         }
         setControls();
         state.socket.addEventListener("open", () => {
+          if (!socketStillCurrent(socketToken)) return;
           setControls();
           appendEvent("实时通道", "WebSocket 已打开。");
         });
         state.socket.addEventListener("close", () => {
+          if (!socketStillCurrent(socketToken)) return;
           stopMicCapture();
           setControls();
           appendEvent("实时通道", "WebSocket 已关闭。可点击重连通道继续当前面试。");
         });
         state.socket.addEventListener("error", () => {
+          if (!socketStillCurrent(socketToken)) return;
           setControls();
           appendEvent(
             "实时通道",
@@ -1827,7 +1834,14 @@
             "red"
           );
         });
-        state.socket.addEventListener("message", handleSocketMessage);
+        state.socket.addEventListener("message", (event) => {
+          if (!socketStillCurrent(socketToken)) return;
+          handleSocketMessage(event);
+        });
+      }
+
+      function socketStillCurrent(socketToken) {
+        return socketToken === state.socketToken;
       }
 
       function handleSocketMessage(event) {
@@ -1883,6 +1897,7 @@
       }
 
       function closeSocket() {
+        state.socketToken += 1;
         if (
           state.socket &&
           (state.socket.readyState === WebSocket.OPEN ||
