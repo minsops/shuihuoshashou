@@ -152,10 +152,22 @@ def _extract_image_text(data: bytes, suffix: str) -> str:
     with tempfile.NamedTemporaryFile(suffix=suffix or ".png") as file:
         file.write(data)
         file.flush()
-        ocr = OCR(file.name)
-        annotations = ocr.recognize()
+        try:
+            ocr = OCR(file.name)
+            annotations = ocr.recognize()
+        except Exception as exc:
+            raise ValueError(
+                "image OCR failed; upload a clearer image, a text PDF/DOCX, or paste the "
+                "resume text directly"
+            ) from exc
     lines = [str(item[0]).strip() for item in annotations if item and str(item[0]).strip()]
-    return _require_text("\n".join(lines))
+    text = "\n".join(lines).strip()
+    if not text:
+        raise ValueError(
+            "image OCR did not detect text; upload a clearer image, a text PDF/DOCX, or paste "
+            "the resume text directly"
+        )
+    return text
 
 
 def _extract_doc_with_textutil(data: bytes, suffix: str) -> str:

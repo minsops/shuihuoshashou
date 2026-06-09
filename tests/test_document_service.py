@@ -3,6 +3,8 @@ from __future__ import annotations
 import builtins
 import io
 import json
+import sys
+import types
 import zipfile
 from pathlib import Path
 
@@ -176,6 +178,52 @@ def test_parse_image_document_missing_ocr_dependency_has_actionable_error(monkey
     message = str(exc.value)
     assert "pip install -e '.[ocr]'" in message
     assert "upload a PDF/DOCX/text resume instead" in message
+
+
+def test_parse_image_document_ocr_failure_has_actionable_error(monkeypatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "mock")
+    get_settings.cache_clear()
+
+    class FailingOCR:
+        def __init__(self, path: str) -> None:
+            self.path = path
+
+        def recognize(self) -> list[object]:
+            raise RuntimeError("bad image")
+
+    module = types.ModuleType("ocrmac")
+    module.OCR = FailingOCR
+    monkeypatch.setitem(sys.modules, "ocrmac", module)
+
+    with pytest.raises(ValueError) as exc:
+        parse_document("resume.png", b"image-bytes", kind="resume", content_type="image/png")
+
+    message = str(exc.value)
+    assert "image OCR failed" in message
+    assert "paste the resume text directly" in message
+
+
+def test_parse_image_document_empty_ocr_has_actionable_error(monkeypatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "mock")
+    get_settings.cache_clear()
+
+    class EmptyOCR:
+        def __init__(self, path: str) -> None:
+            self.path = path
+
+        def recognize(self) -> list[tuple[str]]:
+            return [("",)]
+
+    module = types.ModuleType("ocrmac")
+    module.OCR = EmptyOCR
+    monkeypatch.setitem(sys.modules, "ocrmac", module)
+
+    with pytest.raises(ValueError) as exc:
+        parse_document("resume.png", b"image-bytes", kind="resume", content_type="image/png")
+
+    message = str(exc.value)
+    assert "image OCR did not detect text" in message
+    assert "upload a clearer image" in message
 
 
 def test_parse_legacy_doc_failure_has_conversion_hint(monkeypatch) -> None:
