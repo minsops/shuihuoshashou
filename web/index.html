@@ -2156,6 +2156,7 @@
         const question = currentQuestion.value.trim();
         if (!answer || !question) {
           appendEvent("输入缺失", "当前问题和候选人回答都需要填写。", "red");
+          (question ? answerText : currentQuestion).focus();
           return;
         }
         const timing = turnTiming();

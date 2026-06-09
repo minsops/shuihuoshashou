@@ -406,6 +406,7 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "sendLiveSocketPayload" in response.text
     assert "发送失败" in response.text
     assert "请点击重连通道后重试" in response.text
+    assert "(question ? answerText : currentQuestion).focus();" in response.text
     assert 'answerText.value = ""' in response.text
     assert "answerText.focus();" in response.text
     assert "if (!manual) {" in response.text
