@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+from io import BytesIO
 import socket
 import sys
 from pathlib import Path
@@ -23,8 +24,16 @@ def test_gateway_script_defaults_to_local_demo_port() -> None:
     assert args.host == "127.0.0.1"
     assert args.port == 8001
     assert args.no_reload is False
+    assert args.no_default_port_redirect is False
     assert run_gateway.display_url("127.0.0.1", 8001) == "http://127.0.0.1:8001/"
     assert run_gateway.display_url("0.0.0.0", 8001) == "http://127.0.0.1:8001/"
+
+
+def test_gateway_script_accepts_redirect_disable_flag() -> None:
+    run_gateway = _load_run_gateway()
+    args = run_gateway.parse_args(["--no-default-port-redirect"])
+
+    assert args.no_default_port_redirect is True
 
 
 def test_gateway_script_reports_occupied_port(capsys) -> None:
@@ -57,6 +66,36 @@ def test_gateway_script_warns_when_docker_port_is_occupied(monkeypatch) -> None:
         "Note: port 8000 is already in use on 127.0.0.1.",
         "Open http://127.0.0.1:8001/ for this local gateway, not http://127.0.0.1:8000/.",
     ]
+
+
+def test_gateway_script_redirects_default_port_to_selected_port() -> None:
+    run_gateway = _load_run_gateway()
+    redirect = run_gateway.start_port_redirect("127.0.0.1", 0, 8123)
+    assert redirect is not None
+    server, redirect_url = redirect
+    source_port = server.server_address[1]
+
+    assert redirect_url == f"http://127.0.0.1:{source_port}/"
+    server.shutdown()
+    server.server_close()
+
+
+def test_gateway_script_redirect_handler_preserves_path_and_query() -> None:
+    run_gateway = _load_run_gateway()
+    handler_cls = run_gateway._redirect_handler("http://127.0.0.1:8123/")
+    handler = handler_cls.__new__(handler_cls)
+    headers: list[tuple[str, str]] = []
+    handler.path = "/interview?demo=1"
+    handler.wfile = BytesIO()
+    handler.send_response = lambda status: headers.append(("status", str(status)))
+    handler.send_header = lambda name, value: headers.append((name, value))
+    handler.end_headers = lambda: None
+
+    handler._redirect()
+
+    assert ("status", "307") in headers
+    assert ("Location", "http://127.0.0.1:8123/interview?demo=1") in headers
+    assert b"Redirecting to http://127.0.0.1:8123/interview?demo=1" in handler.wfile.getvalue()
 
 
 def test_gateway_script_runtime_summary_hides_secrets() -> None:

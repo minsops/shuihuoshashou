@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import socket
 import sys
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -39,6 +41,63 @@ def local_port_warning_lines(host: str, port: int) -> list[str]:
     ]
 
 
+def _redirect_bind_host(host: str) -> str:
+    return "127.0.0.1" if host in {"0.0.0.0", "::"} else host
+
+
+def _redirect_handler(target_url: str):
+    class LocalRedirectHandler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            self._redirect()
+
+        def do_HEAD(self) -> None:
+            self._redirect(body=False)
+
+        def do_POST(self) -> None:
+            self._redirect()
+
+        def do_OPTIONS(self) -> None:
+            self._redirect()
+
+        def log_message(self, format: str, *args) -> None:  # noqa: A002
+            return
+
+        def _redirect(self, *, body: bool = True) -> None:
+            location = f"{target_url.rstrip('/')}{self.path}"
+            self.send_response(307)
+            self.send_header("Location", location)
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            if body:
+                self.wfile.write(f"Redirecting to {location}\n".encode("utf-8"))
+
+    return LocalRedirectHandler
+
+
+def start_port_redirect(
+    host: str,
+    source_port: int,
+    target_port: int,
+) -> tuple[ThreadingHTTPServer, str] | None:
+    if target_port == source_port:
+        return None
+    bind_host = _redirect_bind_host(host)
+    try:
+        server = ThreadingHTTPServer(
+            (bind_host, source_port),
+            _redirect_handler(display_url(host, target_port)),
+        )
+    except OSError:
+        return None
+    thread = threading.Thread(target=server.serve_forever, name="gateway-8000-redirect", daemon=True)
+    thread.start()
+    return server, display_url(bind_host, server.server_address[1])
+
+
+def start_default_port_redirect(host: str, port: int) -> tuple[ThreadingHTTPServer, str] | None:
+    return start_port_redirect(host, DOCKER_COMPOSE_PORT, port)
+
+
 def port_is_available(host: str, port: int) -> bool:
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -53,6 +112,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--host", default=DEFAULT_HOST)
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--no-reload", action="store_true", help="Disable uvicorn auto-reload.")
+    parser.add_argument(
+        "--no-default-port-redirect",
+        action="store_true",
+        help="Do not redirect http://127.0.0.1:8000/ to the selected local port.",
+    )
     return parser.parse_args(argv)
 
 
@@ -104,8 +168,15 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"Starting Shuihuo Killer gateway at {url}")
     print(f"API docs: {url}docs")
-    for line in local_port_warning_lines(args.host, args.port):
-        print(line)
+    redirect = None
+    if not args.no_default_port_redirect:
+        redirect = start_default_port_redirect(args.host, args.port)
+        if redirect:
+            _, redirect_url = redirect
+            print(f"Redirecting {redirect_url} to {url}")
+    if not redirect:
+        for line in local_port_warning_lines(args.host, args.port):
+            print(line)
     for line in runtime_summary_lines(status):
         print(line)
     import uvicorn

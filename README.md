@@ -123,7 +123,7 @@ python scripts/run_offline_demo.py
 python scripts/run_gateway.py
 ```
 
-启动脚本会先打印本地访问地址、API 文档地址、模型 provider/model、ASR provider 和数据库地址摘要；摘要只显示是否已配置，不会输出 API key、token 或密码。如果本机 `8000` 已被 Docker 或其他服务占用，脚本会提示你打开当前脚本实际启动的地址，避免误开 `8000`。
+启动脚本会先打印本地访问地址、API 文档地址、模型 provider/model、ASR provider 和数据库地址摘要；摘要只显示是否已配置，不会输出 API key、token 或密码。如果本机 `8000` 空闲，脚本会同时把 `http://127.0.0.1:8000/` 重定向到当前本地 gateway 地址；如果 `8000` 已被 Docker 或其他服务占用，脚本会提示你打开当前脚本实际启动的地址，避免误开 `8000`。如需关闭这个重定向，加 `--no-default-port-redirect`。
 
 API 文档地址：`http://127.0.0.1:8001/docs`。
 
