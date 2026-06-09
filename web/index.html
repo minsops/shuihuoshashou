@@ -1928,11 +1928,31 @@
             `${escapeHtml(message.payload.task_name)} · ${escapeHtml(message.payload.task_id)}。请等待后台评分完成。`
           );
         } else if (message.type === "error") {
-          appendEvent("错误", escapeHtml(message.detail || "unknown error"), "red");
+          appendEvent("错误", formatLiveError(message.detail), "red");
         } else {
           appendEvent("实时通道", `未知实时消息类型：${escapeHtml(message.type)}`, "red");
         }
         setControls();
+      }
+
+      function formatLiveError(detail) {
+        const raw = String(detail || "unknown error");
+        const normalized = raw.toLowerCase();
+        let message = raw;
+        if (normalized.includes("cannot finish interview without candidate turns")) {
+          message = "还没有候选人回答，不能生成评分报告。请先发送至少一条候选人回答。";
+        } else if (normalized.includes("cannot start interview from status reported")) {
+          message = "这场面试已经生成报告，请重置后创建新的面试。";
+        } else if (raw === "text_turn requires answer") {
+          message = "候选人回答不能为空。";
+        } else if (raw === "manual_probe requires answer") {
+          message = "追问前需要先填写候选人回答。";
+        } else if (raw === "invalid seq") {
+          message = "实时消息序号无效，请重连通道后重试。";
+        } else if (raw === "unsupported event type") {
+          message = "实时消息类型不支持，请刷新页面后重试。";
+        }
+        return `${escapeHtml(message)}<br><span class="small">原始错误：${escapeHtml(raw)}</span>`;
       }
 
       function formatAsrWarning(reason) {
