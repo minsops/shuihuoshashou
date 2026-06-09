@@ -1697,9 +1697,16 @@
       }
 
       function resetQuestionMetaForManualEdit() {
+        const hadProbeMeta =
+          state.selectedQuestionSource !== "interviewer" ||
+          state.selectedProbeTarget ||
+          state.selectedCompetency;
         state.selectedQuestionSource = "interviewer";
         state.selectedProbeTarget = null;
         state.selectedCompetency = null;
+        if (hadProbeMeta) {
+          appendEvent("下一问", "已改为手动编辑问题，将按面试官自定义问题记录。");
+        }
       }
 
       function prepareSessionStillCurrent(token) {

@@ -434,6 +434,8 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "文字版 PDF、DOCX" in response.text
     assert "DeepSeek 清洗未完成" in response.text
     assert "resetQuestionMetaForManualEdit" in response.text
+    assert "hadProbeMeta" in response.text
+    assert "已改为手动编辑问题，将按面试官自定义问题记录" in response.text
     assert 'currentQuestion.addEventListener("input", resetQuestionMetaForManualEdit)' in response.text
     assert 'parseDocumentFile(event.target.files[0], event.target, resumeText, "简历", "resume")' in response.text
     assert "reconnectLiveChannel" in response.text
