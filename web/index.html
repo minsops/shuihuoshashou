@@ -1162,6 +1162,7 @@
           modelStatus.title = model.title || model.text;
           const asr = asrStatusFromConfig(config);
           setPill(asrStatus, asr.text, asr.ready ? "ready" : "");
+          asrStatus.title = asr.title || asr.text;
         } catch (error) {
           if (gatewayAuthError(error)) {
             showGatewayKeyRequired("服务检查", { model: true, asr: true });
@@ -1259,23 +1260,37 @@
           return {
             text: ready
               ? tokenReady && !config.aliyun_nls_token_configured
-                ? "ASR 阿里云 NLS 已配置（自动 Token）"
-                : "ASR 阿里云 NLS 已配置"
+                ? "ASR 阿里云 NLS 已配置（自动 Token），未检查"
+                : "ASR 阿里云 NLS 已配置，未检查"
               : "ASR 阿里云 NLS 未配置完整",
-            ready,
+            ready: false,
+            title: ready
+              ? "配置项已填写；点击“检查 ASR”后才会验证依赖和 Token。"
+              : "请检查阿里云 NLS AppKey、Endpoint 和 Token/AK 配置。",
           };
         }
         if (config.asr_provider === "aliyun_ws") {
           const ready =
             config.aliyun_asr_api_key_configured && config.aliyun_asr_endpoint_configured;
           return {
-            text: ready ? "ASR 阿里云 DashScope 已配置" : "ASR 阿里云 DashScope 未配置完整",
-            ready,
+            text: ready
+              ? "ASR 阿里云 DashScope 已配置，未检查"
+              : "ASR 阿里云 DashScope 未配置完整",
+            ready: false,
+            title: ready
+              ? "配置项已填写；点击“检查 ASR”后才会验证依赖。"
+              : "请检查阿里云 DashScope API Key 和 Endpoint。",
           };
         }
         if (config.asr_provider === "http") {
           const ready = config.asr_base_url_configured;
-          return { text: ready ? "ASR HTTP 已配置" : "ASR HTTP 未配置完整", ready };
+          return {
+            text: ready ? "ASR HTTP 已配置，未检查" : "ASR HTTP 未配置完整",
+            ready: false,
+            title: ready
+              ? "配置项已填写；点击“检查 ASR”后才会确认基本配置。"
+              : "请检查 ASR_BASE_URL。",
+          };
         }
         if (config.asr_provider === "stub") {
           return { text: "ASR 模拟模式", ready: false };
