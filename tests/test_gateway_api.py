@@ -544,6 +544,8 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "报告已生成" in response.text
     assert "可以下载 HTML、PDF、JSON 或转写" in response.text
     assert "resetSessionState" in response.text
+    assert 'currentQuestion.value = ""' in response.text
+    assert 'answerText.value = ""' in response.text
     assert 'document.querySelector("#resetSession").addEventListener("click", resetSessionState)' in response.text
     assert "实时转写、回答和追问事件会出现在这里" in response.text
     assert "preparingInterview" in response.text

@@ -2710,6 +2710,9 @@
         metricJob.textContent = "待创建";
         metricCandidate.textContent = "待创建";
         metricTurns.textContent = "0";
+        currentQuestion.value = "";
+        answerText.value = "";
+        resetQuestionMetaForManualEdit();
         competencyList.innerHTML = '<div class="empty">创建面试后显示岗位能力维度</div>';
         renderProbeCards([]);
         credibilityLevel.textContent = "待观察";
