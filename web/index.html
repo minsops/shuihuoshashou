@@ -817,7 +817,16 @@
 
       async function checkRuntime() {
         try {
-          const status = await fetch("/health").then((response) => response.json());
+          const response = await fetch("/health");
+          if (!response.ok) {
+            setPill(runtimeStatus, `服务接口异常 ${response.status}`, "");
+            return;
+          }
+          const status = await response.json();
+          if (status.service !== "shuihuo-killer-gateway") {
+            setPill(runtimeStatus, "端口不是本服务", "");
+            return;
+          }
           setPill(runtimeStatus, status.status === "ok" ? "服务正常" : "服务异常", status.status === "ok" ? "ready" : "");
         } catch (error) {
           setPill(runtimeStatus, "服务不可达", "");

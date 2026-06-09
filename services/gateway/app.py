@@ -252,7 +252,11 @@ async def observe_and_rate_limit(request: Request, call_next):
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "service": "shuihuo-killer-gateway",
+        "version": app.version,
+    }
 
 
 @app.get("/metrics", response_class=PlainTextResponse)

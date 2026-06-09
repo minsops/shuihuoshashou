@@ -246,6 +246,19 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "停止麦克风" in response.text
     assert "audio_chunk" in response.text
     assert "pcm16" in response.text
+    assert "端口不是本服务" in response.text
+
+
+def test_gateway_health_identifies_service(tmp_path: Path, monkeypatch) -> None:
+    client = _client(tmp_path, monkeypatch)
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "ok",
+        "service": "shuihuo-killer-gateway",
+        "version": "0.1.0",
+    }
 
 
 def test_gateway_config_status_hides_secrets(tmp_path: Path, monkeypatch) -> None:
