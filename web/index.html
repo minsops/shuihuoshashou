@@ -1689,7 +1689,7 @@
           anchor.click();
           anchor.remove();
           setTimeout(() => URL.revokeObjectURL(url), 2000);
-          appendEvent("报告下载", `${escapeHtml(format.toUpperCase())} 已开始下载。`, "green");
+          appendEvent("报告下载", `${escapeHtml(reportFormatLabel(format))} 已开始下载。`, "green");
         } catch (error) {
           if (gatewayAuthError(error)) {
             showGatewayKeyRequired("报告下载");
@@ -1705,6 +1705,15 @@
         if (format === "pdf") return `${interviewId}.pdf`;
         if (format === "transcript.json") return `${interviewId}.transcript.json`;
         return `${interviewId}.report.${format}`;
+      }
+
+      function reportFormatLabel(format) {
+        return {
+          html: "HTML",
+          pdf: "PDF",
+          json: "JSON",
+          "transcript.json": "转写",
+        }[format] || format;
       }
 
       function downsampleBuffer(buffer, inputRate, outputRate) {
