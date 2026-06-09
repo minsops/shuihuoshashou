@@ -379,6 +379,8 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "endingInterview" in response.text
     assert "正在结束面试并生成评分报告，请等待结果" in response.text
     assert "requestEndInterview" in response.text
+    assert "setPill(liveStatus, \"评分中\", \"live\");" in response.text
+    assert "setControls();" in response.text
     assert 'sendLiveSocketPayload({ type: "end" }, "结束面试失败")' in response.text
     assert "state.seq += 1" in response.text
     assert "stopMicCapture({ flush: false })" in response.text

@@ -2014,6 +2014,7 @@
         endInterview.disabled = true;
         endInterview.title = "正在结束面试并生成评分报告";
         setPill(liveStatus, "评分中", "live");
+        setControls();
         if (!sendLiveSocketPayload({ type: "end" }, "结束面试失败")) {
           state.endingInterview = false;
           endInterview.disabled = false;
