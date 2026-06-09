@@ -117,6 +117,32 @@ def test_gateway_document_parse_uploads_resume_text(tmp_path: Path, monkeypatch)
     assert "FastAPI" in payload["text"]
 
 
+def test_gateway_document_parse_returns_clear_pdf_errors(tmp_path: Path, monkeypatch) -> None:
+    client = _client(tmp_path, monkeypatch)
+
+    response = client.post(
+        "/api/documents/parse?kind=resume&filename=resume.pdf",
+        content=b"not-a-pdf",
+        headers={"content-type": "application/pdf"},
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "pdf document is invalid or unreadable"}
+
+
+def test_gateway_document_parse_returns_clear_kind_error(tmp_path: Path, monkeypatch) -> None:
+    client = _client(tmp_path, monkeypatch)
+
+    response = client.post(
+        "/api/documents/parse?kind=other&filename=resume.md",
+        content=b"resume",
+        headers={"content-type": "text/markdown"},
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "kind must be jd or resume"}
+
+
 def test_gateway_report_json_falls_back_to_persisted_payload_when_artifact_missing(
     tmp_path: Path, monkeypatch
 ) -> None:
