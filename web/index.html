@@ -1568,8 +1568,7 @@
         } else if (message.type === "task_queued") {
           stopMicCapture();
           state.interviewEnded = true;
-          reportLinks.innerHTML = "";
-          reportPanel.innerHTML = '<div class="empty">后台评分任务已排队，请稍后刷新报告。</div>';
+          renderQueuedReportState(state.interview.id);
           appendEvent(
             "任务已排队",
             `${escapeHtml(message.payload.task_name)} · ${escapeHtml(message.payload.task_id)}。请等待后台评分完成。`
@@ -1695,6 +1694,34 @@
             </table>
           </div>
         `;
+      }
+
+      function renderQueuedReportState(interviewId) {
+        reportLinks.innerHTML = `
+          <button class="secondary" type="button" id="refreshReport" data-report-id="${escapeHtml(interviewId)}">刷新报告</button>
+        `;
+        reportLinks.querySelector("#refreshReport").addEventListener("click", (event) => {
+          refreshQueuedReport(event.currentTarget.dataset.reportId);
+        });
+        reportPanel.innerHTML = '<div class="empty">后台评分任务已排队，请稍后刷新报告。</div>';
+      }
+
+      async function refreshQueuedReport(interviewId) {
+        const button = reportLinks.querySelector("#refreshReport");
+        if (button) button.disabled = true;
+        try {
+          const report = await fetchGatewayJson(`/api/interviews/${interviewId}/report`);
+          renderReport(report);
+          appendEvent("评分完成", `总分 ${escapeHtml(report.score.total_score)}`, "green");
+        } catch (error) {
+          if (gatewayAuthError(error)) {
+            showGatewayKeyRequired("报告刷新");
+          } else {
+            appendEvent("报告刷新失败", escapeHtml(errorText(error)), "red");
+          }
+        } finally {
+          if (button) button.disabled = false;
+        }
       }
 
       async function downloadReportArtifact(interviewId, format) {

@@ -344,6 +344,9 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "正在结束面试并生成评分报告" in response.text
     assert "请等待后台评分完成" in response.text
     assert "后台评分任务已排队，请稍后刷新报告" in response.text
+    assert 'id="refreshReport"' in response.text
+    assert "refreshQueuedReport" in response.text
+    assert "fetchGatewayJson(`/api/interviews/${interviewId}/report`)" in response.text
     assert "resetSessionState" in response.text
     assert 'document.querySelector("#resetSession").addEventListener("click", resetSessionState)' in response.text
     assert "实时转写、回答和追问事件会出现在这里" in response.text
