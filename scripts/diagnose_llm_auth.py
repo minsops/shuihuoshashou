@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import sys
@@ -15,7 +16,15 @@ if str(ROOT) not in sys.path:
 MODELS = ["mimo-v2.5-pro", "mimo2.5pro", "mimo-2.5-pro", "mimo-v2.5"]
 
 
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Try common OpenAI-compatible LLM auth header variants."
+    )
+    return parser.parse_args(argv)
+
+
 def main() -> int:
+    parse_args()
     from libs.common.config import get_settings
 
     settings = get_settings()

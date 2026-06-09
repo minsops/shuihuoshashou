@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -8,7 +9,14 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run a local offline interview demo.")
+    return parser.parse_args(argv)
+
+
 def main() -> None:
+    parse_args()
     from libs.common.database import init_db
     from libs.schemas import CandidateCreate, InterviewCreate, JobCreate, QATurn
     from services.interview_orchestrator.service import (

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import socket
 import ssl
 import subprocess
@@ -12,7 +13,13 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Diagnose DNS, TCP, and TLS for LLM_BASE_URL.")
+    return parser.parse_args(argv)
+
+
 def main() -> int:
+    parse_args()
     from libs.common.config import get_settings
 
     settings = get_settings()
