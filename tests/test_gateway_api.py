@@ -527,6 +527,7 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "reportRefreshEpoch" in response.text
     assert "reportRefreshStillCurrent" in response.text
     assert "reportRefreshInFlight" in response.text
+    assert "reportRefreshStillCurrent(refreshEpoch, interviewId) &&" in response.text
     assert 'button.textContent = "刷新中"' in response.text
     assert 'button.textContent = originalLabel || "刷新报告"' in response.text
     assert "报告刷新正在进行中，请稍候" in response.text

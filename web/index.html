@@ -2320,7 +2320,12 @@
           }
         } finally {
           if (refreshEpoch === state.reportRefreshEpoch) state.reportRefreshInFlight = false;
-          if (button && !autoRefresh && reportLinks.contains(button)) {
+          if (
+            reportRefreshStillCurrent(refreshEpoch, interviewId) &&
+            button &&
+            !autoRefresh &&
+            reportLinks.contains(button)
+          ) {
             button.disabled = false;
             button.textContent = originalLabel || "刷新报告";
           }
