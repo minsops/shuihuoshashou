@@ -364,6 +364,8 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "sendLiveSocketPayload" in response.text
     assert "发送失败" in response.text
     assert "请点击重连通道后重试" in response.text
+    assert "endingInterview" in response.text
+    assert "正在结束面试并生成评分报告，请等待结果" in response.text
     assert "requestEndInterview" in response.text
     assert 'sendLiveSocketPayload({ type: "end" }, "结束面试失败")' in response.text
     assert "state.seq += 1" in response.text

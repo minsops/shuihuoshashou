@@ -778,6 +778,7 @@
         selectedProbeTarget: null,
         selectedCompetency: null,
         interviewEnded: false,
+        endingInterview: false,
         reportReady: false,
         reportPollTimer: null,
         reportPollAttempts: 0,
@@ -857,7 +858,7 @@
         const socketState = state.socket ? state.socket.readyState : WebSocket.CLOSED;
         const connected = socketState === WebSocket.OPEN;
         const connecting = socketState === WebSocket.CONNECTING;
-        const active = connected && !state.interviewEnded;
+        const active = connected && !state.interviewEnded && !state.endingInterview;
         sendAnswer.disabled = !active;
         startMic.disabled = !active || state.micRecording || state.micStarting;
         stopMic.disabled = !connected || !state.micRecording;
@@ -876,6 +877,8 @@
           setPill(liveStatus, "报告已生成", "ready");
         } else if (state.interviewEnded) {
           setPill(liveStatus, "面试已结束", "ready");
+        } else if (state.endingInterview) {
+          setPill(liveStatus, "评分中", "live");
         } else if (connected) {
           setPill(liveStatus, `已连接 ${state.interview.id.slice(0, 8)}`, "live");
         } else if (connecting) {
@@ -913,13 +916,18 @@
       function setControlHints(connected, connecting) {
         const reason = liveChannelUnavailableReason(connecting);
         const endedReason = "面试已结束，请重置后创建新的面试";
+        const endingReason = "正在结束面试并生成评分报告，请等待结果";
         sendAnswer.title = state.interviewEnded
           ? endedReason
+          : state.endingInterview
+            ? endingReason
           : connected
             ? "发送文本回答并触发追问"
             : reason;
         startMic.title = state.interviewEnded
           ? endedReason
+          : state.endingInterview
+            ? endingReason
           : state.micStarting
             ? "正在请求麦克风权限并初始化音频采集"
           : connected
@@ -933,11 +941,15 @@
             : "请先创建实时面试";
         manualProbe.title = state.interviewEnded
           ? endedReason
+          : state.endingInterview
+            ? endingReason
           : connected
             ? "基于当前回答立即生成追问"
             : reason;
         endInterview.title = state.interviewEnded
           ? endedReason
+          : state.endingInterview
+            ? endingReason
           : connected
             ? "结束面试并生成评分报告"
             : reason;
@@ -953,6 +965,7 @@
       function controlHintText(connected, connecting) {
         if (state.reportReady) return "报告已生成。可以下载 HTML、PDF、JSON 或转写，或重置后开始新的面试。";
         if (state.interviewEnded) return "面试已结束。请重置后创建新的面试。";
+        if (state.endingInterview) return "正在结束面试并生成评分报告，请等待结果。";
         if (state.micStarting) return "麦克风启动中。请在浏览器权限弹窗中允许麦克风，并等待初始化完成。";
         if (state.micRecording) return "麦克风采集中。可以停止麦克风，或结束面试生成评分报告。";
         if (state.micError) return `${state.micError} 可以修复后再次点击开始麦克风。`;
@@ -1636,6 +1649,7 @@
         closeSocket();
         stopMicCapture();
         state.interviewEnded = false;
+        state.endingInterview = false;
         state.reportReady = false;
         state.seq = 1;
         state.turns = 0;
@@ -1815,6 +1829,10 @@
           appendEvent("面试已结束", "请重置后创建新的面试。", "red");
           return false;
         }
+        if (state.endingInterview) {
+          appendEvent("评分中", "正在结束面试并生成评分报告，请等待结果。", "red");
+          return false;
+        }
         if (!state.interview) {
           appendEvent("实时通道", "请先创建实时面试。", "red");
           return false;
@@ -1885,10 +1903,12 @@
       function requestEndInterview() {
         stopMicCapture();
         if (!liveChannelReadyForInput()) return;
+        state.endingInterview = true;
         endInterview.disabled = true;
         endInterview.title = "正在结束面试并生成评分报告";
         setPill(liveStatus, "评分中", "live");
         if (!sendLiveSocketPayload({ type: "end" }, "结束面试失败")) {
+          state.endingInterview = false;
           endInterview.disabled = false;
           endInterview.title = "结束面试并生成评分报告";
           setControls();
@@ -1921,12 +1941,14 @@
           appendEvent("ASR", formatAsrWarning(message.payload.reason), "red");
         } else if (message.type === "report") {
           stopMicCapture();
+          state.endingInterview = false;
           state.interviewEnded = true;
           renderReport(message.payload);
           markReportReady();
           appendEvent("评分完成", `总分 ${escapeHtml(message.payload.score.total_score)}`, "green");
         } else if (message.type === "task_queued") {
           stopMicCapture();
+          state.endingInterview = false;
           state.interviewEnded = true;
           renderQueuedReportState(state.interview.id);
           appendEvent(
@@ -1934,6 +1956,7 @@
             `${escapeHtml(message.payload.task_name)} · ${escapeHtml(message.payload.task_id)}。请等待后台评分完成。`
           );
         } else if (message.type === "error") {
+          state.endingInterview = false;
           appendEvent("错误", formatLiveError(message.detail), "red");
         } else {
           appendEvent("实时通道", `未知实时消息类型：${escapeHtml(message.type)}`, "red");
@@ -2462,6 +2485,7 @@
         state.seq = 1;
         state.turns = 0;
         state.interviewEnded = false;
+        state.endingInterview = false;
         state.reportReady = false;
         state.selectedQuestionSource = "interviewer";
         state.selectedProbeTarget = null;
