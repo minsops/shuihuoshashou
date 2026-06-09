@@ -324,6 +324,8 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "页面正在尝试连接" in response.text
     assert "失败详情" in response.text
     assert "gatewayFailureTitle" in response.text
+    assert "setRuntimeStatusFromGateway(status)" in response.text
+    assert "function setRuntimeStatusFromGateway(status)" in response.text
     assert "setRuntimeStatusGatewayUnavailable(error)" in response.text
     assert "function setRuntimeStatusGatewayUnavailable(error)" in response.text
     assert "runtimeStatus.title = gatewayFailureTitle(error)" in response.text

@@ -1409,12 +1409,7 @@
         try {
           const status = await discoverGateway();
           if (!runtimeCheckStillCurrent(checkToken)) return;
-          setPill(
-            runtimeStatus,
-            status.status === "ok" ? "服务正常" : "服务异常",
-            status.status === "ok" ? "ready" : ""
-          );
-          runtimeStatus.title = `当前 gateway：${state.apiOrigin}`;
+          setRuntimeStatusFromGateway(status);
         } catch (error) {
           if (!runtimeCheckStillCurrent(checkToken)) return;
           gatewayError = error;
@@ -1453,6 +1448,15 @@
           setButtonBusy(refreshStatus, false);
           refreshStatus.title = "重新检查服务、模型和 ASR 状态";
         }
+      }
+
+      function setRuntimeStatusFromGateway(status) {
+        setPill(
+          runtimeStatus,
+          status.status === "ok" ? "服务正常" : "服务异常",
+          status.status === "ok" ? "ready" : ""
+        );
+        runtimeStatus.title = `当前 gateway：${state.apiOrigin}`;
       }
 
       function setRuntimeStatusGatewayUnavailable(error) {
@@ -1510,7 +1514,9 @@
         setPill(modelStatus, "模型连接检查中", "live");
         try {
           try {
-            await discoverGateway();
+            const status = await discoverGateway();
+            if (!modelCheckStillCurrent(checkToken)) return;
+            setRuntimeStatusFromGateway(status);
           } catch (error) {
             if (!modelCheckStillCurrent(checkToken)) return;
             setRuntimeStatusGatewayUnavailable(error);
@@ -1554,7 +1560,9 @@
         setPill(asrStatus, "ASR 检查中", "live");
         try {
           try {
-            await discoverGateway();
+            const status = await discoverGateway();
+            if (!asrCheckStillCurrent(checkToken)) return;
+            setRuntimeStatusFromGateway(status);
           } catch (error) {
             if (!asrCheckStillCurrent(checkToken)) return;
             setRuntimeStatusGatewayUnavailable(error);
