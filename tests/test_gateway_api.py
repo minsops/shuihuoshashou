@@ -346,6 +346,7 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "documentParseEpoch" in response.text
     assert "documentParseStillCurrent" in response.text
     assert "cancelDocumentParses" in response.text
+    assert "resetDocumentUploadInputs" in response.text
     assert "解析已取消" in response.text
     assert "资料正在解析，完成后再创建实时面试" in response.text
     assert "maxDocumentUploadBytes = 25 * 1024 * 1024" in response.text

@@ -1440,6 +1440,15 @@
         });
       }
 
+      function resetDocumentUploadInputs() {
+        document.querySelectorAll("#jdFile, #resumeFile").forEach((input) => {
+          input.disabled = false;
+          input.value = "";
+          input.title = "";
+          delete input.dataset.documentParseToken;
+        });
+      }
+
       function fileSuffix(filename) {
         const dotIndex = filename.lastIndexOf(".");
         return dotIndex >= 0 ? filename.slice(dotIndex).toLowerCase() : "";
@@ -2328,6 +2337,7 @@
         state.micError = "";
         state.documentParsingCount = 0;
         cancelDocumentParses();
+        resetDocumentUploadInputs();
         metricJob.textContent = "待创建";
         metricCandidate.textContent = "待创建";
         metricTurns.textContent = "0";
