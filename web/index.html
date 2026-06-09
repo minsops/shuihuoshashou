@@ -1677,9 +1677,23 @@
 
       function handleSocketMessage(event) {
         try {
-          renderLiveMessage(JSON.parse(event.data));
+          const message = JSON.parse(event.data);
+          validateLiveMessage(message);
+          renderLiveMessage(message);
         } catch (error) {
           appendEvent("实时通道", `实时消息格式异常：${escapeHtml(errorText(error))}`, "red");
+        }
+      }
+
+      function validateLiveMessage(message) {
+        if (!message || typeof message !== "object") {
+          throw new Error("实时消息结构异常：消息不是对象");
+        }
+        if (typeof message.type !== "string" || !message.type) {
+          throw new Error("实时消息结构异常：缺少 type");
+        }
+        if (message.type !== "error" && (!message.payload || typeof message.payload !== "object")) {
+          throw new Error(`实时消息结构异常：${message.type} 缺少 payload`);
         }
       }
 
