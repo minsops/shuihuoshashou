@@ -793,6 +793,7 @@
         micRecording: false,
         micError: "",
         documentParsingCount: 0,
+        documentParseToken: 0,
         apiOrigin:
           window.location.origin && window.location.origin !== "null"
             ? window.location.origin
@@ -1357,6 +1358,7 @@
         }
         appendEvent("资料上传", `${escapeHtml(label)} 正在解析：${escapeHtml(file.name)}`);
         setUploadInputStatus(input, `${label} 正在解析：${file.name}`);
+        const documentParseToken = nextDocumentParseToken();
         state.documentParsingCount += 1;
         input.disabled = true;
         setControls();
@@ -1369,6 +1371,11 @@
           });
           const result = await response.json();
           const parsedText = String(result.text || "").trim();
+          if (!documentParseStillCurrent(documentParseToken)) {
+            setUploadInputStatus(input, `${label} 解析已取消：${file.name}`);
+            appendEvent("资料上传", `${escapeHtml(label)} 解析已取消：${escapeHtml(file.name)}`);
+            return;
+          }
           if (!parsedText) {
             setUploadInputStatus(input, `${label} 未提取到可用文本：${file.name}`);
             appendEvent(
@@ -1411,6 +1418,15 @@
 
       function setUploadInputStatus(input, message) {
         input.title = String(message || "").trim();
+      }
+
+      function nextDocumentParseToken() {
+        state.documentParseToken += 1;
+        return state.documentParseToken;
+      }
+
+      function documentParseStillCurrent(token) {
+        return token === state.documentParseToken;
       }
 
       function fileSuffix(filename) {
@@ -2231,6 +2247,7 @@
         state.micStarting = false;
         state.micError = "";
         state.documentParsingCount = 0;
+        nextDocumentParseToken();
         metricJob.textContent = "待创建";
         metricCandidate.textContent = "待创建";
         metricTurns.textContent = "0";

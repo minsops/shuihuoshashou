@@ -333,6 +333,9 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "正在解析" in response.text
     assert "解析失败" in response.text
     assert "documentParsingCount" in response.text
+    assert "documentParseToken" in response.text
+    assert "documentParseStillCurrent" in response.text
+    assert "解析已取消" in response.text
     assert "资料正在解析，完成后再创建实时面试" in response.text
     assert "maxDocumentUploadBytes = 25 * 1024 * 1024" in response.text
     assert "文件超过 25MB" in response.text
