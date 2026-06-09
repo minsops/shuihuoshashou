@@ -250,6 +250,7 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "刷新状态" in response.text
     assert "setStatusTitleFromMessage" in response.text
     assert "result.message" in response.text
+    assert "配置状态读取失败" in response.text
     assert "modelStatusFromConfig" in response.text
     assert "模型模拟模式" in response.text
     assert "模型未配置完整" in response.text

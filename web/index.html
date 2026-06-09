@@ -1167,8 +1167,11 @@
           if (gatewayAuthError(error)) {
             showGatewayKeyRequired("服务检查", { model: true, asr: true });
           } else {
+            const message = `配置状态读取失败：${errorText(error)}`;
             setPill(modelStatus, "模型状态未知", "");
+            setStatusTitleFromMessage(modelStatus, message);
             setPill(asrStatus, "ASR 状态未知", "");
+            setStatusTitleFromMessage(asrStatus, message);
           }
         } finally {
           refreshStatus.disabled = false;
@@ -1182,9 +1185,16 @@
       }
 
       function showGatewayKeyRequired(title, targets = {}) {
-        if (targets.model) setPill(modelStatus, "需要 Gateway Key", "");
-        if (targets.asr) setPill(asrStatus, "需要 Gateway Key", "");
-        appendEvent(title, "Gateway 已启用鉴权，请在顶部 Gateway Key 输入框保存 key。", "red");
+        const message = "Gateway 已启用鉴权，请在顶部 Gateway Key 输入框保存 key。";
+        if (targets.model) {
+          setPill(modelStatus, "需要 Gateway Key", "");
+          setStatusTitleFromMessage(modelStatus, message);
+        }
+        if (targets.asr) {
+          setPill(asrStatus, "需要 Gateway Key", "");
+          setStatusTitleFromMessage(asrStatus, message);
+        }
+        appendEvent(title, message, "red");
       }
 
       function setStatusTitleFromMessage(node, message) {
