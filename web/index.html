@@ -1424,12 +1424,8 @@
           if (gatewayError) return;
           const config = await fetchGatewayJson("/api/config/status");
           if (!runtimeCheckStillCurrent(checkToken)) return;
-          const model = modelStatusFromConfig(config);
-          setPill(modelStatus, model.text, model.ready ? "ready" : "");
-          modelStatus.title = model.title || model.text;
-          const asr = asrStatusFromConfig(config);
-          setPill(asrStatus, asr.text, asr.ready ? "ready" : "");
-          asrStatus.title = asr.title || asr.text;
+          applyModelStatusFromConfig(config);
+          applyAsrStatusFromConfig(config);
         } catch (error) {
           if (!runtimeCheckStillCurrent(checkToken)) return;
           if (gatewayAuthError(error)) {
@@ -1463,6 +1459,42 @@
         state.lastRuntimeCheckAt = Date.now();
         setPill(runtimeStatus, "服务不可达", "");
         runtimeStatus.title = gatewayFailureTitle(error);
+      }
+
+      function applyModelStatusFromConfig(config) {
+        const model = modelStatusFromConfig(config);
+        setPill(modelStatus, model.text, model.ready ? "ready" : "");
+        modelStatus.title = model.title || model.text;
+      }
+
+      function applyAsrStatusFromConfig(config) {
+        const asr = asrStatusFromConfig(config);
+        setPill(asrStatus, asr.text, asr.ready ? "ready" : "");
+        asrStatus.title = asr.title || asr.text;
+      }
+
+      async function refreshPeerDependencyStatusFromConfig(peer) {
+        try {
+          const config = await fetchGatewayJson("/api/config/status");
+          if (peer === "model") {
+            applyModelStatusFromConfig(config);
+          } else if (peer === "asr") {
+            applyAsrStatusFromConfig(config);
+          }
+        } catch (error) {
+          if (gatewayAuthError(error)) {
+            showGatewayKeyRequired("配置刷新", { [peer]: true });
+          } else {
+            const message = `配置状态读取失败：${errorText(error)}`;
+            if (peer === "model") {
+              setPill(modelStatus, "模型状态未知", "");
+              setStatusTitleFromMessage(modelStatus, message);
+            } else if (peer === "asr") {
+              setPill(asrStatus, "ASR 状态未知", "");
+              setStatusTitleFromMessage(asrStatus, message);
+            }
+          }
+        }
       }
 
       function setDependentStatusWaitingForGateway(error) {
@@ -1518,6 +1550,8 @@
             const status = await discoverGateway();
             if (!modelCheckStillCurrent(checkToken)) return;
             setRuntimeStatusFromGateway(status);
+            await refreshPeerDependencyStatusFromConfig("asr");
+            if (!modelCheckStillCurrent(checkToken)) return;
           } catch (error) {
             if (!modelCheckStillCurrent(checkToken)) return;
             setRuntimeStatusGatewayUnavailable(error);
@@ -1564,6 +1598,8 @@
             const status = await discoverGateway();
             if (!asrCheckStillCurrent(checkToken)) return;
             setRuntimeStatusFromGateway(status);
+            await refreshPeerDependencyStatusFromConfig("model");
+            if (!asrCheckStillCurrent(checkToken)) return;
           } catch (error) {
             if (!asrCheckStillCurrent(checkToken)) return;
             setRuntimeStatusGatewayUnavailable(error);

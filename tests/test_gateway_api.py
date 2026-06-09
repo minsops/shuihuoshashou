@@ -333,6 +333,12 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "服务不可达：${errorText(error)}。${gatewayHelpText()}" in response.text
     assert "setDependentStatusWaitingForGateway(error)" in response.text
     assert "function setDependentStatusWaitingForGateway(error)" in response.text
+    assert "applyModelStatusFromConfig(config)" in response.text
+    assert "applyAsrStatusFromConfig(config)" in response.text
+    assert "function refreshPeerDependencyStatusFromConfig(peer)" in response.text
+    assert 'await refreshPeerDependencyStatusFromConfig("asr")' in response.text
+    assert 'await refreshPeerDependencyStatusFromConfig("model")' in response.text
+    assert 'showGatewayKeyRequired("配置刷新", { [peer]: true })' in response.text
     assert "setModelStatusWaitingForGateway(error)" in response.text
     assert "setAsrStatusWaitingForGateway(error)" in response.text
     assert "function gatewayUnavailableEventBody(error)" in response.text
