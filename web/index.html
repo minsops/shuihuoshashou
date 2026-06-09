@@ -1716,12 +1716,18 @@
         } catch (error) {
           if (gatewayAuthError(error)) {
             showGatewayKeyRequired("报告刷新");
+          } else if (reportPendingError(error)) {
+            appendEvent("报告刷新", "报告仍在生成中，请稍后再刷新。");
           } else {
             appendEvent("报告刷新失败", escapeHtml(errorText(error)), "red");
           }
         } finally {
           if (button) button.disabled = false;
         }
+      }
+
+      function reportPendingError(error) {
+        return errorText(error).toLowerCase().includes("report not found");
       }
 
       async function downloadReportArtifact(interviewId, format) {
