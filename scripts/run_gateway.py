@@ -11,6 +11,7 @@ if str(ROOT) not in sys.path:
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8001
+DOCKER_COMPOSE_PORT = 8000
 
 
 def readiness_label(ready: bool) -> str:
@@ -24,6 +25,18 @@ def mode_label(provider: str, ready: bool) -> str:
 def display_url(host: str, port: int) -> str:
     display_host = "127.0.0.1" if host in {"0.0.0.0", "::"} else host
     return f"http://{display_host}:{port}/"
+
+
+def local_port_warning_lines(host: str, port: int) -> list[str]:
+    if port == DOCKER_COMPOSE_PORT:
+        return []
+    if port_is_available(host, DOCKER_COMPOSE_PORT):
+        return []
+    return [
+        f"Note: port {DOCKER_COMPOSE_PORT} is already in use on {host}.",
+        f"Open {display_url(host, port)} for this local gateway, not "
+        f"{display_url(host, DOCKER_COMPOSE_PORT)}.",
+    ]
 
 
 def port_is_available(host: str, port: int) -> bool:
@@ -91,6 +104,8 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"Starting Shuihuo Killer gateway at {url}")
     print(f"API docs: {url}docs")
+    for line in local_port_warning_lines(args.host, args.port):
+        print(line)
     for line in runtime_summary_lines(status):
         print(line)
     import uvicorn

@@ -42,6 +42,23 @@ def test_gateway_script_reports_occupied_port(capsys) -> None:
     assert "python scripts/run_gateway.py --port 8002" in captured.err
 
 
+def test_gateway_script_warns_when_docker_port_is_occupied(monkeypatch) -> None:
+    run_gateway = _load_run_gateway()
+
+    def fake_port_is_available(host: str, port: int) -> bool:
+        assert host == "127.0.0.1"
+        return port != 8000
+
+    monkeypatch.setattr(run_gateway, "port_is_available", fake_port_is_available)
+
+    lines = run_gateway.local_port_warning_lines("127.0.0.1", 8001)
+
+    assert lines == [
+        "Note: port 8000 is already in use on 127.0.0.1.",
+        "Open http://127.0.0.1:8001/ for this local gateway, not http://127.0.0.1:8000/.",
+    ]
+
+
 def test_gateway_script_runtime_summary_hides_secrets() -> None:
     run_gateway = _load_run_gateway()
     status = SimpleNamespace(
