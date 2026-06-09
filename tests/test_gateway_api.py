@@ -302,6 +302,7 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert 'id="saveGatewayKey"' in response.text
     assert "sessionStorage.getItem(\"gatewayApiKey\")" in response.text
     assert '"X-API-Key": state.gatewayApiKey' in response.text
+    assert "fetchWithTimeout(apiUrl(path)" in response.text
     assert "url.searchParams.set(key, value)" in response.text
     assert "new WebSocket(wsUrl(`/ws/interview/${interviewId}`))" in response.text
     assert "gatewayUrl(`/api/interviews/${report.interview_id}/report.html`)" in response.text

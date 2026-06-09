@@ -1007,7 +1007,7 @@
       }
 
       async function fetchGateway(path, options = {}) {
-        const response = await fetchWithTimeout(gatewayUrl(path), {
+        const response = await fetchWithTimeout(apiUrl(path), {
           ...options,
           headers: gatewayHeaders(options.headers || {}),
         });
