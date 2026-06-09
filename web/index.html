@@ -1159,6 +1159,7 @@
           const config = await fetchGatewayJson("/api/config/status");
           const model = modelStatusFromConfig(config);
           setPill(modelStatus, model.text, model.ready ? "ready" : "");
+          modelStatus.title = model.title || model.text;
           const asr = asrStatusFromConfig(config);
           setPill(asrStatus, asr.text, asr.ready ? "ready" : "");
         } catch (error) {
@@ -1237,8 +1238,11 @@
           const ready = config.llm_base_url_configured && config.llm_api_key_configured;
           const modelName = config.llm_model || "未知模型";
           return {
-            text: ready ? `模型 ${modelName} 已配置` : "模型未配置完整",
-            ready,
+            text: ready ? `模型 ${modelName} 已配置，未检查连接` : "模型未配置完整",
+            ready: false,
+            title: ready
+              ? "配置项已填写；点击“检查模型”后才会调用真实模型确认连接。"
+              : "请检查 LLM_BASE_URL 和 LLM_API_KEY。",
           };
         }
         return { text: "模型状态未知", ready: false };

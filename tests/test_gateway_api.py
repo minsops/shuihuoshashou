@@ -252,6 +252,8 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "模型模拟模式" in response.text
     assert "模型未配置完整" in response.text
     assert "模型 ${modelName} 已配置" in response.text
+    assert "未检查连接" in response.text
+    assert "点击“检查模型”后才会调用真实模型确认连接" in response.text
     assert "audio_chunk" in response.text
     assert "pcm16" in response.text
     assert "audioContextConstructor" in response.text
