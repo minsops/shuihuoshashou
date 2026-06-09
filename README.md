@@ -11,7 +11,7 @@ AI 实时深挖面试官助手与反注水面试评估系统。
 - 离线评分有本地任务队列边界，并可选发布到 Redis Streams。
 - 面试状态机拒绝报告后的修改，也拒绝面试未结束就进入评分。
 - 离线评分拒绝空候选人问答上下文，避免生成无依据报告。
-- 统一 LLM client，支持 mock 模式和 OpenAI 兼容 HTTP 模式，默认模型名为 `mimo2.5pro`。
+- 统一 LLM client，支持 mock 模式和 OpenAI 兼容 HTTP 模式，默认模型名为 `mimo-v2.5-pro`。
 - 运行时 LLM prompt 放在 `prompts/` 下，由服务加载，不硬编码在业务代码中。
 - 追问响应在 schema 层限制为 1 到 3 条建议，符合实时追问卡契约。
 - 追问请求会在构建 prompt 前拒绝重复的 recent turn id。

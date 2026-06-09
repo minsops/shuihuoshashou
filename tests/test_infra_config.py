@@ -82,6 +82,13 @@ def test_pyproject_declares_optional_worker_dependencies() -> None:
     assert "opentelemetry-instrumentation-fastapi>=0.47b0" in pyproject
 
 
+def test_readme_documents_current_default_llm_model() -> None:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert "`mimo-v2.5-pro`" in readme
+    assert "`mimo2.5pro`" not in readme
+
+
 def test_env_example_lists_runtime_integration_knobs() -> None:
     env_example = (ROOT / ".env.example").read_text(encoding="utf-8")
 
