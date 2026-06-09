@@ -1230,7 +1230,16 @@
             body: await file.arrayBuffer(),
           });
           const result = await response.json();
-          target.value = result.text.trim() ? result.text : target.value;
+          const parsedText = String(result.text || "").trim();
+          if (!parsedText) {
+            appendEvent(
+              "资料上传失败",
+              `${escapeHtml(label)} 未提取到可用文本，请换成文字版 PDF、DOCX 或直接粘贴内容。`,
+              "red"
+            );
+            return;
+          }
+          target.value = result.text;
           let modelNote = "";
           if (result.llm_attempted) {
             if (result.used_llm) {
