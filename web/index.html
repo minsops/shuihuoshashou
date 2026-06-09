@@ -906,6 +906,10 @@
         return error && error.message ? error.message : String(error);
       }
 
+      function gatewayHelpText() {
+        return "请确认已运行 python scripts/run_gateway.py，并打开 http://127.0.0.1:8001/，或使用启动脚本输出的实际地址。";
+      }
+
       async function postJson(url, payload) {
         const response = await fetch(url, {
           method: "POST",
@@ -930,6 +934,7 @@
             const status = await response.json();
             if (status.service !== "shuihuo-killer-gateway") {
               setPill(runtimeStatus, "端口不是本服务", "");
+              appendEvent("服务检查", `当前端口不是水货杀手 gateway。${gatewayHelpText()}`, "red");
             } else {
               setPill(
                 runtimeStatus,
@@ -940,6 +945,7 @@
           }
         } catch (error) {
           setPill(runtimeStatus, "服务不可达", "");
+          appendEvent("服务检查", `无法连接到本地 gateway。${gatewayHelpText()}`, "red");
         }
         try {
           const config = await fetch("/api/config/status").then((response) => response.json());
