@@ -805,6 +805,7 @@
       const micChunkSamples = micSampleRate;
       const micVoiceRmsThreshold = 0.012;
       const maxDocumentUploadBytes = 25 * 1024 * 1024;
+      const maxLiveFeedEvents = 120;
       const supportedDocumentSuffixes = new Set([
         ".txt",
         ".md",
@@ -964,6 +965,14 @@
           <p>${body}</p>
         `;
         liveFeed.prepend(node);
+        trimLiveFeedEvents();
+      }
+
+      function trimLiveFeedEvents() {
+        const events = liveFeed.querySelectorAll(".event");
+        events.forEach((event, index) => {
+          if (index >= maxLiveFeedEvents) event.remove();
+        });
       }
 
       async function readErrorMessage(response) {
