@@ -279,6 +279,8 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "先创建实时面试" in response.text
     assert "实时通道连接中" in response.text
     assert "通道未连接" in response.text
+    assert "WebSocket 已关闭。可点击重连通道继续当前面试。" in response.text
+    assert "恢复后点击重连通道继续当前面试" in response.text
     assert 'id="controlHint"' in response.text
     assert "controlHintText" in response.text
     assert "实时通道已连接。可以发送文字回答" in response.text

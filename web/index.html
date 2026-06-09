@@ -1434,11 +1434,15 @@
         state.socket.addEventListener("close", () => {
           stopMicCapture();
           setControls();
-          appendEvent("实时通道", "WebSocket 已关闭。");
+          appendEvent("实时通道", "WebSocket 已关闭。可点击重连通道继续当前面试。");
         });
         state.socket.addEventListener("error", () => {
           setControls();
-          appendEvent("实时通道", "WebSocket 连接失败，请检查服务是否仍在运行。", "red");
+          appendEvent(
+            "实时通道",
+            "WebSocket 连接失败，请检查服务是否仍在运行；恢复后点击重连通道继续当前面试。",
+            "red"
+          );
         });
         state.socket.addEventListener("message", (event) => {
           renderLiveMessage(JSON.parse(event.data));
