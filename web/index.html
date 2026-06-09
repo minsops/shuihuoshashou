@@ -847,6 +847,8 @@
           setPill(micStatus, "等待实时通道", "live");
         } else if (state.interviewEnded) {
           setPill(micStatus, "面试已结束", "ready");
+        } else if (state.interview) {
+          setPill(micStatus, "等待重连通道", "");
         } else if (!connected) {
           setPill(micStatus, "先创建实时面试", "");
         } else {
