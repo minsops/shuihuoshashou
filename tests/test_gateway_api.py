@@ -315,6 +315,7 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "validateLiveMessage" in response.text
     assert "实时消息格式异常" in response.text
     assert "实时消息结构异常" in response.text
+    assert "未知实时消息类型" in response.text
     assert 'id="controlHint"' in response.text
     assert "controlHintText" in response.text
     assert "实时通道已连接。可以发送文字回答" in response.text

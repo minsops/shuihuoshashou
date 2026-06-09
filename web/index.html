@@ -1838,6 +1838,8 @@
           );
         } else if (message.type === "error") {
           appendEvent("错误", escapeHtml(message.detail || "unknown error"), "red");
+        } else {
+          appendEvent("实时通道", `未知实时消息类型：${escapeHtml(message.type)}`, "red");
         }
         setControls();
       }
