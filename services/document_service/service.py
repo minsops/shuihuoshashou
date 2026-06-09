@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import mimetypes
+import re
 import subprocess
 import tempfile
 import zipfile
@@ -186,7 +187,7 @@ def _clean_with_llm(text: str, *, kind: DocumentKind) -> tuple[str, bool, bool, 
             fallback.text,
             True,
             False,
-            f"DeepSeek 文档清洗失败，已使用原始解析文本。{exc}",
+            _llm_cleanup_warning(exc),
         )
     cleaned_text = _trim_text(cleaned.text)
     return cleaned_text, True, cleaned_text != fallback.text, ""
@@ -194,6 +195,13 @@ def _clean_with_llm(text: str, *, kind: DocumentKind) -> tuple[str, bool, bool, 
 
 def _combine_warnings(*warnings: str) -> str:
     return " ".join(warning.strip() for warning in warnings if warning.strip())
+
+
+def _llm_cleanup_warning(exc: Exception) -> str:
+    detail = str(exc)
+    match = re.search(r"\bHTTP\s+(\d{3})\b", detail)
+    status = f"HTTP {match.group(1)}，" if match else ""
+    return f"DeepSeek 文档清洗失败，已使用原始解析文本。{status}请检查模型配置、额度或网络。"
 
 
 def _trim_text(text: str) -> str:

@@ -173,3 +173,5 @@ def test_parse_document_warns_when_deepseek_cleanup_fails(monkeypatch) -> None:
     assert result.text == "noise\nFastAPI"
     assert "DeepSeek 文档清洗失败" in result.warning
     assert "已使用原始解析文本" in result.warning
+    assert "HTTP 401" in result.warning
+    assert "bad key" not in result.warning
