@@ -744,6 +744,7 @@
       const checkAsr = document.querySelector("#checkAsr");
       const gatewayKey = document.querySelector("#gatewayKey");
       const saveGatewayKey = document.querySelector("#saveGatewayKey");
+      const loadSampleButton = document.querySelector("#loadSample");
       const liveStatus = document.querySelector("#liveStatus");
       const micStatus = document.querySelector("#micStatus");
       const competencyList = document.querySelector("#competencyList");
@@ -874,6 +875,8 @@
         reconnectSocket.disabled = !state.interview || connected || connecting || state.interviewEnded;
         manualProbe.disabled = !active;
         endInterview.disabled = !active;
+        loadSampleButton.disabled =
+          state.documentParsingCount > 0 || state.preparingInterview || Boolean(state.interview);
         prepareInterview.disabled =
           state.documentParsingCount > 0 ||
           state.preparingInterview ||
@@ -969,6 +972,13 @@
           : state.interview
             ? "当前已有面试，请重置后再创建新的面试"
             : "创建实时面试通道";
+        loadSampleButton.title = state.preparingInterview
+          ? "正在创建实时面试，不能覆盖资料"
+          : state.documentParsingCount > 0
+            ? "资料正在解析，不能覆盖资料"
+          : state.interview
+            ? "当前已有面试，请重置后再加载样例资料"
+            : "填入一组 JD、简历和首问回答";
       }
 
       function controlHintText(connected, connecting) {
@@ -2655,6 +2665,10 @@
       }
 
       function loadSample() {
+        if (state.documentParsingCount > 0 || state.preparingInterview || state.interview) {
+          appendEvent("样例资料", "当前已有面试或资料正在处理，请重置后再加载样例资料。", "red");
+          return;
+        }
         setupForm.job_title.value = "高级 AI 后端工程师";
         setupForm.candidate_name.value = "张三";
         jdText.value =

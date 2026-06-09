@@ -442,6 +442,9 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "重新连接当前面试实时通道" in response.text
     assert "当前已有面试，请重置后再创建新的面试" in response.text
     assert "资料正在解析，完成后再创建实时面试。" in response.text
+    assert "loadSampleButton" in response.text
+    assert "当前已有面试，请重置后再加载样例资料" in response.text
+    assert "当前已有面试或资料正在处理，请重置后再加载样例资料" in response.text
     assert "prepareSessionToken" in response.text
     assert "prepareSessionStillCurrent" in response.text
     assert "if (!prepareSessionStillCurrent(prepareToken)) return" in response.text
