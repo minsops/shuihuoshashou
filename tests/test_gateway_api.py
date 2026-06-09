@@ -1881,6 +1881,56 @@ def test_gateway_websocket_keeps_session_after_asr_failure(
     assert credibility["type"] == "credibility"
 
 
+def test_gateway_websocket_preserves_aliyun_asr_failure_reason(
+    tmp_path: Path, monkeypatch
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+
+    class FailingASREngine:
+        async def transcribe_chunk(
+            self,
+            session_id,
+            seq,
+            audio_b64,
+            *,
+            speaker=None,
+            start_ms=None,
+            end_ms=None,
+            is_final=True,
+            confidence=None,
+        ):
+            del session_id, seq, audio_b64, speaker, start_ms, end_ms, is_final, confidence
+            raise RuntimeError("aliyun_asr_task_failed:InvalidApiKey:bad key")
+
+    monkeypatch.setattr("services.gateway.app.get_asr_engine", lambda: FailingASREngine())
+    audio = base64.b64encode(b"audio").decode("ascii")
+
+    with client.websocket_connect(f"/ws/interview/{interview['id']}") as websocket:
+        websocket.send_json(
+            {
+                "type": "audio_chunk",
+                "session_id": interview["id"],
+                "seq": 1,
+                "audio": audio,
+            }
+        )
+        warning = websocket.receive_json()
+
+    assert warning == {
+        "type": "asr_warning",
+        "payload": {
+            "reason": "aliyun_asr_task_failed:InvalidApiKey:bad key",
+            "seq": 1,
+        },
+    }
+
+
 def test_gateway_websocket_manual_probe_bypasses_auto_gates(
     tmp_path: Path, monkeypatch
 ) -> None:

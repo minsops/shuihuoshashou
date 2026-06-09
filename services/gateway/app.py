@@ -379,6 +379,13 @@ def _aliyun_warning_reason(exc: Exception) -> str:
     return reason if reason.startswith("aliyun_asr_") else "aliyun_asr_connect_failed"
 
 
+def _asr_warning_reason(exc: Exception) -> str:
+    reason = str(exc).strip()
+    if reason.startswith("aliyun_asr_"):
+        return reason
+    return "asr_transcription_failed"
+
+
 def _select_aliyun_audio_context(
     contexts: list[_AliyunAudioContext],
     segment: TranscriptSegment,
@@ -432,7 +439,7 @@ async def _transcribe_or_warn(
             session_id=session_id,
             error_type=type(exc).__name__,
         )
-        await _send_asr_warning(websocket, "asr_transcription_failed", seq)
+        await _send_asr_warning(websocket, _asr_warning_reason(exc), seq)
         return None
 
 
