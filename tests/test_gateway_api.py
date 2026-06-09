@@ -326,6 +326,11 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "gatewayFailureTitle" in response.text
     assert "runtimeStatus.title = gatewayFailureTitle(error)" in response.text
     assert "服务不可达：${errorText(error)}。${gatewayHelpText()}" in response.text
+    assert "setDependentStatusWaitingForGateway(error)" in response.text
+    assert "function setDependentStatusWaitingForGateway(error)" in response.text
+    assert "if (gatewayError) return" in response.text
+    assert "模型等待本地服务" in response.text
+    assert "ASR 等待本地服务" in response.text
     assert "当前 gateway" in response.text
     assert "runtimeCheckToken" in response.text
     assert "runtimeCheckStillCurrent" in response.text

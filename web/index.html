@@ -1395,6 +1395,7 @@
 
       async function checkRuntime() {
         const checkToken = state.runtimeCheckToken + 1;
+        let gatewayError = null;
         state.runtimeCheckToken = checkToken;
         state.modelCheckToken += 1;
         state.asrCheckToken += 1;
@@ -1416,8 +1417,10 @@
           runtimeStatus.title = `当前 gateway：${state.apiOrigin}`;
         } catch (error) {
           if (!runtimeCheckStillCurrent(checkToken)) return;
+          gatewayError = error;
           setPill(runtimeStatus, "服务不可达", "");
           runtimeStatus.title = gatewayFailureTitle(error);
+          setDependentStatusWaitingForGateway(error);
           appendEvent(
             "服务检查",
             `无法连接到本地 gateway。${escapeHtml(gatewayHelpText())}<br><span class="small">失败详情：${escapeHtml(errorText(error))}</span>`,
@@ -1425,6 +1428,7 @@
           );
         }
         try {
+          if (gatewayError) return;
           const config = await fetchGatewayJson("/api/config/status");
           if (!runtimeCheckStillCurrent(checkToken)) return;
           const model = modelStatusFromConfig(config);
@@ -1450,6 +1454,14 @@
           setButtonBusy(refreshStatus, false);
           refreshStatus.title = "重新检查服务、模型和 ASR 状态";
         }
+      }
+
+      function setDependentStatusWaitingForGateway(error) {
+        const message = gatewayFailureTitle(error);
+        setPill(modelStatus, "模型等待本地服务", "");
+        setStatusTitleFromMessage(modelStatus, message);
+        setPill(asrStatus, "ASR 等待本地服务", "");
+        setStatusTitleFromMessage(asrStatus, message);
       }
 
       function gatewayAuthError(error) {
