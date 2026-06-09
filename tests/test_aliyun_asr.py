@@ -253,6 +253,38 @@ def test_check_aliyun_asr_smoke_script_fails_without_transcript(
     assert exit_code == 1
 
 
+def test_check_aliyun_asr_allow_empty_result_does_not_claim_transcript_verified(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    pcm_path = tmp_path / "sample.pcm"
+    pcm_path.write_bytes(b"\x00" * 3200)
+    monkeypatch.setenv("ALIYUN_ASR_API_KEY", "dashscope-secret")
+
+    class FakeEmptySession:
+        def __init__(self, session_id: str, *, settings: Settings) -> None:
+            self.session_id = session_id
+            self.settings = settings
+            self.result_queue: asyncio.Queue[TranscriptSegment | None] = asyncio.Queue()
+
+        async def connect(self) -> None:
+            return None
+
+        async def send_audio(self, pcm_bytes: bytes) -> None:
+            return None
+
+        async def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(check_aliyun_asr, "AliyunASRSession", FakeEmptySession)
+
+    exit_code = asyncio.run(check_aliyun_asr._run(pcm_path, allow_empty_result=True))
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "Aliyun ASR session completed, but no transcript text was verified." in captured.out
+    assert "Aliyun ASR smoke test ok." not in captured.out
+
+
 def test_check_aliyun_asr_smoke_script_closes_session_on_send_failure(
     tmp_path: Path, monkeypatch
 ) -> None:

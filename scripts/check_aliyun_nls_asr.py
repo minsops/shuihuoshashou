@@ -70,7 +70,9 @@ async def _run(pcm_path: Path, *, allow_empty_result: bool = False) -> int:
         return 1
     if texts:
         print("\n".join(texts))
-    print("Aliyun NLS ASR smoke test ok.")
+        print("Aliyun NLS ASR smoke test ok.")
+    else:
+        print("Aliyun NLS ASR session completed, but no transcript text was verified.")
     return 0
 
 
