@@ -236,7 +236,7 @@ WebSocket `audio_chunk` 事件可以包含 `speaker`、`channel`/`audio_channel`
 ALIYUN_ASR_API_KEY=your-dashscope-key python scripts/check_aliyun_asr.py
 ```
 
-脚本默认发送 `tests/fixtures/sample_16k_mono.pcm`；也可以用 `--pcm-path` 指向自己的 16k 单声道 PCM16 语音文件。若阿里云会话完成但没有返回任何转写文本，脚本会返回失败。
+脚本默认发送 `tests/fixtures/sample_16k_mono.pcm`；也可以用 `--pcm-path` 指向自己的 16k 单声道 PCM16 语音文件。若阿里云会话完成但没有返回任何转写文本，脚本会返回失败。只有显式传入 `--allow-empty-result` 时，空转写才会按成功退出；此时脚本会输出 `session completed, but no transcript text was verified`，表示只验证了 WebSocket 会话完成，没有验证识别文本有效。
 
 如果只有智能语音交互 NLS 的 AppKey，可以改用 `ASR_PROVIDER=aliyun_nls_ws`。该模式需要同时配置临时 Token：
 
@@ -259,7 +259,7 @@ ALIYUN_AK_ID=your-access-key-id ALIYUN_AK_SECRET=your-access-key-secret python s
 ALIYUN_NLS_APP_KEY=your-nls-appkey ALIYUN_AK_ID=your-access-key-id ALIYUN_AK_SECRET=your-access-key-secret python scripts/check_aliyun_nls_asr.py
 ```
 
-脚本默认同样发送 `tests/fixtures/sample_16k_mono.pcm`；如果会话完成但没有返回任何转写文本，脚本会返回失败。
+脚本默认同样发送 `tests/fixtures/sample_16k_mono.pcm`；如果会话完成但没有返回任何转写文本，脚本会返回失败。只有显式传入 `--allow-empty-result` 时，空转写才会按成功退出；此时脚本会输出 `session completed, but no transcript text was verified`，表示只验证了 WebSocket 会话完成，没有验证识别文本有效。
 
 如果 ASR provider 对某一帧失败或返回非法 transcript，WebSocket 会发送 `asr_warning`，`reason=asr_transcription_failed`，并保持面试会话打开，后续帧仍可继续处理。
 

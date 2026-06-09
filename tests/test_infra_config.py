@@ -105,6 +105,14 @@ def test_readme_distinguishes_real_llm_smoke_from_mock_mode() -> None:
     assert "只有 `LLM_PROVIDER=openai_compatible`" in readme
 
 
+def test_readme_explains_empty_asr_smoke_result_semantics() -> None:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert "`--allow-empty-result`" in readme
+    assert "session completed, but no transcript text was verified" in readme
+    assert "只验证了 WebSocket 会话完成，没有验证识别文本有效" in readme
+
+
 def test_env_example_lists_runtime_integration_knobs() -> None:
     env_example = (ROOT / ".env.example").read_text(encoding="utf-8")
 
