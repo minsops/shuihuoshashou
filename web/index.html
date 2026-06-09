@@ -1418,8 +1418,7 @@
         } catch (error) {
           if (!runtimeCheckStillCurrent(checkToken)) return;
           gatewayError = error;
-          setPill(runtimeStatus, "服务不可达", "");
-          runtimeStatus.title = gatewayFailureTitle(error);
+          setRuntimeStatusGatewayUnavailable(error);
           setDependentStatusWaitingForGateway(error);
           appendEvent(
             "服务检查",
@@ -1454,6 +1453,11 @@
           setButtonBusy(refreshStatus, false);
           refreshStatus.title = "重新检查服务、模型和 ASR 状态";
         }
+      }
+
+      function setRuntimeStatusGatewayUnavailable(error) {
+        setPill(runtimeStatus, "服务不可达", "");
+        runtimeStatus.title = gatewayFailureTitle(error);
       }
 
       function setDependentStatusWaitingForGateway(error) {
@@ -1509,6 +1513,7 @@
             await discoverGateway();
           } catch (error) {
             if (!modelCheckStillCurrent(checkToken)) return;
+            setRuntimeStatusGatewayUnavailable(error);
             setModelStatusWaitingForGateway(error);
             appendEvent("模型检查", gatewayUnavailableEventBody(error), "red");
             return;
@@ -1552,6 +1557,7 @@
             await discoverGateway();
           } catch (error) {
             if (!asrCheckStillCurrent(checkToken)) return;
+            setRuntimeStatusGatewayUnavailable(error);
             setAsrStatusWaitingForGateway(error);
             appendEvent("ASR 检查", gatewayUnavailableEventBody(error), "red");
             return;
