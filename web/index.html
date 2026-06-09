@@ -929,8 +929,12 @@
         return error && error.message ? error.message : String(error);
       }
 
+      function attemptedGatewayOriginsText() {
+        return gatewayOrigins().join("、");
+      }
+
       function gatewayHelpText() {
-        return "请确认已运行 python scripts/run_gateway.py；页面会自动尝试连接 http://127.0.0.1:8001/。";
+        return `请确认已运行 python scripts/run_gateway.py；页面正在尝试连接：${attemptedGatewayOriginsText()}。`;
       }
 
       function gatewayOrigins() {
@@ -1068,9 +1072,15 @@
             status.status === "ok" ? "服务正常" : "服务异常",
             status.status === "ok" ? "ready" : ""
           );
+          runtimeStatus.title = `当前 gateway：${state.apiOrigin}`;
         } catch (error) {
           setPill(runtimeStatus, "服务不可达", "");
-          appendEvent("服务检查", `无法连接到本地 gateway。${gatewayHelpText()}`, "red");
+          runtimeStatus.title = `服务不可达：${errorText(error)}`;
+          appendEvent(
+            "服务检查",
+            `无法连接到本地 gateway。${escapeHtml(gatewayHelpText())}<br><span class="small">失败详情：${escapeHtml(errorText(error))}</span>`,
+            "red"
+          );
         }
         try {
           const config = await fetchGatewayJson("/api/config/status");

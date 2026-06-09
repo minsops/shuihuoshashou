@@ -259,8 +259,11 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "fetchGatewayJson" in response.text
     assert "wsUrl(`/ws/interview/${interviewId}`)" in response.text
     assert "python scripts/run_gateway.py" in response.text
-    assert "http://127.0.0.1:8001/" in response.text
+    assert "http://127.0.0.1:8001" in response.text
     assert "无法连接到本地 gateway" in response.text
+    assert "页面正在尝试连接" in response.text
+    assert "失败详情" in response.text
+    assert "当前 gateway" in response.text
     assert "ASR 检查中" in response.text
     assert "ASR 阿里云 NLS 已配置" in response.text
     assert "ASR 阿里云 NLS 已配置（自动 Token）" in response.text
