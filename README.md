@@ -115,6 +115,8 @@ python scripts/run_offline_demo.py
 python scripts/run_gateway.py
 ```
 
+启动脚本会先打印本地访问地址、API 文档地址、模型 provider/model、ASR provider 和数据库地址摘要；摘要只显示是否已配置，不会输出 API key、token 或密码。
+
 API 文档地址：`http://127.0.0.1:8001/docs`。
 
 本地 demo UI 地址：`http://127.0.0.1:8001/`。
