@@ -278,6 +278,9 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "payload.detail" in response.text
     assert "input.disabled = true" in response.text
     assert "input.value = \"\"" in response.text
+    assert "资料上传提示" in response.text
+    assert "result.warning" in response.text
+    assert "DeepSeek 清洗未完成" in response.text
     assert 'parseDocumentFile(event.target.files[0], event.target, resumeText, "简历", "resume")' in response.text
     assert "reconnectLiveChannel" in response.text
     assert "重新连接当前面试实时通道" in response.text

@@ -1026,15 +1026,23 @@
           if (!response.ok) throw new Error(await readErrorMessage(response));
           const result = await response.json();
           target.value = result.text.trim() ? result.text : target.value;
-          const modelNote = result.llm_attempted
-            ? result.used_llm
-              ? "，已调用 DeepSeek 清洗正文"
-              : "，已调用 DeepSeek 校验正文"
-            : "";
+          let modelNote = "";
+          if (result.llm_attempted) {
+            if (result.used_llm) {
+              modelNote = "，已调用 DeepSeek 清洗正文";
+            } else if (String(result.warning || "").includes("DeepSeek")) {
+              modelNote = "，DeepSeek 清洗未完成";
+            } else {
+              modelNote = "，已调用 DeepSeek 校验正文";
+            }
+          }
           appendEvent(
             "资料上传",
             `${escapeHtml(label)} 已解析：${escapeHtml(file.name)}（${escapeHtml(result.source)}${modelNote}）`
           );
+          if (result.warning) {
+            appendEvent("资料上传提示", escapeHtml(result.warning), "red");
+          }
         } catch (error) {
           appendEvent("资料上传失败", escapeHtml(errorText(error)), "red");
         } finally {

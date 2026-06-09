@@ -148,3 +148,28 @@ def test_parse_document_uses_deepseek_cleanup(monkeypatch) -> None:
     assert result.llm_attempted is True
     assert result.used_llm is True
     assert result.text == "候选人负责 FastAPI 网关、LLM JSON 解析和报告生成"
+    assert result.warning == ""
+
+
+def test_parse_document_warns_when_deepseek_cleanup_fails(monkeypatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "openai_compatible")
+    monkeypatch.setenv("LLM_BASE_URL", "https://llm.example.test")
+    monkeypatch.setenv("LLM_API_KEY", "secret")
+    get_settings.cache_clear()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        del request
+        return httpx.Response(401, text="bad key")
+
+    monkeypatch.setattr(
+        "services.document_service.service.get_llm_client",
+        lambda: LLMClient(transport=httpx.MockTransport(handler)),
+    )
+
+    result = parse_document("resume.txt", b"noise\nFastAPI", kind="resume")
+
+    assert result.llm_attempted is True
+    assert result.used_llm is False
+    assert result.text == "noise\nFastAPI"
+    assert "DeepSeek 文档清洗失败" in result.warning
+    assert "已使用原始解析文本" in result.warning

@@ -52,7 +52,7 @@ def parse_document(
     suffix = Path(filename).suffix.lower()
     inferred_content_type = content_type or mimetypes.guess_type(filename)[0] or ""
     raw_text, source, warning = _extract_text(filename, data, suffix, inferred_content_type)
-    cleaned_text, llm_attempted, used_llm = _clean_with_llm(raw_text, kind=kind)
+    cleaned_text, llm_attempted, used_llm, cleanup_warning = _clean_with_llm(raw_text, kind=kind)
     return DocumentParseResult(
         filename=filename or "upload",
         kind=kind,
@@ -60,7 +60,7 @@ def parse_document(
         source=source,
         llm_attempted=llm_attempted,
         used_llm=used_llm,
-        warning=warning,
+        warning=_combine_warnings(warning, cleanup_warning),
     )
 
 
@@ -160,11 +160,11 @@ def _extract_doc_with_textutil(data: bytes, suffix: str) -> str:
         return _require_text(output_path.read_text(encoding="utf-8", errors="ignore"))
 
 
-def _clean_with_llm(text: str, *, kind: DocumentKind) -> tuple[str, bool, bool]:
+def _clean_with_llm(text: str, *, kind: DocumentKind) -> tuple[str, bool, bool, str]:
     fallback = _CleanedDocument(text=_trim_text(text))
     settings = get_settings()
     if settings.llm_provider == "mock" or not settings.llm_api_key:
-        return fallback.text, False, False
+        return fallback.text, False, False, ""
     label = "岗位 JD" if kind == "jd" else "候选人简历"
     prompt = (
         f"请从下面的{label}上传内容中提取可用于面试系统的正文。"
@@ -179,11 +179,21 @@ def _clean_with_llm(text: str, *, kind: DocumentKind) -> tuple[str, bool, bool]:
             ],
             _CleanedDocument,
             fallback,
+            raise_on_error=True,
         )
-    except Exception:
-        return fallback.text, True, False
+    except Exception as exc:
+        return (
+            fallback.text,
+            True,
+            False,
+            f"DeepSeek 文档清洗失败，已使用原始解析文本。{exc}",
+        )
     cleaned_text = _trim_text(cleaned.text)
-    return cleaned_text, True, cleaned_text != fallback.text
+    return cleaned_text, True, cleaned_text != fallback.text, ""
+
+
+def _combine_warnings(*warnings: str) -> str:
+    return " ".join(warning.strip() for warning in warnings if warning.strip())
 
 
 def _trim_text(text: str) -> str:
