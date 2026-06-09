@@ -447,6 +447,10 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "reportFormatLabel(format)" in response.text
     assert '"transcript.json": "转写"' in response.text
     assert "reportFilename" in response.text
+    assert "reportEvidenceRows" in response.text
+    assert "暂无维度评分" in response.text
+    assert "暂无转写记录" in response.text
+    assert "暂无证据" in response.text
     assert 'format === "transcript.json"' in response.text
     assert '.transcript.json`' in response.text
     assert "gatewayAuthError" in response.text

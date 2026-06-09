@@ -2041,7 +2041,10 @@
       }
 
       function renderReport(report) {
-        const score = report.score;
+        const score = report.score || {};
+        const dimensions = Array.isArray(score.dimensions) ? score.dimensions : [];
+        const riskNotes = Array.isArray(score.risk_notes) ? score.risk_notes : [];
+        const transcriptTurns = Array.isArray(report.transcript) ? report.transcript : [];
         reportLinks.innerHTML = `
           <button class="secondary" type="button" data-report-format="html" data-report-id="${escapeHtml(report.interview_id)}">HTML</button>
           <button class="secondary" type="button" data-report-format="pdf" data-report-id="${escapeHtml(report.interview_id)}">PDF</button>
@@ -2053,21 +2056,24 @@
             downloadReportArtifact(button.dataset.reportId, button.dataset.reportFormat);
           });
         });
-        const rows = score.dimensions
+        const rows = dimensions.length
+          ? dimensions
           .map(
             (dimension) => `
               <tr>
                 <td>${escapeHtml(dimension.dimension)}</td>
                 <td>${escapeHtml(dimension.score)}</td>
-                <td>${dimension.evidence.map((item) => escapeHtml(item.excerpt)).join("<br>")}</td>
+                <td>${reportEvidenceRows(dimension.evidence)}</td>
               </tr>
             `
           )
-          .join("");
-        const risks = score.risk_notes.length
-          ? score.risk_notes.map((note) => `<p class="risk">${escapeHtml(note)}</p>`).join("")
+          .join("")
+          : '<tr><td colspan="3">暂无维度评分。</td></tr>';
+        const risks = riskNotes.length
+          ? riskNotes.map((note) => `<p class="risk">${escapeHtml(note)}</p>`).join("")
           : '<p class="success">暂无高置信风险点。</p>';
-        const transcript = report.transcript
+        const transcript = transcriptTurns.length
+          ? transcriptTurns
           .map(
             (turn, index) => `
               <tr>
@@ -2077,7 +2083,8 @@
               </tr>
             `
           )
-          .join("");
+          .join("")
+          : '<tr><td colspan="3">暂无转写记录。</td></tr>';
         reportPanel.innerHTML = `
           <div class="report-box">
             <div class="score-line">
@@ -2099,6 +2106,13 @@
             </table>
           </div>
         `;
+      }
+
+      function reportEvidenceRows(evidence) {
+        const items = Array.isArray(evidence) ? evidence : [];
+        return items.length
+          ? items.map((item) => escapeHtml(item.excerpt || item)).join("<br>")
+          : "暂无证据";
       }
 
       function renderQueuedReportState(interviewId) {
