@@ -1566,7 +1566,12 @@
           renderReport(message.payload);
           appendEvent("评分完成", `总分 ${escapeHtml(message.payload.score.total_score)}`, "green");
         } else if (message.type === "task_queued") {
-          appendEvent("任务已排队", `${escapeHtml(message.payload.task_name)} · ${escapeHtml(message.payload.task_id)}`);
+          stopMicCapture();
+          state.interviewEnded = true;
+          appendEvent(
+            "任务已排队",
+            `${escapeHtml(message.payload.task_name)} · ${escapeHtml(message.payload.task_id)}。请等待后台评分完成。`
+          );
         } else if (message.type === "error") {
           appendEvent("错误", escapeHtml(message.detail || "unknown error"), "red");
         }
