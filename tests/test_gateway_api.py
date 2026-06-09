@@ -323,6 +323,8 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "downloadReportArtifact" in response.text
     assert "fetchGateway(`/api/interviews/${interviewId}/report.${format}`)" in response.text
     assert "reportFilename" in response.text
+    assert 'format === "transcript.json"' in response.text
+    assert '.transcript.json`' in response.text
     assert "gatewayAuthError" in response.text
     assert "showGatewayKeyRequired" in response.text
     assert 'showGatewayKeyRequired("模型检查", { model: true })' in response.text

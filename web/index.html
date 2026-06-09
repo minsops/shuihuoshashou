@@ -1703,6 +1703,7 @@
 
       function reportFilename(interviewId, format) {
         if (format === "pdf") return `${interviewId}.pdf`;
+        if (format === "transcript.json") return `${interviewId}.transcript.json`;
         return `${interviewId}.report.${format}`;
       }
 
