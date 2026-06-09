@@ -17,6 +17,10 @@ def readiness_label(ready: bool) -> str:
     return "configured" if ready else "missing"
 
 
+def mode_label(provider: str, ready: bool) -> str:
+    return "mock" if provider in {"mock", "stub"} else readiness_label(ready)
+
+
 def display_url(host: str, port: int) -> str:
     display_host = "127.0.0.1" if host in {"0.0.0.0", "::"} else host
     return f"http://{display_host}:{port}/"
@@ -41,15 +45,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def runtime_summary_lines(status) -> list[str]:
     llm_ready = (
-        status.llm_provider == "mock"
-        or (
-            status.llm_provider == "openai_compatible"
-            and status.llm_base_url_configured
-            and status.llm_api_key_configured
-        )
+        status.llm_provider == "openai_compatible"
+        and status.llm_base_url_configured
+        and status.llm_api_key_configured
     )
     lines = [
-        f"Model: {status.llm_provider} / {status.llm_model} ({readiness_label(llm_ready)})",
+        f"Model: {status.llm_provider} / {status.llm_model} "
+        f"({mode_label(status.llm_provider, llm_ready)})",
     ]
     if status.asr_provider == "aliyun_nls_ws":
         asr_ready = (
@@ -62,8 +64,8 @@ def runtime_summary_lines(status) -> list[str]:
     elif status.asr_provider == "http":
         asr_ready = status.asr_base_url_configured
     else:
-        asr_ready = status.asr_provider == "stub"
-    lines.append(f"ASR: {status.asr_provider} ({readiness_label(asr_ready)})")
+        asr_ready = False
+    lines.append(f"ASR: {status.asr_provider} ({mode_label(status.asr_provider, asr_ready)})")
     lines.append(f"Database: {status.database_url}")
     return lines
 

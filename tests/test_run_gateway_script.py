@@ -70,6 +70,32 @@ def test_gateway_script_runtime_summary_hides_secrets() -> None:
     assert "key" not in summary.lower()
 
 
+def test_gateway_script_runtime_summary_marks_mock_modes() -> None:
+    run_gateway = _load_run_gateway()
+    status = SimpleNamespace(
+        llm_provider="mock",
+        llm_model="mimo-v2.5-pro",
+        llm_base_url_configured=True,
+        llm_api_key_configured=False,
+        asr_provider="stub",
+        aliyun_nls_app_key_configured=False,
+        aliyun_nls_token_configured=False,
+        aliyun_nls_endpoint_configured=True,
+        aliyun_asr_api_key_configured=False,
+        aliyun_asr_endpoint_configured=True,
+        asr_base_url_configured=False,
+        database_url="sqlite:///data/shuihuo_killer.db",
+    )
+
+    lines = run_gateway.runtime_summary_lines(status)
+    summary = "\n".join(lines)
+
+    assert "Model: mock / mimo-v2.5-pro (mock)" in summary
+    assert "ASR: stub (mock)" in summary
+    assert "Model: mock / mimo-v2.5-pro (configured)" not in summary
+    assert "ASR: stub (configured)" not in summary
+
+
 def test_gateway_script_reports_runtime_config_error(monkeypatch, capsys) -> None:
     run_gateway = _load_run_gateway()
     runtime_module = ModuleType("libs.common.runtime")
