@@ -62,6 +62,24 @@ def test_parse_docx_document_without_python_docx(monkeypatch) -> None:
     assert "异常重试" in result.text
 
 
+def test_parse_corrupt_docx_has_actionable_error(monkeypatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "mock")
+    get_settings.cache_clear()
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("word/document.xml", "<w:document>")
+
+    with pytest.raises(ValueError) as exc:
+        parse_document(
+            "resume.docx",
+            buffer.getvalue(),
+            kind="resume",
+            content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+
+    assert str(exc.value) == "docx document is invalid or unreadable"
+
+
 def test_parse_pdf_document(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("LLM_PROVIDER", "mock")
     get_settings.cache_clear()

@@ -109,9 +109,9 @@ def _extract_docx(data: bytes) -> str:
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as archive:
             xml = archive.read("word/document.xml")
-    except (KeyError, zipfile.BadZipFile) as exc:
+        root = ElementTree.fromstring(xml)
+    except (KeyError, zipfile.BadZipFile, ElementTree.ParseError) as exc:
         raise ValueError("docx document is invalid or unreadable") from exc
-    root = ElementTree.fromstring(xml)
     namespace = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
     paragraphs: list[str] = []
     for paragraph in root.iter(f"{namespace}p"):
