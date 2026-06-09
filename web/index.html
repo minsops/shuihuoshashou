@@ -819,6 +819,11 @@
         ".tiff",
         ".heic",
       ]);
+      const supportedDocumentMimeTypes = new Set([
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ]);
       const fallbackGatewayOrigins = ["http://127.0.0.1:8001", "http://localhost:8001"];
 
       function escapeHtml(value) {
@@ -1246,7 +1251,7 @@
 
       async function parseDocumentFile(file, input, target, label, kind) {
         if (!file) return;
-        if (!supportedDocumentSuffixes.has(fileSuffix(file.name))) {
+        if (!supportedDocumentFile(file)) {
           appendEvent(
             "资料上传失败",
             `${escapeHtml(label)} 文件格式暂不支持，请上传 txt、md、json、csv、log、pdf、docx、doc 或图片。`,
@@ -1312,6 +1317,16 @@
       function fileSuffix(filename) {
         const dotIndex = filename.lastIndexOf(".");
         return dotIndex >= 0 ? filename.slice(dotIndex).toLowerCase() : "";
+      }
+
+      function supportedDocumentFile(file) {
+        const type = String(file.type || "").toLowerCase();
+        return (
+          supportedDocumentSuffixes.has(fileSuffix(file.name)) ||
+          supportedDocumentMimeTypes.has(type) ||
+          type.startsWith("text/") ||
+          type.startsWith("image/")
+        );
       }
 
       function renderCompetencies(job) {

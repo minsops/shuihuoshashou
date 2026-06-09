@@ -22,6 +22,9 @@ PDF_SUFFIXES = {".pdf"}
 DOCX_SUFFIXES = {".docx"}
 DOC_SUFFIXES = {".doc"}
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff", ".heic"}
+PDF_MIME_TYPES = {"application/pdf"}
+DOCX_MIME_TYPES = {"application/vnd.openxmlformats-officedocument.wordprocessingml.document"}
+DOC_MIME_TYPES = {"application/msword"}
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 
 
@@ -51,7 +54,7 @@ def parse_document(
     if len(data) > MAX_UPLOAD_BYTES:
         raise ValueError("uploaded document is larger than 25MB")
     suffix = Path(filename).suffix.lower()
-    inferred_content_type = content_type or mimetypes.guess_type(filename)[0] or ""
+    inferred_content_type = (content_type or mimetypes.guess_type(filename)[0] or "").lower()
     raw_text, source, warning = _extract_text(filename, data, suffix, inferred_content_type)
     cleaned_text, llm_attempted, used_llm, cleanup_warning = _clean_with_llm(raw_text, kind=kind)
     return DocumentParseResult(
@@ -73,13 +76,13 @@ def _extract_text(
 ) -> tuple[str, str, str]:
     if suffix in TEXT_SUFFIXES or content_type.startswith("text/"):
         return _decode_text(data), "text", ""
-    if suffix in DOCX_SUFFIXES:
+    if suffix in DOCX_SUFFIXES or content_type in DOCX_MIME_TYPES:
         return _extract_docx(data), "docx", ""
-    if suffix in PDF_SUFFIXES:
+    if suffix in PDF_SUFFIXES or content_type in PDF_MIME_TYPES:
         return _extract_pdf(data), "pdf", ""
     if suffix in IMAGE_SUFFIXES or content_type.startswith("image/"):
         return _extract_image_text(data, suffix), "image_ocr", ""
-    if suffix in DOC_SUFFIXES:
+    if suffix in DOC_SUFFIXES or content_type in DOC_MIME_TYPES:
         return _extract_doc_with_textutil(data, suffix), "doc_textutil", ""
     raise ValueError(
         "unsupported document type; supported: txt, md, json, csv, pdf, docx, doc, png, jpg, jpeg, webp, bmp, tif, tiff, heic"

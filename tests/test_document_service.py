@@ -75,6 +75,31 @@ def test_parse_pdf_document(tmp_path: Path, monkeypatch) -> None:
     assert "FastAPI" in result.text
 
 
+def test_parse_document_uses_mime_type_without_extension(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "mock")
+    get_settings.cache_clear()
+    pdf_path = tmp_path / "sample.pdf"
+    _write_text_fallback_pdf(["岗位要求 Python FastAPI 稳定性治理"], pdf_path)
+
+    pdf_result = parse_document(
+        "upload",
+        pdf_path.read_bytes(),
+        kind="jd",
+        content_type="application/pdf",
+    )
+    docx_result = parse_document(
+        "upload",
+        _docx_bytes("候选人做过评估报告链路和异常重试"),
+        kind="resume",
+        content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
+
+    assert pdf_result.source == "pdf"
+    assert "FastAPI" in pdf_result.text
+    assert docx_result.source == "docx"
+    assert "异常重试" in docx_result.text
+
+
 def test_parse_image_document_missing_ocr_dependency_has_actionable_error(monkeypatch) -> None:
     monkeypatch.setenv("LLM_PROVIDER", "mock")
     get_settings.cache_clear()

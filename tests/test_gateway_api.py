@@ -293,7 +293,10 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "input.value = \"\"" in response.text
     assert ".log,.pdf" in response.text
     assert "supportedDocumentSuffixes" in response.text
-    assert "fileSuffix(file.name)" in response.text
+    assert "supportedDocumentMimeTypes" in response.text
+    assert "supportedDocumentFile(file)" in response.text
+    assert 'type.startsWith("text/")' in response.text
+    assert 'type.startsWith("image/")' in response.text
     assert "文件格式暂不支持" in response.text
     assert "txt、md、json、csv、log、pdf、docx、doc 或图片" in response.text
     assert "maxDocumentUploadBytes = 25 * 1024 * 1024" in response.text
