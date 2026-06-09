@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import builtins
 import io
 import json
 import zipfile
 from pathlib import Path
 
 import httpx
+import pytest
 
 from libs.common.config import get_settings
 from libs.llm_client import LLMClient
+from services.document_service import service as document_service
 from services.report_service.service import _write_text_fallback_pdf
 from services.document_service.service import parse_document
 
@@ -70,6 +73,43 @@ def test_parse_pdf_document(tmp_path: Path, monkeypatch) -> None:
 
     assert result.source == "pdf"
     assert "FastAPI" in result.text
+
+
+def test_parse_image_document_missing_ocr_dependency_has_actionable_error(monkeypatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "mock")
+    get_settings.cache_clear()
+    real_import = builtins.__import__
+
+    def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "ocrmac":
+            raise ImportError("missing ocrmac")
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+
+    with pytest.raises(ValueError) as exc:
+        parse_document("resume.png", b"image-bytes", kind="resume", content_type="image/png")
+
+    message = str(exc.value)
+    assert "pip install -e '.[ocr]'" in message
+    assert "upload a PDF/DOCX/text resume instead" in message
+
+
+def test_parse_legacy_doc_failure_has_conversion_hint(monkeypatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "mock")
+    get_settings.cache_clear()
+
+    def fail_textutil(*args, **kwargs):
+        raise FileNotFoundError("textutil")
+
+    monkeypatch.setattr(document_service.subprocess, "run", fail_textutil)
+
+    with pytest.raises(ValueError) as exc:
+        parse_document("resume.doc", b"doc-bytes", kind="resume", content_type="application/msword")
+
+    message = str(exc.value)
+    assert "legacy .doc parsing requires macOS textutil" in message
+    assert "convert the file to .docx or PDF" in message
 
 
 def test_parse_document_uses_deepseek_cleanup(monkeypatch) -> None:

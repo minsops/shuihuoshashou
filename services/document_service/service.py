@@ -126,7 +126,10 @@ def _extract_image_text(data: bytes, suffix: str) -> str:
     try:
         from ocrmac import OCR
     except ImportError as exc:
-        raise ValueError("image OCR requires ocrmac on macOS; install project dependencies first") from exc
+        raise ValueError(
+            "image OCR requires optional dependency ocrmac on macOS; install with "
+            "`pip install -e '.[ocr]'`, or upload a PDF/DOCX/text resume instead"
+        ) from exc
     with tempfile.NamedTemporaryFile(suffix=suffix or ".png") as file:
         file.write(data)
         file.flush()
@@ -150,7 +153,10 @@ def _extract_doc_with_textutil(data: bytes, suffix: str) -> str:
                 timeout=20,
             )
         except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
-            raise ValueError("doc parsing requires macOS textutil and a readable Word document") from exc
+            raise ValueError(
+                "legacy .doc parsing requires macOS textutil and a readable Word document; "
+                "if it fails, convert the file to .docx or PDF and upload again"
+            ) from exc
         return _require_text(output_path.read_text(encoding="utf-8", errors="ignore"))
 
 
