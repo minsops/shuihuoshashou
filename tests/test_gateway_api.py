@@ -274,6 +274,9 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "停止麦克风" in response.text
     assert "重连通道" in response.text
     assert "刷新状态" in response.text
+    assert 'id="runtimeStatus" role="status" aria-live="polite"' in response.text
+    assert 'id="modelStatus" role="status" aria-live="polite"' in response.text
+    assert 'id="asrStatus" role="status" aria-live="polite"' in response.text
     assert "maxLiveFeedEvents = 120" in response.text
     assert "trimLiveFeedEvents" in response.text
     assert "setStatusTitleFromMessage" in response.text
@@ -367,7 +370,14 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "候选人回答不能为空" in response.text
     assert "实时消息序号无效，请重连通道后重试" in response.text
     assert "原始错误" in response.text
-    assert 'class="control-hint" id="controlHint"' in response.text
+    assert 'id="liveStatus" role="status" aria-live="polite"' in response.text
+    assert 'id="micStatus" role="status" aria-live="polite"' in response.text
+    assert 'class="control-hint" id="controlHint" role="status" aria-live="polite"' in (
+        response.text
+    )
+    assert 'id="liveFeed" role="log" aria-live="polite" aria-relevant="additions text"' in (
+        response.text
+    )
     assert "controlHintText" in response.text
     assert "controlHintTone" in response.text
     assert "controlHint.className" in response.text
@@ -493,6 +503,8 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert ">转写</button>" in response.text
     assert "downloadReportArtifact" in response.text
     assert "reportDownloadStillCurrent" in response.text
+    assert 'id="credibilityBox" role="status" aria-live="polite"' in response.text
+    assert 'id="reportPanel" role="status" aria-live="polite"' in response.text
     assert "if (!reportDownloadStillCurrent(interviewId)) return" in response.text
     assert "reportDownloadInFlight" in response.text
     assert "state.reportDownloadInFlight.has(downloadKey)" in response.text

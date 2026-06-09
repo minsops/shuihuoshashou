@@ -631,9 +631,9 @@
         </div>
       </div>
       <div class="top-actions">
-        <span class="status-pill" id="runtimeStatus"><span class="status-dot"></span><span>检查中</span></span>
-        <span class="status-pill" id="modelStatus"><span class="status-dot"></span><span>模型检查中</span></span>
-        <span class="status-pill" id="asrStatus"><span class="status-dot"></span><span>ASR 检查中</span></span>
+        <span class="status-pill" id="runtimeStatus" role="status" aria-live="polite"><span class="status-dot"></span><span>检查中</span></span>
+        <span class="status-pill" id="modelStatus" role="status" aria-live="polite"><span class="status-dot"></span><span>模型检查中</span></span>
+        <span class="status-pill" id="asrStatus" role="status" aria-live="polite"><span class="status-dot"></span><span>ASR 检查中</span></span>
         <button class="secondary" type="button" id="refreshStatus">刷新状态</button>
         <button class="secondary" type="button" id="checkModel">检查模型</button>
         <button class="secondary" type="button" id="checkAsr">检查 ASR</button>
@@ -704,7 +704,7 @@
             <span class="step">02 面试</span>
             <h2>实时语音与专业追问</h2>
           </div>
-          <span class="status-pill" id="liveStatus"><span class="status-dot"></span><span>未连接</span></span>
+          <span class="status-pill" id="liveStatus" role="status" aria-live="polite"><span class="status-dot"></span><span>未连接</span></span>
         </div>
         <div class="session-strip">
           <div class="metric">
@@ -736,11 +736,11 @@
             <button class="secondary" type="button" id="reconnectSocket" disabled>重连通道</button>
             <button class="secondary" type="button" id="manualProbe" disabled>根据回答追问</button>
             <button class="danger" type="button" id="endInterview" disabled>结束并评分</button>
-            <span class="status-pill" id="micStatus"><span class="status-dot"></span><span>麦克风未开启</span></span>
+            <span class="status-pill" id="micStatus" role="status" aria-live="polite"><span class="status-dot"></span><span>麦克风未开启</span></span>
           </div>
-          <p class="control-hint" id="controlHint">请先创建实时面试并等待实时通道连接。</p>
+          <p class="control-hint" id="controlHint" role="status" aria-live="polite">请先创建实时面试并等待实时通道连接。</p>
         </form>
-        <div class="feed" id="liveFeed">
+        <div class="feed" id="liveFeed" role="log" aria-live="polite" aria-relevant="additions text">
           <div class="empty">实时转写、回答和追问事件会出现在这里</div>
         </div>
       </section>
@@ -767,7 +767,7 @@
               <h3>可信度信号</h3>
               <span class="tag amber" id="credibilityLevel">待观察</span>
             </div>
-            <div class="report-box" id="credibilityBox">
+            <div class="report-box" id="credibilityBox" role="status" aria-live="polite">
               <p>等待候选人首个回答。</p>
             </div>
           </div>
@@ -776,7 +776,7 @@
               <h3>最终评分</h3>
               <div class="row" id="reportLinks"></div>
             </div>
-            <div id="reportPanel">
+            <div id="reportPanel" role="status" aria-live="polite">
               <div class="empty">结束面试后生成综合评分</div>
             </div>
           </div>
