@@ -118,7 +118,9 @@ def test_readme_explains_demo_gateway_key_input() -> None:
 
     assert "`Gateway Key` 输入框" in readme
     assert "只保存在当前浏览器会话中" in readme
-    assert "页面会自动带到 API、WebSocket 和报告下载链接" in readme
+    assert "页面会自动带到 API 和报告下载请求" in readme
+    assert "`gateway-key.*` subprotocol 携带 key" in readme
+    assert "避免把 key 写进 URL" in readme
 
 
 def test_readme_explains_empty_asr_smoke_result_semantics() -> None:

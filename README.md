@@ -193,7 +193,7 @@ curl -s http://127.0.0.1:8001/api/config/status
 
 `/api/config/status` 只返回非密钥 provider path、响应映射 path、timeout、OTLP exporter 是否存在，以及密钥是否已配置；不会返回 API key。数据库 URL 会隐藏密码。Provider/backend selector、数字阈值和必要 companion URL 会在 settings 加载时校验，配置不支持或不完整时会在启动或 smoke test 阶段尽早失败。
 
-设置 `GATEWAY_API_KEY` 后，请在 API 请求中加入 `X-API-Key` 或 bearer token。WebSocket 客户端可以通过 header 或 `?api_key=...` 传入同一 key。使用本地 demo UI 时，在页面顶部 `Gateway Key` 输入框填入同一 key 并点击“保存 Key”；该 key 只保存在当前浏览器会话中，页面会自动带到 API、WebSocket 和报告下载链接。
+设置 `GATEWAY_API_KEY` 后，请在 API 请求中加入 `X-API-Key` 或 bearer token。WebSocket 客户端可以通过 header 或 `?api_key=...` 传入同一 key。使用本地 demo UI 时，在页面顶部 `Gateway Key` 输入框填入同一 key 并点击“保存 Key”；该 key 只保存在当前浏览器会话中，页面会自动带到 API 和报告下载请求，WebSocket 会通过 `gateway-key.*` subprotocol 携带 key，避免把 key 写进 URL。
 
 如果 `check_llm.py` 报连接错误，运行 `diagnose_llm_network.py`。它会检查配置的 `LLM_BASE_URL` 的 DNS、TCP 和 TLS，不会打印 API key。
 

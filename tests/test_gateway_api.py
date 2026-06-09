@@ -304,7 +304,10 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert '"X-API-Key": state.gatewayApiKey' in response.text
     assert "fetchWithTimeout(apiUrl(path)" in response.text
     assert "url.searchParams.set(key, value)" in response.text
-    assert "new WebSocket(wsUrl(`/ws/interview/${interviewId}`))" in response.text
+    assert "websocketProtocols" in response.text
+    assert "base64UrlEncode" in response.text
+    assert 'gateway-key.${base64UrlEncode(state.gatewayApiKey)}' in response.text
+    assert "new WebSocket(wsUrl(`/ws/interview/${interviewId}`), websocketProtocols())" in response.text
     assert 'data-report-format="html"' in response.text
     assert "downloadReportArtifact" in response.text
     assert "fetchGateway(`/api/interviews/${interviewId}/report.${format}`)" in response.text
@@ -677,6 +680,39 @@ def test_gateway_websocket_requires_api_key_when_enabled(tmp_path: Path, monkeyp
         assert websocket.receive_json()["type"] == "credibility"
         websocket.send_json({"type": "end"})
         assert websocket.receive_json()["type"] == "report"
+
+
+def test_gateway_websocket_accepts_api_key_subprotocol(tmp_path: Path, monkeypatch) -> None:
+    client = _client(tmp_path, monkeypatch, gateway_api_key="gateway-secret")
+    headers = {"x-api-key": "gateway-secret"}
+    job = client.post(
+        "/api/jobs",
+        headers=headers,
+        json={"title": "Backend", "jd_text": "Python"},
+    ).json()
+    candidate = client.post(
+        "/api/candidates",
+        headers=headers,
+        json={"name": "Candidate"},
+    ).json()
+    interview = client.post(
+        "/api/interviews",
+        headers=headers,
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+
+    with client.websocket_connect(
+        f"/ws/interview/{interview['id']}",
+        headers={"sec-websocket-protocol": "gateway-key.Z2F0ZXdheS1zZWNyZXQ"},
+    ) as websocket:
+        websocket.send_json(
+            {
+                "type": "text_turn",
+                "seq": 1,
+                "answer": "我负责可靠性治理并把错误分流、重试和报告生成串起来，线上超时率明显下降。",
+            }
+        )
+        assert websocket.receive_json()["type"] == "transcript"
 
 
 def test_gateway_job_probe_pattern_search(tmp_path: Path, monkeypatch) -> None:

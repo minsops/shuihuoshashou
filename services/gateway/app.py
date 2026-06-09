@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import binascii
 import json
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -166,7 +167,25 @@ def _extract_gateway_api_key(headers: Headers, query_key: str | None = None) -> 
     authorization = headers.get("authorization", "")
     if authorization.lower().startswith("bearer "):
         return authorization[7:].strip()
+    websocket_key = _extract_websocket_protocol_key(headers)
+    if websocket_key:
+        return websocket_key
     return query_key or ""
+
+
+def _extract_websocket_protocol_key(headers: Headers) -> str:
+    protocols = headers.get("sec-websocket-protocol", "")
+    for protocol in protocols.split(","):
+        item = protocol.strip()
+        if not item.startswith("gateway-key."):
+            continue
+        encoded = item.removeprefix("gateway-key.")
+        try:
+            padding = "=" * (-len(encoded) % 4)
+            return base64.urlsafe_b64decode(f"{encoded}{padding}").decode("utf-8")
+        except (binascii.Error, UnicodeDecodeError):
+            return ""
+    return ""
 
 
 def _gateway_authorized(headers: Headers, expected_key: str, query_key: str | None = None) -> bool:
