@@ -682,6 +682,7 @@
             <button class="danger" type="button" id="endInterview" disabled>结束并评分</button>
             <span class="status-pill" id="micStatus"><span class="status-dot"></span><span>麦克风未开启</span></span>
           </div>
+          <p class="small" id="controlHint">请先创建实时面试并等待实时通道连接。</p>
         </form>
         <div class="feed" id="liveFeed">
           <div class="empty">实时转写、回答和追问事件会出现在这里</div>
@@ -763,6 +764,7 @@
       const reconnectSocket = document.querySelector("#reconnectSocket");
       const manualProbe = document.querySelector("#manualProbe");
       const endInterview = document.querySelector("#endInterview");
+      const controlHint = document.querySelector("#controlHint");
 
       const state = {
         job: null,
@@ -826,6 +828,7 @@
         prepareInterview.disabled =
           state.preparingInterview || Boolean(state.interview) || connected || connecting;
         setControlHints(connected, connecting);
+        controlHint.textContent = controlHintText(connected, connecting);
         if (state.interviewEnded) {
           setPill(liveStatus, "面试已结束", "ready");
         } else if (connected) {
@@ -884,6 +887,15 @@
           : state.interview
             ? "当前已有面试，请重置后再创建新的面试"
             : "创建实时面试通道";
+      }
+
+      function controlHintText(connected, connecting) {
+        if (state.interviewEnded) return "面试已结束。请重置后创建新的面试。";
+        if (state.micRecording) return "麦克风采集中。可以停止麦克风，或结束面试生成评分报告。";
+        if (connected) return "实时通道已连接。可以发送文字回答，或点击开始麦克风进行语音转写。";
+        if (connecting) return "实时通道连接中，请稍候。连接成功后按钮会自动启用。";
+        if (state.interview) return "实时通道未连接。请点击重连通道，或重置后重新创建面试。";
+        return "请先创建实时面试并等待实时通道连接。";
       }
 
       function appendEvent(title, body, tone = "") {
