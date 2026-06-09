@@ -2337,6 +2337,10 @@
         setPill(liveStatus, "报告已生成", "ready");
       }
 
+      function reportDownloadStillCurrent(interviewId) {
+        return state.interview && state.interview.id === interviewId && state.reportReady;
+      }
+
       async function downloadReportArtifact(interviewId, format) {
         if (!interviewId || !format) {
           appendEvent("报告下载失败", "报告 ID 或格式缺失，请刷新报告后重试。", "red");
@@ -2360,7 +2364,9 @@
           const response = await fetchGateway(`/api/interviews/${interviewId}/report.${format}`, {
             timeoutMs: reportDownloadTimeoutMs,
           });
+          if (!reportDownloadStillCurrent(interviewId)) return;
           const blob = await response.blob();
+          if (!reportDownloadStillCurrent(interviewId)) return;
           const url = URL.createObjectURL(blob);
           const anchor = document.createElement("a");
           anchor.href = url;
@@ -2371,6 +2377,7 @@
           setTimeout(() => URL.revokeObjectURL(url), 2000);
           appendEvent("报告下载", `${escapeHtml(reportFormatLabel(format))} 已开始下载。`, "green");
         } catch (error) {
+          if (!reportDownloadStillCurrent(interviewId)) return;
           if (gatewayAuthError(error)) {
             showGatewayKeyRequired("报告下载");
           } else {
