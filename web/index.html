@@ -794,6 +794,8 @@
         micError: "",
         documentParsingCount: 0,
         documentParseEpoch: 0,
+        runtimeCheckToken: 0,
+        lastRuntimeCheckAt: 0,
         apiOrigin:
           window.location.origin && window.location.origin !== "null"
             ? window.location.origin
@@ -1149,7 +1151,30 @@
         checkRuntime();
       }
 
+      function runtimeCheckStillCurrent(checkToken) {
+        return checkToken === state.runtimeCheckToken;
+      }
+
+      function shouldRefreshRuntimeOnFocus() {
+        if (document.visibilityState !== "visible") return false;
+        const statusText = runtimeStatus.textContent || "";
+        const staleMs = 30_000;
+        return (
+          !state.lastRuntimeCheckAt ||
+          Date.now() - state.lastRuntimeCheckAt > staleMs ||
+          statusText.includes("服务不可达") ||
+          statusText.includes("状态未知")
+        );
+      }
+
+      function refreshRuntimeIfVisible() {
+        if (shouldRefreshRuntimeOnFocus()) checkRuntime();
+      }
+
       async function checkRuntime() {
+        const checkToken = state.runtimeCheckToken + 1;
+        state.runtimeCheckToken = checkToken;
+        state.lastRuntimeCheckAt = Date.now();
         refreshStatus.disabled = true;
         refreshStatus.title = "正在刷新服务、模型和 ASR 状态";
         setPill(runtimeStatus, "检查中", "live");
@@ -1157,6 +1182,7 @@
         setPill(asrStatus, "ASR 检查中", "live");
         try {
           const status = await discoverGateway();
+          if (!runtimeCheckStillCurrent(checkToken)) return;
           setPill(
             runtimeStatus,
             status.status === "ok" ? "服务正常" : "服务异常",
@@ -1164,6 +1190,7 @@
           );
           runtimeStatus.title = `当前 gateway：${state.apiOrigin}`;
         } catch (error) {
+          if (!runtimeCheckStillCurrent(checkToken)) return;
           setPill(runtimeStatus, "服务不可达", "");
           runtimeStatus.title = `服务不可达：${errorText(error)}`;
           appendEvent(
@@ -1174,6 +1201,7 @@
         }
         try {
           const config = await fetchGatewayJson("/api/config/status");
+          if (!runtimeCheckStillCurrent(checkToken)) return;
           const model = modelStatusFromConfig(config);
           setPill(modelStatus, model.text, model.ready ? "ready" : "");
           modelStatus.title = model.title || model.text;
@@ -1181,6 +1209,7 @@
           setPill(asrStatus, asr.text, asr.ready ? "ready" : "");
           asrStatus.title = asr.title || asr.text;
         } catch (error) {
+          if (!runtimeCheckStillCurrent(checkToken)) return;
           if (gatewayAuthError(error)) {
             showGatewayKeyRequired("服务检查", { model: true, asr: true });
           } else {
@@ -1191,6 +1220,7 @@
             setStatusTitleFromMessage(asrStatus, message);
           }
         } finally {
+          if (!runtimeCheckStillCurrent(checkToken)) return;
           refreshStatus.disabled = false;
           refreshStatus.title = "重新检查服务、模型和 ASR 状态";
         }
@@ -2393,6 +2423,9 @@
       reconnectSocket.addEventListener("click", reconnectLiveChannel);
       manualProbe.addEventListener("click", () => sendTurn(true));
       endInterview.addEventListener("click", requestEndInterview);
+      document.addEventListener("visibilitychange", refreshRuntimeIfVisible);
+      window.addEventListener("focus", refreshRuntimeIfVisible);
+      window.addEventListener("online", refreshRuntimeIfVisible);
 
       gatewayKey.value = state.gatewayApiKey;
       checkRuntime();
