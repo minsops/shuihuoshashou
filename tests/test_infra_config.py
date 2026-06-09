@@ -133,6 +133,22 @@ def test_env_example_lists_runtime_integration_knobs() -> None:
         assert key in env_example
 
 
+def test_env_example_includes_complete_deepseek_configuration_block() -> None:
+    env_example = (ROOT / ".env.example").read_text(encoding="utf-8")
+
+    for line in [
+        "# LLM_PROVIDER=openai_compatible",
+        "# LLM_MODEL=deepseek-v4-pro",
+        "# LLM_BASE_URL=https://api.deepseek.com",
+        "# LLM_API_PATH=/chat/completions",
+        "# LLM_API_KEY=your-deepseek-key",
+        "# LLM_AUTH_HEADER=Authorization",
+        "# LLM_AUTH_SCHEME=Bearer",
+        "# LLM_RESPONSE_CONTENT_PATH=choices.0.message.content",
+    ]:
+        assert line in env_example
+
+
 def test_postgres_schema_matches_core_spec_tables() -> None:
     schema = (ROOT / "db" / "postgres" / "001_core_schema.sql").read_text(encoding="utf-8")
 
