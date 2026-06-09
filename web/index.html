@@ -1672,9 +1672,15 @@
             "red"
           );
         });
-        state.socket.addEventListener("message", (event) => {
+        state.socket.addEventListener("message", handleSocketMessage);
+      }
+
+      function handleSocketMessage(event) {
+        try {
           renderLiveMessage(JSON.parse(event.data));
-        });
+        } catch (error) {
+          appendEvent("实时通道", `实时消息格式异常：${escapeHtml(errorText(error))}`, "red");
+        }
       }
 
       async function reconnectLiveChannel() {
