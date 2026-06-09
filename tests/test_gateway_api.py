@@ -254,6 +254,9 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "先创建实时面试" in response.text
     assert "实时通道连接中" in response.text
     assert "通道未连接" in response.text
+    assert "readErrorMessage" in response.text
+    assert "item.loc" in response.text
+    assert "payload.detail" in response.text
 
 
 def test_gateway_health_identifies_service(tmp_path: Path, monkeypatch) -> None:

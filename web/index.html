@@ -836,13 +836,44 @@
         liveFeed.prepend(node);
       }
 
+      async function readErrorMessage(response) {
+        const fallback = `HTTP ${response.status}`;
+        const text = await response.text();
+        if (!text.trim()) return fallback;
+        try {
+          const payload = JSON.parse(text);
+          const detail = payload.detail;
+          if (Array.isArray(detail)) {
+            return detail
+              .map((item) => {
+                const path = Array.isArray(item.loc) ? item.loc.join(".") : "";
+                return [path, item.msg].filter(Boolean).join(": ");
+              })
+              .filter(Boolean)
+              .join("；") || fallback;
+          }
+          if (typeof detail === "string" && detail.trim()) return detail;
+          if (detail && typeof detail === "object") return JSON.stringify(detail);
+          if (typeof payload.message === "string" && payload.message.trim()) {
+            return payload.message;
+          }
+        } catch (error) {
+          return text;
+        }
+        return text;
+      }
+
+      function errorText(error) {
+        return error && error.message ? error.message : String(error);
+      }
+
       async function postJson(url, payload) {
         const response = await fetch(url, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify(payload),
         });
-        if (!response.ok) throw new Error(await response.text());
+        if (!response.ok) throw new Error(await readErrorMessage(response));
         return response.json();
       }
 
@@ -921,7 +952,7 @@
             headers: { "content-type": file.type || "application/octet-stream" },
             body: await file.arrayBuffer(),
           });
-          if (!response.ok) throw new Error(await response.text());
+          if (!response.ok) throw new Error(await readErrorMessage(response));
           const result = await response.json();
           target.value = result.text.trim() ? result.text : target.value;
           const modelNote = result.llm_attempted
@@ -934,7 +965,7 @@
             `${escapeHtml(label)} 已解析：${escapeHtml(file.name)}（${escapeHtml(result.source)}${modelNote}）`
           );
         } catch (error) {
-          appendEvent("资料上传失败", escapeHtml(error), "red");
+          appendEvent("资料上传失败", escapeHtml(errorText(error)), "red");
         }
       }
 
@@ -1070,7 +1101,7 @@
           appendEvent("面试创建", `${escapeHtml(job.title)} · ${escapeHtml(candidate.name)}`);
         } catch (error) {
           setPill(setupStatus, "创建失败", "");
-          appendEvent("错误", escapeHtml(error), "red");
+          appendEvent("错误", escapeHtml(errorText(error)), "red");
           prepareInterview.disabled = false;
         }
       }
