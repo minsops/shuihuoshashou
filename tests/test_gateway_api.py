@@ -323,6 +323,9 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "无法连接到本地 gateway" in response.text
     assert "页面正在尝试连接" in response.text
     assert "失败详情" in response.text
+    assert "gatewayFailureTitle" in response.text
+    assert "runtimeStatus.title = gatewayFailureTitle(error)" in response.text
+    assert "服务不可达：${errorText(error)}。${gatewayHelpText()}" in response.text
     assert "当前 gateway" in response.text
     assert "runtimeCheckToken" in response.text
     assert "runtimeCheckStillCurrent" in response.text

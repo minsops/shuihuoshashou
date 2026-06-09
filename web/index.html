@@ -1221,6 +1221,10 @@
         return `请确认已运行 python scripts/run_gateway.py；页面正在尝试连接：${attemptedGatewayOriginsText()}。`;
       }
 
+      function gatewayFailureTitle(error) {
+        return `服务不可达：${errorText(error)}。${gatewayHelpText()}`;
+      }
+
       function gatewayOrigins() {
         return [state.apiOrigin, ...fallbackGatewayOrigins].filter(
           (origin, index, origins) => origin && origins.indexOf(origin) === index
@@ -1413,7 +1417,7 @@
         } catch (error) {
           if (!runtimeCheckStillCurrent(checkToken)) return;
           setPill(runtimeStatus, "服务不可达", "");
-          runtimeStatus.title = `服务不可达：${errorText(error)}`;
+          runtimeStatus.title = gatewayFailureTitle(error);
           appendEvent(
             "服务检查",
             `无法连接到本地 gateway。${escapeHtml(gatewayHelpText())}<br><span class="small">失败详情：${escapeHtml(errorText(error))}</span>`,
