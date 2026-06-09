@@ -248,6 +248,8 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "停止麦克风" in response.text
     assert "重连通道" in response.text
     assert "刷新状态" in response.text
+    assert "setStatusTitleFromMessage" in response.text
+    assert "result.message" in response.text
     assert "modelStatusFromConfig" in response.text
     assert "模型模拟模式" in response.text
     assert "模型未配置完整" in response.text

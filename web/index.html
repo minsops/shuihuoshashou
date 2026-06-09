@@ -1187,6 +1187,10 @@
         appendEvent(title, "Gateway 已启用鉴权，请在顶部 Gateway Key 输入框保存 key。", "red");
       }
 
+      function setStatusTitleFromMessage(node, message) {
+        node.title = String(message || "").trim() || node.textContent.trim();
+      }
+
       async function checkLlmConnection() {
         checkModel.disabled = true;
         checkModel.title = "正在调用真实模型检查连接";
@@ -1195,13 +1199,16 @@
           await discoverGateway();
           const result = await fetchGatewayJson("/api/config/llm/check", { method: "POST" });
           setPill(modelStatus, result.ok ? "模型连接正常" : "模型连接异常", result.ok ? "ready" : "");
+          setStatusTitleFromMessage(modelStatus, result.message);
           appendEvent("模型检查", escapeHtml(result.message), result.ok ? "green" : "red");
         } catch (error) {
           if (gatewayAuthError(error)) {
             showGatewayKeyRequired("模型检查", { model: true });
           } else {
+            const message = errorText(error);
             setPill(modelStatus, "模型连接异常", "");
-            appendEvent("模型检查", escapeHtml(errorText(error)), "red");
+            setStatusTitleFromMessage(modelStatus, message);
+            appendEvent("模型检查", escapeHtml(message), "red");
           }
         } finally {
           checkModel.disabled = false;
@@ -1217,13 +1224,16 @@
           await discoverGateway();
           const result = await fetchGatewayJson("/api/config/asr/check", { method: "POST" });
           setPill(asrStatus, asrCheckStatusText(result), result.ok ? "ready" : "");
+          setStatusTitleFromMessage(asrStatus, result.message);
           appendEvent("ASR 检查", escapeHtml(result.message), result.ok ? "green" : "red");
         } catch (error) {
           if (gatewayAuthError(error)) {
             showGatewayKeyRequired("ASR 检查", { asr: true });
           } else {
+            const message = errorText(error);
             setPill(asrStatus, "ASR 异常", "");
-            appendEvent("ASR 检查", escapeHtml(errorText(error)), "red");
+            setStatusTitleFromMessage(asrStatus, message);
+            appendEvent("ASR 检查", escapeHtml(message), "red");
           }
         } finally {
           checkAsr.disabled = false;
