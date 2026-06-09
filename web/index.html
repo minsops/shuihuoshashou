@@ -1830,6 +1830,7 @@
 
       function selectQuestion(question, meta = {}) {
         currentQuestion.value = question;
+        answerText.value = "";
         updateTextCounters();
         state.selectedQuestionSource = meta.questionSource || "interviewer";
         state.selectedProbeTarget = meta.probeTarget || null;
