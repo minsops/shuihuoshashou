@@ -322,6 +322,8 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "实时通道未连接。请点击重连通道" in response.text
     assert "liveChannelReadyForInput" in response.text
     assert "实时通道未连接，请点击重连通道。" in response.text
+    assert "requestEndInterview" in response.text
+    assert 'JSON.stringify({ type: "end" })' in response.text
     assert "readErrorMessage" in response.text
     assert "item.loc" in response.text
     assert "payload.detail" in response.text

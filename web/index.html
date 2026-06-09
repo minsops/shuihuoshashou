@@ -1798,6 +1798,15 @@
         );
       }
 
+      function requestEndInterview() {
+        stopMicCapture();
+        if (!liveChannelReadyForInput()) return;
+        endInterview.disabled = true;
+        endInterview.title = "正在结束面试并生成评分报告";
+        setPill(liveStatus, "评分中", "live");
+        state.socket.send(JSON.stringify({ type: "end" }));
+      }
+
       function renderLiveMessage(message) {
         if (message.type === "transcript") {
           state.turns += message.payload.speaker === "candidate" && message.payload.is_final ? 1 : 0;
@@ -2364,15 +2373,7 @@
       stopMic.addEventListener("click", stopMicCapture);
       reconnectSocket.addEventListener("click", reconnectLiveChannel);
       manualProbe.addEventListener("click", () => sendTurn(true));
-      endInterview.addEventListener("click", () => {
-        stopMicCapture();
-        if (state.socket && state.socket.readyState === WebSocket.OPEN) {
-          endInterview.disabled = true;
-          endInterview.title = "正在结束面试并生成评分报告";
-          setPill(liveStatus, "评分中", "live");
-          state.socket.send(JSON.stringify({ type: "end" }));
-        }
-      });
+      endInterview.addEventListener("click", requestEndInterview);
 
       gatewayKey.value = state.gatewayApiKey;
       checkRuntime();
