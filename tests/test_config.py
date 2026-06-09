@@ -36,6 +36,12 @@ def test_settings_rejects_invalid_llm_extra_body_json() -> None:
         Settings(llm_extra_body_json='["not", "an", "object"]')
 
 
+def test_settings_rejects_invalid_llm_response_content_path() -> None:
+    for path in ["", " ", "choices..message.content", ".choices.0.message.content"]:
+        with pytest.raises(ValidationError, match="LLM_RESPONSE_CONTENT_PATH"):
+            Settings(llm_response_content_path=path)
+
+
 def test_settings_accepts_declared_production_backends() -> None:
     settings = Settings(
         llm_provider="openai_compatible",

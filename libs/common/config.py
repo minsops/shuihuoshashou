@@ -151,6 +151,10 @@ class Settings(BaseSettings):
                 raise ValueError("LLM_EXTRA_BODY_JSON must be valid JSON") from exc
             if not isinstance(extra_body, dict):
                 raise ValueError("LLM_EXTRA_BODY_JSON must decode to an object")
+        if not self.llm_response_content_path.strip() or any(
+            not part.strip() for part in self.llm_response_content_path.split(".")
+        ):
+            raise ValueError("LLM_RESPONSE_CONTENT_PATH must be a non-empty dot path")
         return self
 
 
