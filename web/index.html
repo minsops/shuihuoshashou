@@ -1775,7 +1775,7 @@
                   <span class="tag">${Math.round(Number(item.weight || 0) * 100)}%</span>
                 </div>
                 <p>${escapeHtml(item.description)}</p>
-                <button class="secondary" type="button" data-seed-question="${index}" title="把该能力维度生成当前面试问题">生成此维度问题</button>
+                <button class="secondary" type="button" data-seed-question="${index}" title="把该能力维度生成当前面试问题" aria-label="生成${escapeHtml(item.name)}维度的面试问题">生成此维度问题</button>
               </div>
             `
           )
@@ -1825,7 +1825,7 @@
                 </div>
                 <h3>${escapeHtml(item.question)}</h3>
                 <p>${escapeHtml(item.target)}</p>
-                <button class="secondary" type="button" data-probe-index="${index}" title="将此追问填入当前面试问题">设为下一问</button>
+                <button class="secondary" type="button" data-probe-index="${index}" title="将此追问填入当前面试问题" aria-label="将此追问设为下一问">设为下一问</button>
               </div>
             `
           )
@@ -2338,10 +2338,10 @@
         const riskNotes = Array.isArray(score.risk_notes) ? score.risk_notes : [];
         const transcriptTurns = Array.isArray(report.transcript) ? report.transcript : [];
         reportLinks.innerHTML = `
-          <button class="secondary" type="button" data-report-format="html" data-report-id="${escapeHtml(reportId)}" title="下载 HTML 报告">HTML</button>
-          <button class="secondary" type="button" data-report-format="pdf" data-report-id="${escapeHtml(reportId)}" title="下载 PDF 报告">PDF</button>
-          <button class="secondary" type="button" data-report-format="json" data-report-id="${escapeHtml(reportId)}" title="下载 JSON 报告">JSON</button>
-          <button class="secondary" type="button" data-report-format="transcript.json" data-report-id="${escapeHtml(reportId)}" title="下载转写记录">转写</button>
+          <button class="secondary" type="button" data-report-format="html" data-report-id="${escapeHtml(reportId)}" title="下载 HTML 报告" aria-label="下载 HTML 报告">HTML</button>
+          <button class="secondary" type="button" data-report-format="pdf" data-report-id="${escapeHtml(reportId)}" title="下载 PDF 报告" aria-label="下载 PDF 报告">PDF</button>
+          <button class="secondary" type="button" data-report-format="json" data-report-id="${escapeHtml(reportId)}" title="下载 JSON 报告" aria-label="下载 JSON 报告">JSON</button>
+          <button class="secondary" type="button" data-report-format="transcript.json" data-report-id="${escapeHtml(reportId)}" title="下载转写记录" aria-label="下载转写记录">转写</button>
         `;
         reportLinks.querySelectorAll("[data-report-format]").forEach((button) => {
           button.addEventListener("click", () => {
@@ -2429,7 +2429,7 @@
         clearQueuedReportPolling();
         const refreshEpoch = state.reportRefreshEpoch;
         reportLinks.innerHTML = `
-          <button class="secondary" type="button" id="refreshReport" data-report-id="${escapeHtml(interviewId)}" title="手动刷新评分报告">刷新报告</button>
+          <button class="secondary" type="button" id="refreshReport" data-report-id="${escapeHtml(interviewId)}" title="手动刷新评分报告" aria-label="手动刷新评分报告">刷新报告</button>
         `;
         reportLinks.querySelector("#refreshReport").addEventListener("click", (event) => {
           refreshQueuedReport(event.currentTarget.dataset.reportId, { refreshEpoch });

@@ -498,7 +498,9 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "hadProbeMeta" in response.text
     assert "已改为手动编辑问题，将按面试官自定义问题记录" in response.text
     assert 'title="把该能力维度生成当前面试问题"' in response.text
+    assert 'aria-label="生成${escapeHtml(item.name)}维度的面试问题"' in response.text
     assert 'title="将此追问填入当前面试问题"' in response.text
+    assert 'aria-label="将此追问设为下一问"' in response.text
     assert "function selectQuestion(question, meta = {})" in response.text
     assert 'answerText.value = "";\n        updateTextCounters();\n        state.selectedQuestionSource' in (
         response.text
@@ -552,9 +554,13 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert 'data-report-format="html"' in response.text
     assert 'data-report-format="transcript.json"' in response.text
     assert 'title="下载 HTML 报告"' in response.text
+    assert 'aria-label="下载 HTML 报告"' in response.text
     assert 'title="下载 PDF 报告"' in response.text
+    assert 'aria-label="下载 PDF 报告"' in response.text
     assert 'title="下载 JSON 报告"' in response.text
+    assert 'aria-label="下载 JSON 报告"' in response.text
     assert 'title="下载转写记录"' in response.text
+    assert 'aria-label="下载转写记录"' in response.text
     assert ">转写</button>" in response.text
     assert "downloadReportArtifact" in response.text
     assert "reportDownloadStillCurrent" in response.text
@@ -613,6 +619,7 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert 'button.textContent = "刷新中"' in response.text
     assert 'button.textContent = originalLabel || "刷新报告"' in response.text
     assert 'title="手动刷新评分报告"' in response.text
+    assert 'aria-label="手动刷新评分报告"' in response.text
     assert "报告刷新正在进行中，请稍候" in response.text
     assert "fetchGatewayJson(`/api/interviews/${interviewId}/report`)" in response.text
     assert "reportPendingError" in response.text
