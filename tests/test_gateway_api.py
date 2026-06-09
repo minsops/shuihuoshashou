@@ -377,6 +377,9 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "item.loc" in response.text
     assert "payload.detail" in response.text
     assert 'part !== "body" && part !== "query"' in response.text
+    assert "const { timeoutMs, ...fetchOptions } = options" in response.text
+    assert "timeoutMs: documentParseTimeoutMs" in response.text
+    assert "documentParseTimeoutMs = 45_000" in response.text
     assert "input.disabled = true" in response.text
     assert "input.value = \"\"" in response.text
     assert ".log,.pdf" in response.text
@@ -431,7 +434,8 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert 'id="saveGatewayKey"' in response.text
     assert "sessionStorage.getItem(\"gatewayApiKey\")" in response.text
     assert '"X-API-Key": state.gatewayApiKey' in response.text
-    assert "fetchWithTimeout(apiUrl(path)" in response.text
+    assert "fetchWithTimeout(" in response.text
+    assert "apiUrl(path)" in response.text
     assert "url.searchParams.set(key, value)" in response.text
     assert "websocketProtocols" in response.text
     assert "base64UrlEncode" in response.text
@@ -446,7 +450,9 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "state.reportDownloadInFlight.has(downloadKey)" in response.text
     assert "state.reportDownloadInFlight.delete(downloadKey)" in response.text
     assert "正在下载中，请稍候" in response.text
-    assert "fetchGateway(`/api/interviews/${interviewId}/report.${format}`)" in response.text
+    assert "`/api/interviews/${interviewId}/report.${format}`" in response.text
+    assert "timeoutMs: reportDownloadTimeoutMs" in response.text
+    assert "reportDownloadTimeoutMs = 30_000" in response.text
     assert 'button.textContent = "下载中"' in response.text
     assert "正在下载 ${reportFormatLabel(format)} 报告" in response.text
     assert "button.textContent = originalLabel || reportFormatLabel(format)" in response.text

@@ -816,6 +816,8 @@
       const maxLiveFeedEvents = 120;
       const queuedReportPollIntervalMs = 3000;
       const queuedReportMaxPollAttempts = 30;
+      const documentParseTimeoutMs = 45_000;
+      const reportDownloadTimeoutMs = 30_000;
       const supportedDocumentSuffixes = new Set([
         ".txt",
         ".md",
@@ -1142,10 +1144,15 @@
       }
 
       async function fetchGateway(path, options = {}) {
-        const response = await fetchWithTimeout(apiUrl(path), {
-          ...options,
-          headers: gatewayHeaders(options.headers || {}),
-        });
+        const { timeoutMs, ...fetchOptions } = options;
+        const response = await fetchWithTimeout(
+          apiUrl(path),
+          {
+            ...fetchOptions,
+            headers: gatewayHeaders(fetchOptions.headers || {}),
+          },
+          timeoutMs
+        );
         if (!response.ok) throw new Error(await readErrorMessage(response));
         return response;
       }
@@ -1432,6 +1439,7 @@
             method: "POST",
             headers: { "content-type": file.type || "application/octet-stream" },
             body: await file.arrayBuffer(),
+            timeoutMs: documentParseTimeoutMs,
           });
           const result = await response.json();
           const parsedText = String(result.text || "").trim();
@@ -2252,7 +2260,9 @@
           button.title = `正在下载 ${reportFormatLabel(format)} 报告`;
         }
         try {
-          const response = await fetchGateway(`/api/interviews/${interviewId}/report.${format}`);
+          const response = await fetchGateway(`/api/interviews/${interviewId}/report.${format}`, {
+            timeoutMs: reportDownloadTimeoutMs,
+          });
           const blob = await response.blob();
           const url = URL.createObjectURL(blob);
           const anchor = document.createElement("a");
