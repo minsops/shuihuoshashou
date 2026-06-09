@@ -399,6 +399,58 @@
         line-height: 1.45;
       }
 
+      .control-hint {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        min-height: 36px;
+        margin: var(--space-xs) 0 0;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 8px 10px;
+        background: color-mix(in oklch, var(--surface-2), transparent 30%);
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .control-hint::before {
+        content: "";
+        flex: 0 0 auto;
+        width: 8px;
+        height: 8px;
+        margin-top: 5px;
+        border-radius: 999px;
+        background: var(--muted);
+      }
+
+      .control-hint.ready {
+        border-color: color-mix(in oklch, var(--green), transparent 55%);
+        color: var(--ink);
+      }
+
+      .control-hint.ready::before {
+        background: var(--green);
+      }
+
+      .control-hint.live {
+        border-color: color-mix(in oklch, var(--amber), transparent 45%);
+        color: var(--ink);
+      }
+
+      .control-hint.live::before {
+        background: var(--amber);
+      }
+
+      .control-hint.warn {
+        border-color: color-mix(in oklch, var(--red), transparent 55%);
+        color: var(--red);
+      }
+
+      .control-hint.warn::before {
+        background: var(--red);
+      }
+
       .feed {
         max-height: 480px;
         min-height: 220px;
@@ -682,7 +734,7 @@
             <button class="danger" type="button" id="endInterview" disabled>结束并评分</button>
             <span class="status-pill" id="micStatus"><span class="status-dot"></span><span>麦克风未开启</span></span>
           </div>
-          <p class="small" id="controlHint">请先创建实时面试并等待实时通道连接。</p>
+          <p class="control-hint" id="controlHint">请先创建实时面试并等待实时通道连接。</p>
         </form>
         <div class="feed" id="liveFeed">
           <div class="empty">实时转写、回答和追问事件会出现在这里</div>
@@ -885,6 +937,7 @@
           connecting;
         setControlHints(connected, connecting);
         controlHint.textContent = controlHintText(connected, connecting);
+        controlHint.className = `control-hint ${controlHintTone(connected, connecting)}`.trim();
         if (state.reportReady) {
           setPill(liveStatus, "报告已生成", "ready");
         } else if (state.interviewEnded) {
@@ -992,6 +1045,13 @@
         if (connecting) return "实时通道连接中，请稍候。连接成功后按钮会自动启用。";
         if (state.interview) return "实时通道未连接。请点击重连通道，或重置后重新创建面试。";
         return "请先创建实时面试并等待实时通道连接。";
+      }
+
+      function controlHintTone(connected, connecting) {
+        if (state.reportReady || state.interviewEnded || connected || state.micRecording) return "ready";
+        if (state.endingInterview || state.micStarting || connecting) return "live";
+        if (state.micError || state.interview) return "warn";
+        return "";
       }
 
       function appendEvent(title, body, tone = "") {

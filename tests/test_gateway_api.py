@@ -367,8 +367,11 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "候选人回答不能为空" in response.text
     assert "实时消息序号无效，请重连通道后重试" in response.text
     assert "原始错误" in response.text
-    assert 'id="controlHint"' in response.text
+    assert 'class="control-hint" id="controlHint"' in response.text
     assert "controlHintText" in response.text
+    assert "controlHintTone" in response.text
+    assert "controlHint.className" in response.text
+    assert ".control-hint.warn" in response.text
     assert "实时通道已连接。可以发送文字回答" in response.text
     assert "实时通道未连接。请点击重连通道" in response.text
     assert "liveChannelReadyForInput" in response.text
