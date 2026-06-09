@@ -782,6 +782,7 @@
         reportReady: false,
         reportPollTimer: null,
         reportPollAttempts: 0,
+        reportRefreshEpoch: 0,
         reportRefreshInFlight: false,
         startedAt: 0,
         micStream: null,
@@ -2136,14 +2137,15 @@
 
       function renderQueuedReportState(interviewId) {
         clearQueuedReportPolling();
+        const refreshEpoch = state.reportRefreshEpoch;
         reportLinks.innerHTML = `
           <button class="secondary" type="button" id="refreshReport" data-report-id="${escapeHtml(interviewId)}">刷新报告</button>
         `;
         reportLinks.querySelector("#refreshReport").addEventListener("click", (event) => {
-          refreshQueuedReport(event.currentTarget.dataset.reportId);
+          refreshQueuedReport(event.currentTarget.dataset.reportId, { refreshEpoch });
         });
         reportPanel.innerHTML = '<div class="empty">后台评分任务已排队，系统会自动刷新报告。</div>';
-        scheduleQueuedReportPolling(interviewId);
+        scheduleQueuedReportPolling(interviewId, refreshEpoch);
       }
 
       function clearQueuedReportPolling() {
@@ -2152,10 +2154,22 @@
           state.reportPollTimer = null;
         }
         state.reportPollAttempts = 0;
+        state.reportRefreshEpoch += 1;
+        state.reportRefreshInFlight = false;
       }
 
-      function scheduleQueuedReportPolling(interviewId) {
+      function reportRefreshStillCurrent(refreshEpoch, interviewId) {
+        return (
+          refreshEpoch === state.reportRefreshEpoch &&
+          state.interview &&
+          state.interview.id === interviewId &&
+          !state.reportReady
+        );
+      }
+
+      function scheduleQueuedReportPolling(interviewId, refreshEpoch = state.reportRefreshEpoch) {
         if (!interviewId || state.reportReady || state.reportPollTimer) return;
+        if (!reportRefreshStillCurrent(refreshEpoch, interviewId)) return;
         if (state.reportPollAttempts >= queuedReportMaxPollAttempts) {
           appendEvent("报告刷新", "后台评分仍未完成，请稍后手动刷新报告。");
           return;
@@ -2163,11 +2177,13 @@
         state.reportPollAttempts += 1;
         state.reportPollTimer = window.setTimeout(() => {
           state.reportPollTimer = null;
-          refreshQueuedReport(interviewId, { auto: true });
+          refreshQueuedReport(interviewId, { auto: true, refreshEpoch });
         }, queuedReportPollIntervalMs);
       }
 
       async function refreshQueuedReport(interviewId, options = {}) {
+        const refreshEpoch = options.refreshEpoch ?? state.reportRefreshEpoch;
+        if (!reportRefreshStillCurrent(refreshEpoch, interviewId)) return;
         if (state.reportRefreshInFlight) return;
         state.reportRefreshInFlight = true;
         const button = reportLinks.querySelector("#refreshReport");
@@ -2179,20 +2195,22 @@
         }
         try {
           const report = await fetchGatewayJson(`/api/interviews/${interviewId}/report`);
+          if (!reportRefreshStillCurrent(refreshEpoch, interviewId)) return;
           renderReport(report);
           markReportReady();
           appendEvent("评分完成", `总分 ${escapeHtml(reportTotalScoreText(report))}`, "green");
         } catch (error) {
+          if (!reportRefreshStillCurrent(refreshEpoch, interviewId)) return;
           if (gatewayAuthError(error)) {
             showGatewayKeyRequired("报告刷新");
           } else if (reportPendingError(error)) {
             if (!autoRefresh) appendEvent("报告刷新", "报告仍在生成中，请稍后再刷新。");
-            scheduleQueuedReportPolling(interviewId);
+            scheduleQueuedReportPolling(interviewId, refreshEpoch);
           } else {
             appendEvent("报告刷新失败", escapeHtml(errorText(error)), "red");
           }
         } finally {
-          state.reportRefreshInFlight = false;
+          if (refreshEpoch === state.reportRefreshEpoch) state.reportRefreshInFlight = false;
           if (button && !autoRefresh && reportLinks.contains(button)) {
             button.disabled = false;
             button.textContent = originalLabel || "刷新报告";

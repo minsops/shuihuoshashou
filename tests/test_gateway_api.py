@@ -479,6 +479,8 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "clearQueuedReportPolling" in response.text
     assert "queuedReportMaxPollAttempts = 30" in response.text
     assert "queuedReportPollIntervalMs = 3000" in response.text
+    assert "reportRefreshEpoch" in response.text
+    assert "reportRefreshStillCurrent" in response.text
     assert "reportRefreshInFlight" in response.text
     assert 'button.textContent = "刷新中"' in response.text
     assert 'button.textContent = originalLabel || "刷新报告"' in response.text
