@@ -990,13 +990,7 @@
           const payload = JSON.parse(text);
           const detail = payload.detail;
           if (Array.isArray(detail)) {
-            return detail
-              .map((item) => {
-                const path = Array.isArray(item.loc) ? item.loc.join(".") : "";
-                return [path, item.msg].filter(Boolean).join(": ");
-              })
-              .filter(Boolean)
-              .join("；") || fallback;
+            return detail.map(formatApiDetailItem).filter(Boolean).join("；") || fallback;
           }
           if (typeof detail === "string" && detail.trim()) return detail;
           if (detail && typeof detail === "object") return JSON.stringify(detail);
@@ -1007,6 +1001,17 @@
           return text;
         }
         return text;
+      }
+
+      function formatApiDetailItem(item) {
+        if (typeof item === "string") return item.trim();
+        if (!item || typeof item !== "object") return String(item || "").trim();
+        const path = Array.isArray(item.loc)
+          ? item.loc.filter((part) => part !== "body" && part !== "query").join(".")
+          : "";
+        const message =
+          typeof item.msg === "string" && item.msg.trim() ? item.msg : JSON.stringify(item);
+        return [path, message].filter(Boolean).join(": ");
       }
 
       function errorText(error) {

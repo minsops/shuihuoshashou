@@ -359,8 +359,10 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "requestEndInterview" in response.text
     assert 'JSON.stringify({ type: "end" })' in response.text
     assert "readErrorMessage" in response.text
+    assert "formatApiDetailItem" in response.text
     assert "item.loc" in response.text
     assert "payload.detail" in response.text
+    assert 'part !== "body" && part !== "query"' in response.text
     assert "input.disabled = true" in response.text
     assert "input.value = \"\"" in response.text
     assert ".log,.pdf" in response.text
