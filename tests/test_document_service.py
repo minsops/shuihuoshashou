@@ -100,6 +100,18 @@ def test_parse_document_uses_mime_type_without_extension(tmp_path: Path, monkeyp
     assert "异常重试" in docx_result.text
 
 
+def test_parse_document_unsupported_type_lists_log(monkeypatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "mock")
+    get_settings.cache_clear()
+
+    with pytest.raises(ValueError) as exc:
+        parse_document("resume.xyz", b"opaque", kind="resume", content_type="application/x-unknown")
+
+    message = str(exc.value)
+    assert "unsupported document type" in message
+    assert "log" in message
+
+
 def test_parse_image_document_missing_ocr_dependency_has_actionable_error(monkeypatch) -> None:
     monkeypatch.setenv("LLM_PROVIDER", "mock")
     get_settings.cache_clear()

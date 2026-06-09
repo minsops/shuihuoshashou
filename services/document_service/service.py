@@ -85,7 +85,7 @@ def _extract_text(
     if suffix in DOC_SUFFIXES or content_type in DOC_MIME_TYPES:
         return _extract_doc_with_textutil(data, suffix), "doc_textutil", ""
     raise ValueError(
-        "unsupported document type; supported: txt, md, json, csv, pdf, docx, doc, png, jpg, jpeg, webp, bmp, tif, tiff, heic"
+        "unsupported document type; supported: txt, md, json, csv, log, pdf, docx, doc, png, jpg, jpeg, webp, bmp, tif, tiff, heic"
     )
 
 
