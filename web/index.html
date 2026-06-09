@@ -419,6 +419,14 @@
         color: var(--red);
       }
 
+      .text-counter {
+        justify-self: end;
+      }
+
+      .text-counter.warn {
+        color: var(--red);
+      }
+
       .control-hint {
         display: flex;
         align-items: flex-start;
@@ -752,10 +760,12 @@
           <label>
             当前面试问题
             <textarea class="question-field" name="current_question" id="currentQuestion" required>请介绍一个你最核心的 AI 后端项目，重点说明你本人负责的模块、关键技术取舍和上线后的指标变化。</textarea>
+            <span class="small text-counter" id="questionCharCount" role="status" aria-live="polite">问题 0 字</span>
           </label>
           <label>
             候选人回答
             <textarea class="answer-field" name="answer" id="answerText" required>我主要负责优化项目架构，做了很多可靠性提升，最终效果比较明显。</textarea>
+            <span class="small text-counter" id="answerCharCount" role="status" aria-live="polite">回答 0 字</span>
           </label>
           <div class="toolbar">
             <button type="submit" id="sendAnswer" aria-describedby="controlHint" disabled>发送回答</button>
@@ -819,6 +829,8 @@
       const resumeText = document.querySelector("#resumeText");
       const currentQuestion = document.querySelector("#currentQuestion");
       const answerText = document.querySelector("#answerText");
+      const questionCharCount = document.querySelector("#questionCharCount");
+      const answerCharCount = document.querySelector("#answerCharCount");
       const setupStatus = document.querySelector("#setupStatus");
       const runtimeStatus = document.querySelector("#runtimeStatus");
       const modelStatus = document.querySelector("#modelStatus");
@@ -901,6 +913,7 @@
       const micSampleRate = 16000;
       const micChunkSamples = Math.floor(micSampleRate / 4);
       const micVoiceRmsThreshold = 0.012;
+      const answerMinChars = 20;
       const maxDocumentUploadBytes = 25 * 1024 * 1024;
       const maxLiveFeedEvents = 120;
       const queuedReportPollIntervalMs = 3000;
@@ -1097,6 +1110,20 @@
         if (state.endingInterview || state.micStarting || connecting) return "live";
         if (state.micError || state.interview) return "warn";
         return "";
+      }
+
+      function updateTextCounters() {
+        const questionChars = currentQuestion.value.trim().length;
+        const answerChars = answerText.value.trim().length;
+        questionCharCount.textContent = `问题 ${questionChars} 字`;
+        answerCharCount.textContent =
+          answerChars > 0 && answerChars < answerMinChars
+            ? `回答 ${answerChars} 字，建议至少 ${answerMinChars} 字`
+            : `回答 ${answerChars} 字`;
+        answerCharCount.className =
+          answerChars > 0 && answerChars < answerMinChars
+            ? "small text-counter warn"
+            : "small text-counter";
       }
 
       function appendEvent(title, body, tone = "") {
@@ -1803,6 +1830,7 @@
 
       function selectQuestion(question, meta = {}) {
         currentQuestion.value = question;
+        updateTextCounters();
         state.selectedQuestionSource = meta.questionSource || "interviewer";
         state.selectedProbeTarget = meta.probeTarget || null;
         state.selectedCompetency = meta.competency || null;
@@ -2808,6 +2836,7 @@
         resetQuestionMetaForManualEdit();
         answerText.value =
           "我主要写了 FastAPI 网关和模型调用编排，处理过 JSON 解析失败、超时重试和报告生成。我把失败重试从固定次数改成按错误类型分流，P95 延迟从 3.8 秒降到 2.4 秒。";
+        updateTextCounters();
         appendEvent("样例资料", "已填入一组 JD、简历和首问回答。");
       }
 
@@ -2840,6 +2869,7 @@
         metricTurns.textContent = "0";
         currentQuestion.value = "";
         answerText.value = "";
+        updateTextCounters();
         resetQuestionMetaForManualEdit();
         competencyList.innerHTML = '<div class="empty">创建面试后显示岗位能力维度</div>';
         renderProbeCards([]);
@@ -2884,7 +2914,11 @@
       reconnectSocket.addEventListener("click", reconnectLiveChannel);
       manualProbe.addEventListener("click", () => sendTurn(true));
       endInterview.addEventListener("click", requestEndInterview);
-      currentQuestion.addEventListener("input", resetQuestionMetaForManualEdit);
+      currentQuestion.addEventListener("input", () => {
+        resetQuestionMetaForManualEdit();
+        updateTextCounters();
+      });
+      answerText.addEventListener("input", updateTextCounters);
       document.addEventListener("visibilitychange", refreshRuntimeIfVisible);
       window.addEventListener("focus", refreshRuntimeIfVisible);
       window.addEventListener("online", refreshRuntimeIfVisible);
@@ -2892,6 +2926,7 @@
       gatewayKey.value = state.gatewayApiKey;
       checkRuntime();
       loadSample();
+      updateTextCounters();
       setControls();
     </script>
   </body>

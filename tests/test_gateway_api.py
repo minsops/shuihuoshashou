@@ -387,6 +387,12 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "controlHintText" in response.text
     assert "controlHintTone" in response.text
     assert "controlHint.className" in response.text
+    assert 'id="questionCharCount" role="status" aria-live="polite"' in response.text
+    assert 'id="answerCharCount" role="status" aria-live="polite"' in response.text
+    assert "answerMinChars = 20" in response.text
+    assert "updateTextCounters" in response.text
+    assert "建议至少 ${answerMinChars} 字" in response.text
+    assert 'answerText.addEventListener("input", updateTextCounters)' in response.text
     assert ".control-hint.warn" in response.text
     assert "实时通道已连接。可以发送文字回答" in response.text
     assert "实时通道未连接。请点击重连通道" in response.text
@@ -474,7 +480,8 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "resetQuestionMetaForManualEdit" in response.text
     assert "hadProbeMeta" in response.text
     assert "已改为手动编辑问题，将按面试官自定义问题记录" in response.text
-    assert 'currentQuestion.addEventListener("input", resetQuestionMetaForManualEdit)' in response.text
+    assert 'currentQuestion.addEventListener("input", () =>' in response.text
+    assert "resetQuestionMetaForManualEdit();" in response.text
     assert 'parseDocumentFile(event.target.files[0], event.target, resumeText, "简历", "resume")' in response.text
     assert "reconnectLiveChannel" in response.text
     assert "reconnectInterviewId" in response.text
