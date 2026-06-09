@@ -332,6 +332,8 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "setUploadInputStatus" in response.text
     assert "正在解析" in response.text
     assert "解析失败" in response.text
+    assert "documentParsingCount" in response.text
+    assert "资料正在解析，完成后再创建实时面试" in response.text
     assert "maxDocumentUploadBytes = 25 * 1024 * 1024" in response.text
     assert "文件超过 25MB" in response.text
     assert "请压缩、拆分或直接粘贴关键内容" in response.text

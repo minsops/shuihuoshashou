@@ -792,6 +792,7 @@
         micStartToken: 0,
         micRecording: false,
         micError: "",
+        documentParsingCount: 0,
         apiOrigin:
           window.location.origin && window.location.origin !== "null"
             ? window.location.origin
@@ -855,7 +856,11 @@
         manualProbe.disabled = !active;
         endInterview.disabled = !active;
         prepareInterview.disabled =
-          state.preparingInterview || Boolean(state.interview) || connected || connecting;
+          state.documentParsingCount > 0 ||
+          state.preparingInterview ||
+          Boolean(state.interview) ||
+          connected ||
+          connecting;
         setControlHints(connected, connecting);
         controlHint.textContent = controlHintText(connected, connecting);
         if (state.reportReady) {
@@ -929,6 +934,8 @@
             : reason;
         prepareInterview.title = state.preparingInterview
           ? "正在创建实时面试"
+          : state.documentParsingCount > 0
+            ? "资料正在解析，完成后再创建实时面试"
           : state.interview
             ? "当前已有面试，请重置后再创建新的面试"
             : "创建实时面试通道";
@@ -1350,7 +1357,9 @@
         }
         appendEvent("资料上传", `${escapeHtml(label)} 正在解析：${escapeHtml(file.name)}`);
         setUploadInputStatus(input, `${label} 正在解析：${file.name}`);
+        state.documentParsingCount += 1;
         input.disabled = true;
+        setControls();
         try {
           const params = new URLSearchParams({ kind, filename: file.name });
           const response = await fetchGateway(`/api/documents/parse?${params.toString()}`, {
@@ -1393,8 +1402,10 @@
           setUploadInputStatus(input, `${label} 解析失败：${message}`);
           appendEvent("资料上传失败", escapeHtml(message), "red");
         } finally {
+          state.documentParsingCount = Math.max(0, state.documentParsingCount - 1);
           input.disabled = false;
           input.value = "";
+          setControls();
         }
       }
 
@@ -2219,6 +2230,7 @@
         state.selectedCompetency = null;
         state.micStarting = false;
         state.micError = "";
+        state.documentParsingCount = 0;
         metricJob.textContent = "待创建";
         metricCandidate.textContent = "待创建";
         metricTurns.textContent = "0";
