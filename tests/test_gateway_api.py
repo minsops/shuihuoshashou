@@ -315,6 +315,8 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "controlHintText" in response.text
     assert "实时通道已连接。可以发送文字回答" in response.text
     assert "实时通道未连接。请点击重连通道" in response.text
+    assert "liveChannelReadyForInput" in response.text
+    assert "实时通道未连接，请点击重连通道。" in response.text
     assert "readErrorMessage" in response.text
     assert "item.loc" in response.text
     assert "payload.detail" in response.text

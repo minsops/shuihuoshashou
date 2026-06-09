@@ -1725,12 +1725,28 @@
         };
       }
 
-      function sendTurn(manual = false) {
-        if (!state.socket || state.socket.readyState !== WebSocket.OPEN) return;
+      function liveChannelReadyForInput() {
         if (state.interviewEnded) {
           appendEvent("面试已结束", "请重置后创建新的面试。", "red");
-          return;
+          return false;
         }
+        if (!state.interview) {
+          appendEvent("实时通道", "请先创建实时面试。", "red");
+          return false;
+        }
+        if (state.socket && state.socket.readyState === WebSocket.CONNECTING) {
+          appendEvent("实时通道", "实时通道连接中，请稍候。", "red");
+          return false;
+        }
+        if (!state.socket || state.socket.readyState !== WebSocket.OPEN) {
+          appendEvent("实时通道", "实时通道未连接，请点击重连通道。", "red");
+          return false;
+        }
+        return true;
+      }
+
+      function sendTurn(manual = false) {
+        if (!liveChannelReadyForInput()) return;
         const answer = answerText.value.trim();
         const question = currentQuestion.value.trim();
         if (!answer || !question) {
