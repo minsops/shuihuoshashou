@@ -2167,6 +2167,10 @@
           manual ? "追问触发" : "回答已发送",
           `<span class="small">Q</span> ${escapeHtml(question)}<br><span class="small">A</span> ${escapeHtml(answer)}`
         );
+        if (!manual) {
+          answerText.value = "";
+          updateTextCounters();
+        }
       }
 
       function requestEndInterview() {
