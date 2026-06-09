@@ -1562,6 +1562,7 @@
           appendEvent("面试创建", "当前已有面试，请重置后再创建新的面试。", "red");
           return;
         }
+        if (!validateSetupForm(form)) return;
         state.preparingInterview = true;
         closeSocket();
         stopMicCapture();
@@ -1607,6 +1608,23 @@
           state.preparingInterview = false;
           setControls();
         }
+      }
+
+      function validateSetupForm(form) {
+        const fields = [
+          [form.job_title, "岗位名称"],
+          [form.candidate_name, "候选人"],
+          [form.jd_text, "岗位 JD"],
+          [form.resume_text, "简历摘要"],
+        ];
+        for (const [field, label] of fields) {
+          if (!field.value.trim()) {
+            appendEvent("面试创建失败", `${escapeHtml(label)}不能为空。`, "red");
+            field.focus();
+            return false;
+          }
+        }
+        return true;
       }
 
       async function openSocketWithLatestGateway(interviewId) {
