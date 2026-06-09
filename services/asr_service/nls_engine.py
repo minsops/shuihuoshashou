@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from libs.common.config import Settings, get_settings
 from libs.schemas import TranscriptSegment
-from services.asr_service.nls_token import create_token
+from services.asr_service.nls_token import AliyunNLSTokenProvider
 from services.asr_service.service import ASREngine, Speaker
 
 
@@ -21,9 +21,11 @@ class AliyunNLSSession:
         *,
         settings: Settings | None = None,
         ws: Any | None = None,
+        token_provider: AliyunNLSTokenProvider | None = None,
     ) -> None:
         self.session_id = session_id
         self.settings = settings or get_settings()
+        self._token_provider = token_provider
         self.task_id = uuid4().hex
         self.ws = ws
         self.result_queue: asyncio.Queue[TranscriptSegment | None] = asyncio.Queue()
@@ -88,25 +90,30 @@ class AliyunNLSSession:
 
         endpoint = self.settings.aliyun_nls_endpoint
         separator = "&" if "?" in endpoint else "?"
-        token = self._resolve_token()
+        token = await self._resolve_token()
         url = f"{endpoint}{separator}{urlencode({'token': token})}"
         try:
             return await websockets.connect(url, proxy=None, ssl=_ssl_context())
         except TypeError:
             return await websockets.connect(url, ssl=_ssl_context())
 
-    def _resolve_token(self) -> str:
+    async def _resolve_token(self) -> str:
         token = self.settings.aliyun_nls_token.strip()
         if token:
             return token
+        provider = self._token_provider or self._build_token_provider()
+        return await asyncio.to_thread(provider.get_token)
+
+    def _build_token_provider(self) -> AliyunNLSTokenProvider:
         if not (self.settings.aliyun_ak_id.strip() and self.settings.aliyun_ak_secret.strip()):
             raise RuntimeError("aliyun_nls_token_missing")
-        return create_token(
-            self.settings.aliyun_ak_id,
-            self.settings.aliyun_ak_secret,
+        self._token_provider = AliyunNLSTokenProvider(
+            access_key_id=self.settings.aliyun_ak_id,
+            access_key_secret=self.settings.aliyun_ak_secret,
             endpoint=self.settings.aliyun_nls_token_endpoint,
             region_id=self.settings.aliyun_nls_token_region,
-        ).id
+        )
+        return self._token_provider
 
     async def _reader_loop(self) -> None:
         try:
@@ -203,13 +210,30 @@ class AliyunNLSSession:
 class AliyunNLSWSASREngine(ASREngine):
     def __init__(self, *, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
+        self._token_provider = self._build_token_provider()
         self._sessions: dict[str, AliyunNLSSession] = {}
+
+    def _build_token_provider(self) -> AliyunNLSTokenProvider | None:
+        if self.settings.aliyun_nls_token.strip():
+            return None
+        if not (self.settings.aliyun_ak_id.strip() and self.settings.aliyun_ak_secret.strip()):
+            return None
+        return AliyunNLSTokenProvider(
+            access_key_id=self.settings.aliyun_ak_id,
+            access_key_secret=self.settings.aliyun_ak_secret,
+            endpoint=self.settings.aliyun_nls_token_endpoint,
+            region_id=self.settings.aliyun_nls_token_region,
+        )
 
     async def get_or_create_session(self, session_id: str) -> AliyunNLSSession:
         session = self._sessions.get(session_id)
         if session is not None and not session.finished:
             return session
-        session = AliyunNLSSession(session_id, settings=self.settings)
+        session = AliyunNLSSession(
+            session_id,
+            settings=self.settings,
+            token_provider=self._token_provider,
+        )
         try:
             await session.connect()
         except Exception:

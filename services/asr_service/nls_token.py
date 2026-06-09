@@ -7,14 +7,17 @@ import hmac
 import json
 import os
 import ssl
+import time
 import uuid
 from dataclasses import dataclass
-from typing import Any
+from threading import Lock
+from typing import Any, Callable
 from urllib.parse import quote, urlencode
 from urllib.request import urlopen
 
 DEFAULT_ENDPOINT = "https://nls-meta.cn-shanghai.aliyuncs.com/"
 DEFAULT_REGION = "cn-shanghai"
+TOKEN_EXPIRY_SAFETY_SECONDS = 300
 
 
 @dataclass(frozen=True)
@@ -22,6 +25,44 @@ class AliyunNLSToken:
     id: str
     expire_time: int | None = None
     user_id: str = ""
+
+
+class AliyunNLSTokenProvider:
+    def __init__(
+        self,
+        *,
+        access_key_id: str,
+        access_key_secret: str,
+        endpoint: str = DEFAULT_ENDPOINT,
+        region_id: str = DEFAULT_REGION,
+        create_token_func: Callable[..., AliyunNLSToken] | None = None,
+        now_func: Callable[[], float] | None = None,
+    ) -> None:
+        self.access_key_id = access_key_id
+        self.access_key_secret = access_key_secret
+        self.endpoint = endpoint
+        self.region_id = region_id
+        self._create_token = create_token_func or create_token
+        self._now = now_func or time.time
+        self._cached_token: AliyunNLSToken | None = None
+        self._lock = Lock()
+
+    def get_token(self) -> str:
+        with self._lock:
+            if self._cached_token is not None and self._is_fresh(self._cached_token):
+                return self._cached_token.id
+            self._cached_token = self._create_token(
+                self.access_key_id,
+                self.access_key_secret,
+                endpoint=self.endpoint,
+                region_id=self.region_id,
+            )
+            return self._cached_token.id
+
+    def _is_fresh(self, token: AliyunNLSToken) -> bool:
+        if token.expire_time is None:
+            return False
+        return token.expire_time > int(self._now()) + TOKEN_EXPIRY_SAFETY_SECONDS
 
 
 def create_token_from_env(*, timeout: float = 10) -> AliyunNLSToken | None:

@@ -246,7 +246,7 @@ ALIYUN_NLS_APP_KEY=your-nls-appkey
 ALIYUN_NLS_TOKEN=your-nls-token
 ```
 
-NLS AppKey 用于 StartTranscription payload，NLS Token 用于 WebSocket URL 鉴权；只配置 AppKey 不能连接。固定 Token 优先级最高；如果 `ALIYUN_NLS_TOKEN` 为空，但 `ALIYUN_AK_ID` 和 `ALIYUN_AK_SECRET` 已配置，gateway 会在连接 NLS WebSocket 前自动创建 Token。
+NLS AppKey 用于 StartTranscription payload，NLS Token 用于 WebSocket URL 鉴权；只配置 AppKey 不能连接。固定 Token 优先级最高；如果 `ALIYUN_NLS_TOKEN` 为空，但 `ALIYUN_AK_ID` 和 `ALIYUN_AK_SECRET` 已配置，gateway 会在连接 NLS WebSocket 前自动创建 Token，并复用未过期 Token。
 
 ```bash
 ALIYUN_NLS_APP_KEY=your-nls-appkey ALIYUN_NLS_TOKEN=your-nls-token python scripts/check_aliyun_nls_asr.py

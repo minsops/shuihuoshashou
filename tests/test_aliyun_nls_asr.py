@@ -13,7 +13,7 @@ from scripts import create_aliyun_nls_token
 from scripts import check_aliyun_nls_asr
 from scripts.create_aliyun_nls_token import AliyunNLSToken
 from services.asr_service import nls_token
-from services.asr_service.nls_engine import AliyunNLSSession
+from services.asr_service.nls_engine import AliyunNLSSession, AliyunNLSWSASREngine
 
 
 class FakeNLSWS:
@@ -341,8 +341,8 @@ def test_create_aliyun_nls_token_builds_signed_request(monkeypatch) -> None:
     assert "Signature" in query
 
 
-def test_nls_session_creates_token_from_ak_when_token_is_empty(monkeypatch) -> None:
-    created: dict[str, str] = {}
+def test_nls_token_provider_reuses_fresh_token() -> None:
+    created: list[str] = []
 
     def fake_create_token(
         access_key_id: str,
@@ -351,13 +351,57 @@ def test_nls_session_creates_token_from_ak_when_token_is_empty(monkeypatch) -> N
         endpoint: str,
         region_id: str,
     ) -> AliyunNLSToken:
-        created["access_key_id"] = access_key_id
-        created["access_key_secret"] = access_key_secret
-        created["endpoint"] = endpoint
-        created["region_id"] = region_id
-        return AliyunNLSToken(id="created-token")
+        assert access_key_id == "ak-id"
+        assert access_key_secret == "ak-secret"
+        assert endpoint == "https://example.aliyun.com/"
+        assert region_id == "cn-test"
+        created.append(f"created-token-{len(created) + 1}")
+        return AliyunNLSToken(id=created[-1], expire_time=2000)
 
-    monkeypatch.setattr("services.asr_service.nls_engine.create_token", fake_create_token)
+    provider = nls_token.AliyunNLSTokenProvider(
+        access_key_id="ak-id",
+        access_key_secret="ak-secret",
+        endpoint="https://example.aliyun.com/",
+        region_id="cn-test",
+        create_token_func=fake_create_token,
+        now_func=lambda: 1000,
+    )
+
+    assert provider.get_token() == "created-token-1"
+    assert provider.get_token() == "created-token-1"
+    assert created == ["created-token-1"]
+
+
+def test_nls_token_provider_refreshes_expiring_token() -> None:
+    created: list[str] = []
+
+    def fake_create_token(*args, **kwargs) -> AliyunNLSToken:
+        del args, kwargs
+        created.append(f"created-token-{len(created) + 1}")
+        return AliyunNLSToken(id=created[-1], expire_time=1100)
+
+    provider = nls_token.AliyunNLSTokenProvider(
+        access_key_id="ak-id",
+        access_key_secret="ak-secret",
+        create_token_func=fake_create_token,
+        now_func=lambda: 1000,
+    )
+
+    assert provider.get_token() == "created-token-1"
+    assert provider.get_token() == "created-token-2"
+    assert created == ["created-token-1", "created-token-2"]
+
+
+def test_nls_session_gets_auto_token_from_provider() -> None:
+    class FakeTokenProvider:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def get_token(self) -> str:
+            self.calls += 1
+            return "created-token"
+
+    provider = FakeTokenProvider()
     session = AliyunNLSSession(
         "session-1",
         settings=Settings(
@@ -369,12 +413,31 @@ def test_nls_session_creates_token_from_ak_when_token_is_empty(monkeypatch) -> N
             aliyun_nls_token_endpoint="https://example.aliyun.com/",
             aliyun_nls_token_region="cn-test",
         ),
+        token_provider=provider,
     )
 
-    assert session._resolve_token() == "created-token"
-    assert created == {
-        "access_key_id": "ak-id",
-        "access_key_secret": "ak-secret",
-        "endpoint": "https://example.aliyun.com/",
-        "region_id": "cn-test",
-    }
+    assert asyncio.run(session._resolve_token()) == "created-token"
+    assert provider.calls == 1
+
+
+def test_nls_engine_shares_auto_token_provider_across_sessions(monkeypatch) -> None:
+    async def fake_connect(self) -> None:
+        self.started = True
+
+    monkeypatch.setattr(AliyunNLSSession, "connect", fake_connect)
+    engine = AliyunNLSWSASREngine(
+        settings=Settings(
+            asr_provider="aliyun_nls_ws",
+            aliyun_nls_app_key="app-key",
+            aliyun_nls_token="",
+            aliyun_ak_id="ak-id",
+            aliyun_ak_secret="ak-secret",
+        )
+    )
+
+    first = asyncio.run(engine.get_or_create_session("session-1"))
+    second = asyncio.run(engine.get_or_create_session("session-2"))
+
+    assert engine._token_provider is not None
+    assert first._token_provider is engine._token_provider
+    assert second._token_provider is engine._token_provider
