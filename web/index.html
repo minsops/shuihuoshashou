@@ -1708,7 +1708,11 @@
 
       async function refreshQueuedReport(interviewId) {
         const button = reportLinks.querySelector("#refreshReport");
-        if (button) button.disabled = true;
+        const originalLabel = button ? button.textContent : "";
+        if (button) {
+          button.disabled = true;
+          button.textContent = "刷新中";
+        }
         try {
           const report = await fetchGatewayJson(`/api/interviews/${interviewId}/report`);
           renderReport(report);
@@ -1722,7 +1726,10 @@
             appendEvent("报告刷新失败", escapeHtml(errorText(error)), "red");
           }
         } finally {
-          if (button) button.disabled = false;
+          if (button && reportLinks.contains(button)) {
+            button.disabled = false;
+            button.textContent = originalLabel || "刷新报告";
+          }
         }
       }
 

@@ -346,6 +346,8 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "后台评分任务已排队，请稍后刷新报告" in response.text
     assert 'id="refreshReport"' in response.text
     assert "refreshQueuedReport" in response.text
+    assert 'button.textContent = "刷新中"' in response.text
+    assert 'button.textContent = originalLabel || "刷新报告"' in response.text
     assert "fetchGatewayJson(`/api/interviews/${interviewId}/report`)" in response.text
     assert "reportPendingError" in response.text
     assert "报告仍在生成中，请稍后再刷新" in response.text
