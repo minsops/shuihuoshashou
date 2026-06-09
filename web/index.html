@@ -772,6 +772,7 @@
         interview: null,
         socket: null,
         preparingInterview: false,
+        prepareSessionToken: 0,
         seq: 1,
         turns: 0,
         selectedQuestionSource: "interviewer",
@@ -1688,6 +1689,10 @@
         state.selectedCompetency = null;
       }
 
+      function prepareSessionStillCurrent(token) {
+        return token === state.prepareSessionToken;
+      }
+
       async function prepareSession(form) {
         if (state.preparingInterview) {
           appendEvent("面试创建", "正在创建实时面试，请稍候。");
@@ -1702,6 +1707,8 @@
           return;
         }
         if (!validateSetupForm(form)) return;
+        const prepareToken = state.prepareSessionToken + 1;
+        state.prepareSessionToken = prepareToken;
         state.preparingInterview = true;
         clearQueuedReportPolling();
         closeSocket();
@@ -1725,29 +1732,38 @@
             title: form.job_title.value.trim(),
             jd_text: form.jd_text.value.trim(),
           });
+          if (!prepareSessionStillCurrent(prepareToken)) return;
           const candidate = await postJson("/api/candidates", {
             name: form.candidate_name.value.trim(),
             resume_text: form.resume_text.value.trim(),
           });
+          if (!prepareSessionStillCurrent(prepareToken)) return;
           const interview = await postJson("/api/interviews", {
             job_id: job.id,
             candidate_id: candidate.id,
           });
+          if (!prepareSessionStillCurrent(prepareToken)) return;
           state.job = job;
           state.candidate = candidate;
           state.interview = interview;
           metricJob.textContent = job.title;
           metricCandidate.textContent = candidate.name;
           renderCompetencies(job);
-          await openSocketWithLatestGateway(interview.id);
+          await openSocketWithLatestGateway(interview.id, () =>
+            prepareSessionStillCurrent(prepareToken)
+          );
+          if (!prepareSessionStillCurrent(prepareToken)) return;
           setPill(setupStatus, "已建面试", "ready");
           appendEvent("面试创建", `${escapeHtml(job.title)} · ${escapeHtml(candidate.name)}`);
         } catch (error) {
+          if (!prepareSessionStillCurrent(prepareToken)) return;
           setPill(setupStatus, "创建失败", "");
           appendEvent("错误", escapeHtml(errorText(error)), "red");
         } finally {
-          state.preparingInterview = false;
-          setControls();
+          if (prepareSessionStillCurrent(prepareToken)) {
+            state.preparingInterview = false;
+            setControls();
+          }
         }
       }
 
@@ -1768,16 +1784,18 @@
         return true;
       }
 
-      async function openSocketWithLatestGateway(interviewId) {
+      async function openSocketWithLatestGateway(interviewId, stillCurrent = () => true) {
         try {
           await discoverGateway();
         } catch (error) {
+          if (!stillCurrent()) return;
           appendEvent(
             "实时通道",
             `连接前无法确认本地 gateway：${escapeHtml(errorText(error))}`,
             "red"
           );
         }
+        if (!stillCurrent()) return;
         openSocket(interviewId);
       }
 
@@ -2622,6 +2640,7 @@
         state.job = null;
         state.candidate = null;
         state.interview = null;
+        state.prepareSessionToken += 1;
         state.preparingInterview = false;
         state.seq = 1;
         state.turns = 0;
