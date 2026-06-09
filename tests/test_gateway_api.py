@@ -290,6 +290,10 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "当前已有面试，请重置后再创建新的面试" in response.text
     assert "重新检查服务、模型和 ASR 状态" in response.text
     assert 'refreshStatus.addEventListener("click", checkRuntime)' in response.text
+    assert 'id="checkModel"' in response.text
+    assert "checkLlmConnection" in response.text
+    assert "/api/config/llm/check" in response.text
+    assert "手动调用真实模型检查连接" in response.text
     assert "interviewEnded" in response.text
     assert "面试已结束，请重置后创建新的面试" in response.text
     assert "正在结束面试并生成评分报告" in response.text
@@ -401,6 +405,81 @@ def test_gateway_config_status_hides_secrets(tmp_path: Path, monkeypatch) -> Non
     assert payload["object_storage_endpoint_configured"] is False
     assert payload["object_storage_bucket"] == "shuihuo-killer"
     assert "super-secret" not in response.text
+
+
+def test_gateway_llm_check_reports_mock_mode(tmp_path: Path, monkeypatch) -> None:
+    client = _client(tmp_path, monkeypatch)
+
+    response = client.post("/api/config/llm/check")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "ok": False,
+        "mode": "mock",
+        "message": "当前是模型模拟模式，没有调用真实模型。",
+    }
+
+
+def test_gateway_llm_check_calls_configured_model(tmp_path: Path, monkeypatch) -> None:
+    client = _client(tmp_path, monkeypatch)
+    monkeypatch.setenv("LLM_PROVIDER", "openai_compatible")
+    monkeypatch.setenv("LLM_MODEL", "mimo-v2.5-pro")
+    monkeypatch.setenv("LLM_BASE_URL", "https://llm.example.test")
+    monkeypatch.setenv("LLM_API_KEY", "secret-key")
+    get_settings.cache_clear()
+
+    class FakeClient:
+        async def complete_json(self, messages, schema, fallback, raise_on_error=False):
+            assert raise_on_error is True
+            assert messages
+            return schema.model_validate(
+                {
+                    "suggestions": [
+                        {
+                            "question": "讲一个真实排障案例？",
+                            "target": "验证模型连通",
+                            "competency": "LLM",
+                            "priority": 1,
+                        }
+                    ],
+                    "credibility": {
+                        "level": "solid",
+                        "reason": "ok",
+                        "drill_down_hint": "ok",
+                    },
+                }
+            )
+
+    monkeypatch.setattr("services.gateway.app.get_llm_client", lambda: FakeClient())
+
+    response = client.post("/api/config/llm/check")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "ok": True,
+        "mode": "live",
+        "message": "真实模型连接正常：openai_compatible / mimo-v2.5-pro",
+    }
+
+
+def test_gateway_llm_check_sanitizes_upstream_error(tmp_path: Path, monkeypatch) -> None:
+    client = _client(tmp_path, monkeypatch)
+    monkeypatch.setenv("LLM_PROVIDER", "openai_compatible")
+    monkeypatch.setenv("LLM_MODEL", "mimo-v2.5-pro")
+    monkeypatch.setenv("LLM_BASE_URL", "https://llm.example.test")
+    monkeypatch.setenv("LLM_API_KEY", "secret-key")
+    get_settings.cache_clear()
+
+    class FakeClient:
+        async def complete_json(self, messages, schema, fallback, raise_on_error=False):
+            raise RuntimeError("HTTP 401: {'error':'bad secret-key'}")
+
+    monkeypatch.setattr("services.gateway.app.get_llm_client", lambda: FakeClient())
+
+    response = client.post("/api/config/llm/check")
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": False, "mode": "error", "message": "HTTP 401"}
 
 
 def test_gateway_config_status_redacts_database_password(

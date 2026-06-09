@@ -570,6 +570,7 @@
         <span class="status-pill" id="modelStatus"><span class="status-dot"></span><span>模型检查中</span></span>
         <span class="status-pill" id="asrStatus"><span class="status-dot"></span><span>ASR 检查中</span></span>
         <button class="secondary" type="button" id="refreshStatus">刷新状态</button>
+        <button class="secondary" type="button" id="checkModel">检查模型</button>
         <button class="secondary" type="button" id="loadSample">样例资料</button>
         <a class="button secondary" href="/docs" target="_blank">API 文档</a>
       </div>
@@ -726,6 +727,7 @@
       const modelStatus = document.querySelector("#modelStatus");
       const asrStatus = document.querySelector("#asrStatus");
       const refreshStatus = document.querySelector("#refreshStatus");
+      const checkModel = document.querySelector("#checkModel");
       const liveStatus = document.querySelector("#liveStatus");
       const micStatus = document.querySelector("#micStatus");
       const competencyList = document.querySelector("#competencyList");
@@ -1021,6 +1023,24 @@
         } finally {
           refreshStatus.disabled = false;
           refreshStatus.title = "重新检查服务、模型和 ASR 状态";
+        }
+      }
+
+      async function checkLlmConnection() {
+        checkModel.disabled = true;
+        checkModel.title = "正在调用真实模型检查连接";
+        setPill(modelStatus, "模型连接检查中", "live");
+        try {
+          await discoverGateway();
+          const result = await fetchGatewayJson("/api/config/llm/check", { method: "POST" });
+          setPill(modelStatus, result.ok ? "模型连接正常" : "模型连接异常", result.ok ? "ready" : "");
+          appendEvent("模型检查", escapeHtml(result.message), result.ok ? "green" : "red");
+        } catch (error) {
+          setPill(modelStatus, "模型连接异常", "");
+          appendEvent("模型检查", escapeHtml(errorText(error)), "red");
+        } finally {
+          checkModel.disabled = false;
+          checkModel.title = "手动调用真实模型检查连接";
         }
       }
 
@@ -1750,6 +1770,7 @@
       });
 
       refreshStatus.addEventListener("click", checkRuntime);
+      checkModel.addEventListener("click", checkLlmConnection);
       document.querySelector("#loadSample").addEventListener("click", loadSample);
       document.querySelector("#resetSession").addEventListener("click", resetSessionState);
       startMic.addEventListener("click", startMicCapture);

@@ -30,17 +30,21 @@ from libs.schemas import (
     AIGCDetectRequest,
     CandidateCreate,
     ConsentCreate,
+    CredibilitySignal,
     InterviewCreate,
     JobCreate,
     OfflineInterviewInput,
     OfflineInterviewResult,
+    ProbeResponse,
     OfflineTaskAccepted,
     ProbeRequest,
+    ProbeSuggestion,
     QATurn,
     ReportBuildRequest,
     ScoringRequest,
     TranscriptSegment,
 )
+from libs.llm_client import LLMMessage, get_llm_client
 from services.aigc_detect_service.service import detect_interview
 from services.asr_service.service import (
     ASREngine,
@@ -275,6 +279,76 @@ def metrics() -> str:
 @app.get("/api/config/status", response_model=RuntimeStatus)
 def config_status() -> RuntimeStatus:
     return get_runtime_status()
+
+
+@app.post("/api/config/llm/check")
+async def check_llm_connection() -> dict[str, str | bool]:
+    status = get_runtime_status()
+    if status.llm_provider == "mock":
+        return {
+            "ok": False,
+            "mode": "mock",
+            "message": "当前是模型模拟模式，没有调用真实模型。",
+        }
+    if not status.llm_base_url_configured or not status.llm_api_key_configured:
+        return {
+            "ok": False,
+            "mode": "incomplete",
+            "message": "模型配置不完整，请检查 LLM_BASE_URL 和 LLM_API_KEY。",
+        }
+    fallback = ProbeResponse(
+        suggestions=[
+            ProbeSuggestion(
+                question="fallback",
+                target="fallback",
+                competency="fallback",
+                priority=1,
+            )
+        ],
+        credibility=CredibilitySignal(level="vague", reason="fallback", drill_down_hint="fallback"),
+    )
+    try:
+        response = await get_llm_client().complete_json(
+            [
+                LLMMessage(
+                    role="system",
+                    content=(
+                        "Return only a JSON object with this exact shape: "
+                        '{"suggestions":[{"question":"...","target":"...","competency":"...",'
+                        '"priority":1}],"credibility":{"level":"solid","reason":"...",'
+                        '"drill_down_hint":"..."}}. The credibility.level must be one of '
+                        "solid, vague, suspicious."
+                    ),
+                ),
+                LLMMessage(
+                    role="user",
+                    content="Generate one concise interview probe question for an LLM connection check.",
+                ),
+            ],
+            ProbeResponse,
+            fallback,
+            raise_on_error=True,
+        )
+    except RuntimeError as exc:
+        return {"ok": False, "mode": "error", "message": _safe_public_error(str(exc))}
+    if response == fallback:
+        return {
+            "ok": False,
+            "mode": "fallback",
+            "message": "真实模型调用未得到有效 JSON 响应，请检查 provider 协议和响应字段路径。",
+        }
+    return {
+        "ok": True,
+        "mode": "live",
+        "message": f"真实模型连接正常：{status.llm_provider} / {status.llm_model}",
+    }
+
+
+def _safe_public_error(message: str) -> str:
+    cleaned = " ".join(message.split())
+    if cleaned.startswith("HTTP "):
+        return cleaned.split(":", maxsplit=1)[0]
+    return cleaned[:240] or "unknown LLM error"
 
 
 @app.get("/", response_class=HTMLResponse)
