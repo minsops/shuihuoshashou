@@ -681,8 +681,10 @@
             <input
               type="file"
               id="jdFile"
+              aria-describedby="jdFileStatus"
               accept=".txt,.md,.markdown,.json,.csv,.log,.pdf,.doc,.docx,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff,.heic,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,image/*"
             />
+            <span class="small" id="jdFileStatus" role="status" aria-live="polite">支持 PDF、Word、图片和文本文件。</span>
           </label>
           <label>
             简历摘要
@@ -693,8 +695,10 @@
             <input
               type="file"
               id="resumeFile"
+              aria-describedby="resumeFileStatus"
               accept=".txt,.md,.markdown,.json,.csv,.log,.pdf,.doc,.docx,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff,.heic,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,image/*"
             />
+            <span class="small" id="resumeFileStatus" role="status" aria-live="polite">支持 PDF、Word、图片和文本文件。</span>
           </label>
           <div class="toolbar">
             <button type="submit" id="prepareInterview">创建实时面试</button>
@@ -1645,7 +1649,12 @@
       }
 
       function setUploadInputStatus(input, message) {
-        input.title = String(message || "").trim();
+        const text = String(message || "").trim();
+        input.title = text;
+        const status = document.querySelector(`#${input.id}Status`);
+        if (status) {
+          status.textContent = text || "支持 PDF、Word、图片和文本文件。";
+        }
       }
 
       function nextDocumentParseToken(input) {
@@ -1669,7 +1678,7 @@
         document.querySelectorAll("#jdFile, #resumeFile").forEach((input) => {
           input.disabled = false;
           input.value = "";
-          input.title = "";
+          setUploadInputStatus(input, "");
           delete input.dataset.documentParseToken;
         });
       }

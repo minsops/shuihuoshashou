@@ -436,6 +436,12 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "文件格式暂不支持" in response.text
     assert "txt、md、json、csv、log、pdf、docx、doc 或图片" in response.text
     assert "setUploadInputStatus" in response.text
+    assert 'aria-describedby="jdFileStatus"' in response.text
+    assert 'id="jdFileStatus" role="status" aria-live="polite"' in response.text
+    assert 'aria-describedby="resumeFileStatus"' in response.text
+    assert 'id="resumeFileStatus" role="status" aria-live="polite"' in response.text
+    assert "支持 PDF、Word、图片和文本文件" in response.text
+    assert 'document.querySelector(`#${input.id}Status`)' in response.text
     assert "正在解析" in response.text
     assert "解析失败" in response.text
     assert "documentParsingCount" in response.text
