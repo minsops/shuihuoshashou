@@ -270,6 +270,9 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "resetSessionState" in response.text
     assert 'document.querySelector("#resetSession").addEventListener("click", resetSessionState)' in response.text
     assert "实时转写、回答和追问事件会出现在这里" in response.text
+    assert "preparingInterview" in response.text
+    assert "正在创建实时面试，请稍候" in response.text
+    assert "当前已有面试，请重置后再创建新的面试" in response.text
 
 
 def test_gateway_health_identifies_service(tmp_path: Path, monkeypatch) -> None:
