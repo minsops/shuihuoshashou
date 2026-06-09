@@ -1338,10 +1338,10 @@
           const ready = config.llm_base_url_configured && config.llm_api_key_configured;
           const modelName = config.llm_model || "未知模型";
           return {
-            text: ready ? `模型 ${modelName} 已配置，未检查连接` : "模型未配置完整",
+            text: ready ? `模型 ${modelName} 已配置，未测试` : "模型未配置完整",
             ready: false,
             title: ready
-              ? "配置项已填写；点击“检查模型”后才会调用真实模型确认连接。"
+              ? "本地服务已连接；模型配置已填写但尚未调用真实模型测试。点击“检查模型”后才会确认模型连接。"
               : "请检查 LLM_BASE_URL 和 LLM_API_KEY。",
           };
         }
