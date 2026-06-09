@@ -305,7 +305,10 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "fetchWithTimeout(apiUrl(path)" in response.text
     assert "url.searchParams.set(key, value)" in response.text
     assert "new WebSocket(wsUrl(`/ws/interview/${interviewId}`))" in response.text
-    assert "gatewayUrl(`/api/interviews/${report.interview_id}/report.html`)" in response.text
+    assert 'data-report-format="html"' in response.text
+    assert "downloadReportArtifact" in response.text
+    assert "fetchGateway(`/api/interviews/${interviewId}/report.${format}`)" in response.text
+    assert "reportFilename" in response.text
     assert "gatewayAuthError" in response.text
     assert "showGatewayKeyRequired" in response.text
     assert 'showGatewayKeyRequired("模型检查", { model: true })' in response.text

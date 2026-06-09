@@ -1571,10 +1571,15 @@
       function renderReport(report) {
         const score = report.score;
         reportLinks.innerHTML = `
-          <a class="button secondary" href="${escapeHtml(gatewayUrl(`/api/interviews/${report.interview_id}/report.html`))}" target="_blank">HTML</a>
-          <a class="button secondary" href="${escapeHtml(gatewayUrl(`/api/interviews/${report.interview_id}/report.pdf`))}" target="_blank">PDF</a>
-          <a class="button secondary" href="${escapeHtml(gatewayUrl(`/api/interviews/${report.interview_id}/report.json`))}" target="_blank">JSON</a>
+          <button class="secondary" type="button" data-report-format="html" data-report-id="${escapeHtml(report.interview_id)}">HTML</button>
+          <button class="secondary" type="button" data-report-format="pdf" data-report-id="${escapeHtml(report.interview_id)}">PDF</button>
+          <button class="secondary" type="button" data-report-format="json" data-report-id="${escapeHtml(report.interview_id)}">JSON</button>
         `;
+        reportLinks.querySelectorAll("[data-report-format]").forEach((button) => {
+          button.addEventListener("click", () => {
+            downloadReportArtifact(button.dataset.reportId, button.dataset.reportFormat);
+          });
+        });
         const rows = score.dimensions
           .map(
             (dimension) => `
@@ -1621,6 +1626,38 @@
             </table>
           </div>
         `;
+      }
+
+      async function downloadReportArtifact(interviewId, format) {
+        if (!interviewId || !format) return;
+        const button = reportLinks.querySelector(`[data-report-format="${format}"]`);
+        if (button) button.disabled = true;
+        try {
+          const response = await fetchGateway(`/api/interviews/${interviewId}/report.${format}`);
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          const anchor = document.createElement("a");
+          anchor.href = url;
+          anchor.download = reportFilename(interviewId, format);
+          document.body.append(anchor);
+          anchor.click();
+          anchor.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 2000);
+          appendEvent("报告下载", `${escapeHtml(format.toUpperCase())} 已开始下载。`, "green");
+        } catch (error) {
+          if (gatewayAuthError(error)) {
+            showGatewayKeyRequired("报告下载");
+          } else {
+            appendEvent("报告下载失败", escapeHtml(errorText(error)), "red");
+          }
+        } finally {
+          if (button) button.disabled = false;
+        }
+      }
+
+      function reportFilename(interviewId, format) {
+        if (format === "pdf") return `${interviewId}.pdf`;
+        return `${interviewId}.report.${format}`;
       }
 
       function downsampleBuffer(buffer, inputRate, outputRate) {
