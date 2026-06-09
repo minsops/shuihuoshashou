@@ -266,6 +266,10 @@
         background: var(--surface-2);
       }
 
+      input[type="file"]:disabled {
+        cursor: wait;
+      }
+
       .split {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -401,6 +405,18 @@
         color: var(--muted);
         font-size: 12px;
         line-height: 1.45;
+      }
+
+      .upload-status.live {
+        color: oklch(0.42 0.095 68);
+      }
+
+      .upload-status.ready {
+        color: var(--green);
+      }
+
+      .upload-status.warn {
+        color: var(--red);
       }
 
       .control-hint {
@@ -684,7 +700,7 @@
               aria-describedby="jdFileStatus"
               accept=".txt,.md,.markdown,.json,.csv,.log,.pdf,.doc,.docx,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff,.heic,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,image/*"
             />
-            <span class="small" id="jdFileStatus" role="status" aria-live="polite">支持 PDF、Word、图片和文本文件。</span>
+            <span class="small upload-status" id="jdFileStatus" role="status" aria-live="polite">支持 PDF、Word、图片和文本文件。</span>
           </label>
           <label>
             简历摘要
@@ -698,7 +714,7 @@
               aria-describedby="resumeFileStatus"
               accept=".txt,.md,.markdown,.json,.csv,.log,.pdf,.doc,.docx,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff,.heic,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,image/*"
             />
-            <span class="small" id="resumeFileStatus" role="status" aria-live="polite">支持 PDF、Word、图片和文本文件。</span>
+            <span class="small upload-status" id="resumeFileStatus" role="status" aria-live="polite">支持 PDF、Word、图片和文本文件。</span>
           </label>
           <div class="toolbar">
             <button type="submit" id="prepareInterview">创建实时面试</button>
@@ -1563,7 +1579,7 @@
       async function parseDocumentFile(file, input, target, label, kind) {
         if (!file) return;
         if (!supportedDocumentFile(file)) {
-          setUploadInputStatus(input, `${label} 文件格式暂不支持：${file.name}`);
+          setUploadInputStatus(input, `${label} 文件格式暂不支持：${file.name}`, "warn");
           appendEvent(
             "资料上传失败",
             `${escapeHtml(label)} 文件格式暂不支持，请上传 txt、md、json、csv、log、pdf、docx、doc 或图片。`,
@@ -1573,7 +1589,7 @@
           return;
         }
         if (file.size > maxDocumentUploadBytes) {
-          setUploadInputStatus(input, `${label} 文件超过 25MB：${file.name}`);
+          setUploadInputStatus(input, `${label} 文件超过 25MB：${file.name}`, "warn");
           appendEvent(
             "资料上传失败",
             `${escapeHtml(label)} 文件超过 25MB，请压缩、拆分或直接粘贴关键内容。`,
@@ -1583,7 +1599,7 @@
           return;
         }
         appendEvent("资料上传", `${escapeHtml(label)} 正在解析：${escapeHtml(file.name)}`);
-        setUploadInputStatus(input, `${label} 正在解析：${file.name}`);
+        setUploadInputStatus(input, `${label} 正在解析：${file.name}`, "live");
         const documentParseToken = nextDocumentParseToken(input);
         state.documentParsingCount += 1;
         input.disabled = true;
@@ -1604,7 +1620,7 @@
             return;
           }
           if (!parsedText) {
-            setUploadInputStatus(input, `${label} 未提取到可用文本：${file.name}`);
+            setUploadInputStatus(input, `${label} 未提取到可用文本：${file.name}`, "warn");
             appendEvent(
               "资料上传失败",
               `${escapeHtml(label)} 未提取到可用文本，请换成文字版 PDF、DOCX 或直接粘贴内容。`,
@@ -1627,14 +1643,14 @@
             "资料上传",
             `${escapeHtml(label)} 已解析：${escapeHtml(file.name)}（${escapeHtml(result.source)}${modelNote}）`
           );
-          setUploadInputStatus(input, `${label} 已解析：${file.name}`);
+          setUploadInputStatus(input, `${label} 已解析：${file.name}`, "ready");
           if (result.warning) {
             appendEvent("资料上传提示", escapeHtml(result.warning), "red");
           }
         } catch (error) {
           if (!documentParseStillCurrent(input, documentParseToken)) return;
           const message = errorText(error);
-          setUploadInputStatus(input, `${label} 解析失败：${message}`);
+          setUploadInputStatus(input, `${label} 解析失败：${message}`, "warn");
           appendEvent("资料上传失败", escapeHtml(message), "red");
         } finally {
           state.documentParsingCount = Math.max(0, state.documentParsingCount - 1);
@@ -1648,11 +1664,12 @@
         }
       }
 
-      function setUploadInputStatus(input, message) {
+      function setUploadInputStatus(input, message, tone = "") {
         const text = String(message || "").trim();
         input.title = text;
         const status = document.querySelector(`#${input.id}Status`);
         if (status) {
+          status.className = `small upload-status ${tone}`.trim();
           status.textContent = text || "支持 PDF、Word、图片和文本文件。";
         }
       }
