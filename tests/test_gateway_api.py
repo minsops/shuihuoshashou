@@ -351,6 +351,7 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "reconnectLiveChannel" in response.text
     assert "重新连接当前面试实时通道" in response.text
     assert "当前已有面试，请重置后再创建新的面试" in response.text
+    assert "资料正在解析，完成后再创建实时面试。" in response.text
     assert "validateSetupForm" in response.text
     assert "面试创建失败" in response.text
     assert "不能为空" in response.text

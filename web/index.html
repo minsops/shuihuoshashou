@@ -1562,6 +1562,10 @@
           appendEvent("面试创建", "当前已有面试，请重置后再创建新的面试。", "red");
           return;
         }
+        if (state.documentParsingCount > 0) {
+          appendEvent("面试创建", "资料正在解析，完成后再创建实时面试。", "red");
+          return;
+        }
         if (!validateSetupForm(form)) return;
         state.preparingInterview = true;
         closeSocket();
