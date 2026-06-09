@@ -1574,6 +1574,32 @@
         appendEvent("样例资料", "已填入一组 JD、简历和首问回答。");
       }
 
+      function resetSessionState() {
+        stopMicCapture();
+        closeSocket();
+        state.job = null;
+        state.candidate = null;
+        state.interview = null;
+        state.seq = 1;
+        state.turns = 0;
+        state.interviewEnded = false;
+        state.selectedQuestionSource = "interviewer";
+        state.selectedProbeTarget = null;
+        state.selectedCompetency = null;
+        metricJob.textContent = "待创建";
+        metricCandidate.textContent = "待创建";
+        metricTurns.textContent = "0";
+        competencyList.innerHTML = '<div class="empty">创建面试后显示岗位能力维度</div>';
+        renderProbeCards([]);
+        credibilityLevel.textContent = "待观察";
+        credibilityBox.innerHTML = "<p>等待候选人首个回答。</p>";
+        liveFeed.innerHTML = '<div class="empty">实时转写、回答和追问事件会出现在这里</div>';
+        reportLinks.innerHTML = "";
+        reportPanel.innerHTML = '<div class="empty">结束面试后生成综合评分</div>';
+        setPill(setupStatus, "未建面试", "");
+        setControls();
+      }
+
       setupForm.addEventListener("submit", (event) => {
         event.preventDefault();
         prepareSession(event.currentTarget);
@@ -1594,27 +1620,7 @@
 
       refreshStatus.addEventListener("click", checkRuntime);
       document.querySelector("#loadSample").addEventListener("click", loadSample);
-      document.querySelector("#resetSession").addEventListener("click", () => {
-        stopMicCapture();
-        closeSocket();
-        state.job = null;
-        state.candidate = null;
-        state.interview = null;
-        state.seq = 1;
-        state.turns = 0;
-        state.interviewEnded = false;
-        state.selectedQuestionSource = "interviewer";
-        state.selectedProbeTarget = null;
-        state.selectedCompetency = null;
-        metricJob.textContent = "待创建";
-        metricCandidate.textContent = "待创建";
-        metricTurns.textContent = "0";
-        competencyList.innerHTML = '<div class="empty">创建面试后显示岗位能力维度</div>';
-        renderProbeCards([]);
-        reportLinks.innerHTML = "";
-        reportPanel.innerHTML = '<div class="empty">结束面试后生成综合评分</div>';
-        setPill(setupStatus, "未建面试", "");
-      });
+      document.querySelector("#resetSession").addEventListener("click", resetSessionState);
       startMic.addEventListener("click", startMicCapture);
       stopMic.addEventListener("click", stopMicCapture);
       reconnectSocket.addEventListener("click", reconnectLiveChannel);
