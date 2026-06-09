@@ -1568,6 +1568,8 @@
         } else if (message.type === "task_queued") {
           stopMicCapture();
           state.interviewEnded = true;
+          reportLinks.innerHTML = "";
+          reportPanel.innerHTML = '<div class="empty">后台评分任务已排队，请稍后刷新报告。</div>';
           appendEvent(
             "任务已排队",
             `${escapeHtml(message.payload.task_name)} · ${escapeHtml(message.payload.task_id)}。请等待后台评分完成。`
