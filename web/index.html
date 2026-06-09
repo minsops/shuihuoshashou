@@ -2184,11 +2184,14 @@
       async function refreshQueuedReport(interviewId, options = {}) {
         const refreshEpoch = options.refreshEpoch ?? state.reportRefreshEpoch;
         if (!reportRefreshStillCurrent(refreshEpoch, interviewId)) return;
-        if (state.reportRefreshInFlight) return;
-        state.reportRefreshInFlight = true;
         const button = reportLinks.querySelector("#refreshReport");
         const originalLabel = button ? button.textContent : "";
         const autoRefresh = options.auto === true;
+        if (state.reportRefreshInFlight) {
+          if (!autoRefresh) appendEvent("报告刷新", "报告刷新正在进行中，请稍候。");
+          return;
+        }
+        state.reportRefreshInFlight = true;
         if (button && !autoRefresh) {
           button.disabled = true;
           button.textContent = "刷新中";

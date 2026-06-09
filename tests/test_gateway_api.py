@@ -484,6 +484,7 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "reportRefreshInFlight" in response.text
     assert 'button.textContent = "刷新中"' in response.text
     assert 'button.textContent = originalLabel || "刷新报告"' in response.text
+    assert "报告刷新正在进行中，请稍候" in response.text
     assert "fetchGatewayJson(`/api/interviews/${interviewId}/report`)" in response.text
     assert "reportPendingError" in response.text
     assert "报告仍在生成中，请稍后再刷新" in response.text
