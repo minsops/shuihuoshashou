@@ -1329,6 +1329,7 @@
       async function parseDocumentFile(file, input, target, label, kind) {
         if (!file) return;
         if (!supportedDocumentFile(file)) {
+          setUploadInputStatus(input, `${label} 文件格式暂不支持：${file.name}`);
           appendEvent(
             "资料上传失败",
             `${escapeHtml(label)} 文件格式暂不支持，请上传 txt、md、json、csv、log、pdf、docx、doc 或图片。`,
@@ -1338,6 +1339,7 @@
           return;
         }
         if (file.size > maxDocumentUploadBytes) {
+          setUploadInputStatus(input, `${label} 文件超过 25MB：${file.name}`);
           appendEvent(
             "资料上传失败",
             `${escapeHtml(label)} 文件超过 25MB，请压缩、拆分或直接粘贴关键内容。`,
@@ -1347,6 +1349,7 @@
           return;
         }
         appendEvent("资料上传", `${escapeHtml(label)} 正在解析：${escapeHtml(file.name)}`);
+        setUploadInputStatus(input, `${label} 正在解析：${file.name}`);
         input.disabled = true;
         try {
           const params = new URLSearchParams({ kind, filename: file.name });
@@ -1358,6 +1361,7 @@
           const result = await response.json();
           const parsedText = String(result.text || "").trim();
           if (!parsedText) {
+            setUploadInputStatus(input, `${label} 未提取到可用文本：${file.name}`);
             appendEvent(
               "资料上传失败",
               `${escapeHtml(label)} 未提取到可用文本，请换成文字版 PDF、DOCX 或直接粘贴内容。`,
@@ -1380,15 +1384,22 @@
             "资料上传",
             `${escapeHtml(label)} 已解析：${escapeHtml(file.name)}（${escapeHtml(result.source)}${modelNote}）`
           );
+          setUploadInputStatus(input, `${label} 已解析：${file.name}`);
           if (result.warning) {
             appendEvent("资料上传提示", escapeHtml(result.warning), "red");
           }
         } catch (error) {
-          appendEvent("资料上传失败", escapeHtml(errorText(error)), "red");
+          const message = errorText(error);
+          setUploadInputStatus(input, `${label} 解析失败：${message}`);
+          appendEvent("资料上传失败", escapeHtml(message), "red");
         } finally {
           input.disabled = false;
           input.value = "";
         }
+      }
+
+      function setUploadInputStatus(input, message) {
+        input.title = String(message || "").trim();
       }
 
       function fileSuffix(filename) {
