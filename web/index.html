@@ -920,7 +920,7 @@
       const queuedReportMaxPollAttempts = 30;
       const documentParseTimeoutMs = 45_000;
       const reportDownloadTimeoutMs = 30_000;
-      const externalCheckTimeoutMs = 20_000;
+      const externalCheckTimeoutMs = 65_000;
       const supportedDocumentSuffixes = new Set([
         ".txt",
         ".md",
@@ -1207,6 +1207,9 @@
           return "请求超时，请确认本地服务仍在运行，或稍后重试。";
         }
         const message = error && error.message ? error.message : String(error);
+        if (/signal is aborted|aborted without reason/i.test(message)) {
+          return "请求被浏览器中止，通常是前端超时或重复触发检查导致。";
+        }
         if (/failed to fetch|networkerror|load failed/i.test(message)) {
           return "无法连接到本地服务，请确认 gateway 正在运行后重试。";
         }
