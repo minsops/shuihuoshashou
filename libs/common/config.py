@@ -73,6 +73,10 @@ class Settings(BaseSettings):
     )
     chain_crack_penalty: float = Field(default=8.0, ge=0.0)
     chain_held_up_bonus: float = Field(default=3.0, ge=0.0)
+    question_match_threshold: float = Field(default=0.30, ge=0.0, le=1.0)
+    question_bank_min: int = Field(default=12, ge=1)
+    question_bank_max: int = Field(default=18, ge=1)
+    debug_text_input_enabled: bool = True
     speaker_diarization_provider: Literal["local", "http"] = "local"
     speaker_diarization_base_url: str = ""
     speaker_diarization_api_path: str = "/diarize"
@@ -117,6 +121,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def runtime_dependencies_are_configured(self) -> "Settings":
+        if self.question_bank_max < self.question_bank_min:
+            raise ValueError("QUESTION_BANK_MAX must be greater than or equal to QUESTION_BANK_MIN")
         if self.asr_provider == "http" and not self.asr_base_url.strip():
             raise ValueError("ASR_PROVIDER=http requires ASR_BASE_URL")
         if (

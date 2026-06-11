@@ -236,6 +236,8 @@ class QATurn(BaseModel):
     question_utterance_id: str | None = None
     answer_utterance_id: str | None = None
     probe_chain_id: str | None = None
+    asked_option_id: str | None = None
+    question_origin: Literal["system_suggested", "interviewer_custom"] | None = None
 
     @model_validator(mode="after")
     def answer_timestamps_are_monotonic(self) -> "QATurn":
@@ -256,7 +258,12 @@ class QATurn(BaseModel):
     def turn_id_is_not_blank(cls, value: str) -> str:
         return _not_blank(value, "turn_id")
 
-    @field_validator("question_utterance_id", "answer_utterance_id", "probe_chain_id")
+    @field_validator(
+        "question_utterance_id",
+        "answer_utterance_id",
+        "probe_chain_id",
+        "asked_option_id",
+    )
     @classmethod
     def utterance_ids_are_not_blank(cls, value: str | None, info: ValidationInfo) -> str | None:
         if value is not None:
@@ -662,6 +669,56 @@ class QuestionBank(BaseModel):
         question_ids = [item.question_id for item in self.items]
         if len(question_ids) != len(set(question_ids)):
             raise ValueError("question bank items must not contain duplicate question_id values")
+        return self
+
+
+class NextOption(BaseModel):
+    option_id: str = Field(default_factory=new_id)
+    kind: Literal["follow_up", "bank", "generated"]
+    question: str
+    reason: str
+    category: str | None = None
+    chain_id: str | None = None
+    bank_question_id: str | None = None
+
+    @field_validator("option_id", "question", "reason")
+    @classmethod
+    def text_fields_are_not_blank(cls, value: str, info: ValidationInfo) -> str:
+        return _not_blank(value, f"next option {info.field_name}")
+
+    @field_validator("category", "chain_id", "bank_question_id")
+    @classmethod
+    def optional_text_fields_are_not_blank(
+        cls, value: str | None, info: ValidationInfo
+    ) -> str | None:
+        if value is not None:
+            return _not_blank(value, f"next option {info.field_name}")
+        return value
+
+
+class NextOptions(BaseModel):
+    interview_id: str
+    after_turn_id: str | None = None
+    follow_up: list[NextOption] = Field(min_length=1, max_length=2)
+    alternatives: list[NextOption] = Field(min_length=2, max_length=3)
+
+    @field_validator("interview_id")
+    @classmethod
+    def interview_id_is_not_blank(cls, value: str) -> str:
+        return _not_blank(value, "next options interview_id")
+
+    @field_validator("after_turn_id")
+    @classmethod
+    def after_turn_id_is_not_blank(cls, value: str | None) -> str | None:
+        if value is not None:
+            return _not_blank(value, "next options after_turn_id")
+        return value
+
+    @model_validator(mode="after")
+    def option_ids_are_unique(self) -> "NextOptions":
+        option_ids = [option.option_id for option in [*self.follow_up, *self.alternatives]]
+        if len(option_ids) != len(set(option_ids)):
+            raise ValueError("next options must not contain duplicate option_id values")
         return self
 
 

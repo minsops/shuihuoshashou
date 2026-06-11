@@ -40,6 +40,10 @@ def test_docker_compose_declares_required_infrastructure() -> None:
         "REHEARSAL_THRESHOLD: ${REHEARSAL_THRESHOLD:-0.55}",
         "CHAIN_CRACK_PENALTY: ${CHAIN_CRACK_PENALTY:-8}",
         "CHAIN_HELD_UP_BONUS: ${CHAIN_HELD_UP_BONUS:-3}",
+        "QUESTION_MATCH_THRESHOLD: ${QUESTION_MATCH_THRESHOLD:-0.30}",
+        "QUESTION_BANK_MIN: ${QUESTION_BANK_MIN:-12}",
+        "QUESTION_BANK_MAX: ${QUESTION_BANK_MAX:-18}",
+        "DEBUG_TEXT_INPUT_ENABLED: ${DEBUG_TEXT_INPUT_ENABLED:-true}",
     ]:
         assert compose.count(key) == 2
     for key in [
@@ -184,6 +188,10 @@ def test_env_example_lists_runtime_integration_knobs() -> None:
         "DIALOGUE_SILENCE_CLOSE_MS=",
         "CHAIN_CRACK_PENALTY=",
         "CHAIN_HELD_UP_BONUS=",
+        "QUESTION_MATCH_THRESHOLD=",
+        "QUESTION_BANK_MIN=",
+        "QUESTION_BANK_MAX=",
+        "DEBUG_TEXT_INPUT_ENABLED=",
         "AIGC_DETECTOR_PROVIDER=",
         "AIGC_DETECTOR_BASE_URL=",
         "AIGC_AI_PROB_THRESHOLD=",
@@ -241,6 +249,8 @@ def test_postgres_schema_matches_core_spec_tables() -> None:
         "question_utterance_id UUID REFERENCES utterances(id)",
         "answer_utterance_id UUID REFERENCES utterances(id)",
         "probe_chain_id UUID REFERENCES probe_chains(id)",
+        "asked_option_id TEXT CHECK",
+        "question_origin TEXT CHECK",
     ]:
         assert column in schema
     assert "REFERENCES jobs(id)" in schema
@@ -256,6 +266,7 @@ def test_postgres_schema_enforces_core_contract_invariants() -> None:
         "ended_at IS NULL OR started_at IS NULL OR ended_at >= started_at",
         "turn_index >= 0",
         "question_source IN ('interviewer', 'ai_probe')",
+        "question_origin IN ('system_suggested', 'interviewer_custom')",
         "answer_start_ms >= 0",
         "answer_end_ms >= answer_start_ms",
         "jsonb_typeof(dimensions) = 'array' AND jsonb_array_length(dimensions) > 0",

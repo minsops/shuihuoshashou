@@ -481,14 +481,17 @@ def test_sqlite_qa_turns_enforce_core_contract(tmp_path, monkeypatch) -> None:
         answer_start_ms: int,
         answer_end_ms: int,
         probe_target: str | None = None,
+        asked_option_id: str | None = None,
+        question_origin: str | None = None,
     ) -> None:
         with connect() as conn:
             conn.execute(
                 """
                 INSERT INTO qa_turns
                 (id, interview_id, turn_index, question, question_source, answer,
-                 answer_start_ms, answer_end_ms, probe_target, payload)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 answer_start_ms, answer_end_ms, probe_target, asked_option_id,
+                 question_origin, payload)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     turn_id,
@@ -500,21 +503,37 @@ def test_sqlite_qa_turns_enforce_core_contract(tmp_path, monkeypatch) -> None:
                     answer_start_ms,
                     answer_end_ms,
                     probe_target,
+                    asked_option_id,
+                    question_origin,
                     "{}",
                 ),
             )
 
     insert_turn("turn-valid", 0, "q", "interviewer", "a", 10, 20)
+    insert_turn(
+        "turn-valid-origin",
+        1,
+        "q",
+        "interviewer",
+        "a",
+        10,
+        20,
+        None,
+        "option-1",
+        "system_suggested",
+    )
 
     invalid_rows = [
-        ("turn-negative-index", -1, "q", "interviewer", "a", 10, 20, None),
-        ("turn-blank-question", 1, " ", "interviewer", "a", 10, 20, None),
-        ("turn-bad-source", 1, "q", "candidate", "a", 10, 20, None),
-        ("turn-blank-answer", 1, "q", "interviewer", " ", 10, 20, None),
-        ("turn-negative-start", 1, "q", "interviewer", "a", -1, 20, None),
-        ("turn-backwards", 1, "q", "interviewer", "a", 20, 10, None),
-        ("turn-blank-target", 1, "q", "ai_probe", "a", 10, 20, " "),
-        ("turn-duplicate-index", 0, "q", "interviewer", "a", 10, 20, None),
+        ("turn-negative-index", -1, "q", "interviewer", "a", 10, 20, None, None, None),
+        ("turn-blank-question", 2, " ", "interviewer", "a", 10, 20, None, None, None),
+        ("turn-bad-source", 2, "q", "candidate", "a", 10, 20, None, None, None),
+        ("turn-blank-answer", 2, "q", "interviewer", " ", 10, 20, None, None, None),
+        ("turn-negative-start", 2, "q", "interviewer", "a", -1, 20, None, None, None),
+        ("turn-backwards", 2, "q", "interviewer", "a", 20, 10, None, None, None),
+        ("turn-blank-target", 2, "q", "ai_probe", "a", 10, 20, " ", None, None),
+        ("turn-blank-option", 2, "q", "interviewer", "a", 10, 20, None, " ", None),
+        ("turn-bad-origin", 2, "q", "interviewer", "a", 10, 20, None, None, "manual"),
+        ("turn-duplicate-index", 0, "q", "interviewer", "a", 10, 20, None, None, None),
     ]
     for row in invalid_rows:
         with pytest.raises(sqlite3.IntegrityError):
@@ -733,5 +752,7 @@ def test_sqlite_init_migrates_realtime_columns_and_legacy_turns(
     assert "signal_enabled" in interview_columns
     assert interview_row["signal_enabled"] == 0
     assert "payload" in turn_columns
+    assert "asked_option_id" in turn_columns
+    assert "question_origin" in turn_columns
     assert turns[0].turn_id == "turn-1"
     assert turns[0].answer_start_ms == 10

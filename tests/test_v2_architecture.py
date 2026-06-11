@@ -203,6 +203,8 @@ def test_utterance_and_turn_refs_are_persisted(tmp_path, monkeypatch) -> None:
             answer_end_ms=answer.end_ms,
             question_utterance_id=question.utterance_id,
             answer_utterance_id=answer.utterance_id,
+            asked_option_id="option-1",
+            question_origin="system_suggested",
         ),
     )
 
@@ -210,6 +212,8 @@ def test_utterance_and_turn_refs_are_persisted(tmp_path, monkeypatch) -> None:
     persisted_turn = list_turns(interview.id)[0]
     assert persisted_turn.question_utterance_id == question.utterance_id
     assert persisted_turn.answer_utterance_id == answer.utterance_id
+    assert persisted_turn.asked_option_id == "option-1"
+    assert persisted_turn.question_origin == "system_suggested"
 
 
 def test_probe_suggestion_chain_id_is_persisted_when_answered(tmp_path, monkeypatch) -> None:

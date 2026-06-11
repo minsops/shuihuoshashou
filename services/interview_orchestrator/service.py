@@ -323,8 +323,8 @@ def add_turn(interview_id: str, turn: QATurn) -> InterviewRecord:
             INSERT OR REPLACE INTO qa_turns
             (id, interview_id, turn_index, question, question_source, answer,
              answer_start_ms, answer_end_ms, probe_target, question_utterance_id,
-             answer_utterance_id, probe_chain_id, payload)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             answer_utterance_id, probe_chain_id, asked_option_id, question_origin, payload)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 turn.turn_id,
@@ -339,6 +339,8 @@ def add_turn(interview_id: str, turn: QATurn) -> InterviewRecord:
                 turn.question_utterance_id,
                 turn.answer_utterance_id,
                 turn.probe_chain_id,
+                turn.asked_option_id,
+                turn.question_origin,
                 dumps(turn.model_dump()),
             ),
         )
@@ -390,7 +392,8 @@ def list_turns(interview_id: str) -> list[QATurn]:
         rows = conn.execute(
             """
             SELECT id, question, question_source, answer, answer_start_ms, answer_end_ms,
-                   probe_target, question_utterance_id, answer_utterance_id, probe_chain_id, payload
+                   probe_target, question_utterance_id, answer_utterance_id, probe_chain_id,
+                   asked_option_id, question_origin, payload
             FROM qa_turns
             WHERE interview_id = ?
             ORDER BY turn_index
@@ -414,6 +417,8 @@ def list_turns(interview_id: str) -> list[QATurn]:
                 question_utterance_id=row["question_utterance_id"],
                 answer_utterance_id=row["answer_utterance_id"],
                 probe_chain_id=row["probe_chain_id"],
+                asked_option_id=row["asked_option_id"],
+                question_origin=row["question_origin"],
             )
         )
     return turns
