@@ -12,7 +12,7 @@ if str(ROOT) not in sys.path:
 
 from libs.common.config import Settings  # noqa: E402
 from scripts.create_aliyun_nls_token import create_token_from_env  # noqa: E402
-from services.asr_service.nls_engine import AliyunNLSSession  # noqa: E402
+from services.asr_service.nls_engine import AliyunNLSWSASREngine  # noqa: E402
 
 DEFAULT_PCM_PATH = ROOT / "tests" / "fixtures" / "sample_16k_mono.pcm"
 
@@ -41,10 +41,18 @@ async def _run(pcm_path: Path, *, allow_empty_result: bool = False) -> int:
         asr_provider="aliyun_nls_ws",
         aliyun_nls_app_key=app_key,
         aliyun_nls_token=token,
+        aliyun_ak_id=os.environ.get("ALIYUN_AK_ID", ""),
+        aliyun_ak_secret=os.environ.get("ALIYUN_AK_SECRET", ""),
+        aliyun_nls_token_endpoint=os.environ.get(
+            "ALIYUN_NLS_TOKEN_ENDPOINT",
+            "https://nls-meta.cn-shanghai.aliyuncs.com/",
+        ),
+        aliyun_nls_token_region=os.environ.get("ALIYUN_NLS_TOKEN_REGION", "cn-shanghai"),
     )
-    session = AliyunNLSSession("aliyun-nls-smoke", settings=settings)
+    engine = AliyunNLSWSASREngine(settings=settings)
+    session = None
     try:
-        await session.connect()
+        session = await engine.get_or_create_session("aliyun-nls-smoke")
         pcm = pcm_path.read_bytes()
         chunk_size = max(3200, settings.aliyun_nls_sample_rate // 10 * 2)
         for offset in range(0, len(pcm), chunk_size):
@@ -52,15 +60,18 @@ async def _run(pcm_path: Path, *, allow_empty_result: bool = False) -> int:
             await asyncio.sleep(0.1)
         await session.close()
     except Exception as exc:
-        if session.started and not session.finished:
+        if session is not None and session.started and not session.finished:
             try:
-                await session.close()
+                await engine.close_session("aliyun-nls-smoke")
             except Exception as close_exc:
                 print(f"Aliyun NLS ASR cleanup failed: {close_exc}", file=sys.stderr)
         print(f"Aliyun NLS ASR smoke test failed: {exc}", file=sys.stderr)
         return 1
 
     texts: list[str] = []
+    if session is None:
+        print("Aliyun NLS ASR smoke test failed: session was not created.", file=sys.stderr)
+        return 1
     while not session.result_queue.empty():
         segment = await session.result_queue.get()
         if segment is not None and segment.text.strip():

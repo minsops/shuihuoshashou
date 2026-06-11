@@ -174,7 +174,17 @@ def test_check_aliyun_nls_asr_smoke_script_uses_pcm_file(
                 )
             )
 
-    monkeypatch.setattr(check_aliyun_nls_asr, "AliyunNLSSession", FakeSmokeSession)
+    class FakeSmokeEngine:
+        def __init__(self, *, settings: Settings) -> None:
+            self.settings = settings
+
+        async def get_or_create_session(self, session_id: str) -> FakeSmokeSession:
+            return FakeSmokeSession(session_id, settings=self.settings)
+
+        async def close_session(self, session_id: str) -> None:
+            return None
+
+    monkeypatch.setattr(check_aliyun_nls_asr, "AliyunNLSWSASREngine", FakeSmokeEngine)
 
     exit_code = asyncio.run(check_aliyun_nls_asr._run(pcm_path))
 
@@ -233,7 +243,17 @@ def test_check_aliyun_nls_asr_allow_empty_result_does_not_claim_transcript_verif
         async def close(self) -> None:
             return None
 
-    monkeypatch.setattr(check_aliyun_nls_asr, "AliyunNLSSession", FakeEmptySession)
+    class FakeEmptyEngine:
+        def __init__(self, *, settings: Settings) -> None:
+            self.settings = settings
+
+        async def get_or_create_session(self, session_id: str) -> FakeEmptySession:
+            return FakeEmptySession(session_id, settings=self.settings)
+
+        async def close_session(self, session_id: str) -> None:
+            return None
+
+    monkeypatch.setattr(check_aliyun_nls_asr, "AliyunNLSWSASREngine", FakeEmptyEngine)
 
     exit_code = asyncio.run(check_aliyun_nls_asr._run(pcm_path, allow_empty_result=True))
 
@@ -286,7 +306,17 @@ def test_check_aliyun_nls_asr_smoke_script_can_create_token_from_ak(
                 )
             )
 
-    monkeypatch.setattr(check_aliyun_nls_asr, "AliyunNLSSession", FakeSmokeSession)
+    class FakeSmokeEngine:
+        def __init__(self, *, settings: Settings) -> None:
+            self.settings = settings
+
+        async def get_or_create_session(self, session_id: str) -> FakeSmokeSession:
+            return FakeSmokeSession(session_id, settings=self.settings)
+
+        async def close_session(self, session_id: str) -> None:
+            return None
+
+    monkeypatch.setattr(check_aliyun_nls_asr, "AliyunNLSWSASREngine", FakeSmokeEngine)
 
     exit_code = asyncio.run(check_aliyun_nls_asr._run(pcm_path))
 
@@ -502,4 +532,48 @@ def test_nls_engine_retries_once_after_auto_token_failure(monkeypatch) -> None:
     assert session.started is True
     assert provider.invalidations == 1
     assert connect_calls == 2
+    assert engine._sessions["session-1"] is session
+
+
+def test_nls_engine_retries_with_auto_token_after_fixed_token_403(monkeypatch) -> None:
+    connect_tokens: list[str] = []
+    connect_auto_flags: list[bool] = []
+
+    class FakeTokenProvider:
+        def __init__(self) -> None:
+            self.invalidations = 0
+
+        def get_token(self) -> str:
+            return "created-token"
+
+        def invalidate(self) -> None:
+            self.invalidations += 1
+
+    async def fake_connect(self) -> None:
+        connect_auto_flags.append(self._prefer_auto_token)
+        connect_tokens.append(await self._resolve_token())
+        if len(connect_tokens) == 1:
+            raise RuntimeError("server rejected WebSocket connection: HTTP 403")
+        self.started = True
+
+    monkeypatch.setattr(AliyunNLSSession, "connect", fake_connect)
+    provider = FakeTokenProvider()
+    engine = AliyunNLSWSASREngine(
+        settings=Settings(
+            asr_provider="aliyun_nls_ws",
+            aliyun_nls_app_key="app-key",
+            aliyun_nls_token="expired-fixed-token",
+            aliyun_ak_id="ak-id",
+            aliyun_ak_secret="ak-secret",
+        )
+    )
+    engine._token_provider = provider
+
+    session = asyncio.run(engine.get_or_create_session("session-1"))
+
+    assert session.started is True
+    assert provider.invalidations == 1
+    assert connect_auto_flags == [False, True]
+    assert connect_tokens == ["expired-fixed-token", "created-token"]
+    assert engine._prefer_auto_token is True
     assert engine._sessions["session-1"] is session

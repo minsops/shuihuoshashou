@@ -22,10 +22,12 @@ class AliyunNLSSession:
         settings: Settings | None = None,
         ws: Any | None = None,
         token_provider: AliyunNLSTokenProvider | None = None,
+        prefer_auto_token: bool = False,
     ) -> None:
         self.session_id = session_id
         self.settings = settings or get_settings()
         self._token_provider = token_provider
+        self._prefer_auto_token = prefer_auto_token
         self.task_id = uuid4().hex
         self.ws = ws
         self.result_queue: asyncio.Queue[TranscriptSegment | None] = asyncio.Queue()
@@ -99,7 +101,7 @@ class AliyunNLSSession:
 
     async def _resolve_token(self) -> str:
         token = self.settings.aliyun_nls_token.strip()
-        if token:
+        if token and not self._prefer_auto_token:
             return token
         provider = self._token_provider or self._build_token_provider()
         return await asyncio.to_thread(provider.get_token)
@@ -211,11 +213,10 @@ class AliyunNLSWSASREngine(ASREngine):
     def __init__(self, *, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
         self._token_provider = self._build_token_provider()
+        self._prefer_auto_token = False
         self._sessions: dict[str, AliyunNLSSession] = {}
 
     def _build_token_provider(self) -> AliyunNLSTokenProvider | None:
-        if self.settings.aliyun_nls_token.strip():
-            return None
         if not (self.settings.aliyun_ak_id.strip() and self.settings.aliyun_ak_secret.strip()):
             return None
         return AliyunNLSTokenProvider(
@@ -235,6 +236,7 @@ class AliyunNLSWSASREngine(ASREngine):
         except Exception as exc:
             if self._token_provider is not None and _nls_token_failure(exc):
                 self._token_provider.invalidate()
+                self._prefer_auto_token = True
                 session = self._new_session(session_id)
                 try:
                     await session.connect()
@@ -252,6 +254,7 @@ class AliyunNLSWSASREngine(ASREngine):
             session_id,
             settings=self.settings,
             token_provider=self._token_provider,
+            prefer_auto_token=self._prefer_auto_token,
         )
 
     async def close_session(self, session_id: str) -> None:
@@ -282,7 +285,13 @@ class AliyunNLSWSASREngine(ASREngine):
 
 def _nls_token_failure(exc: Exception) -> bool:
     reason = str(exc).lower()
-    return "40000002" in reason or "bad token" in reason or "invalid token" in reason
+    return (
+        "40000002" in reason
+        or "bad token" in reason
+        or "invalid token" in reason
+        or "http 403" in reason
+        or "forbidden" in reason
+    )
 
 
 def _nls_event_ok(data: dict[str, Any], event_name: str) -> bool:
