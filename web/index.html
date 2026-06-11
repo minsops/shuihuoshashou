@@ -919,6 +919,7 @@
       const queuedReportPollIntervalMs = 3000;
       const queuedReportMaxPollAttempts = 30;
       const documentParseTimeoutMs = 45_000;
+      const prepareSessionTimeoutMs = 90_000;
       const reportDownloadTimeoutMs = 30_000;
       const externalCheckTimeoutMs = 65_000;
       const supportedDocumentSuffixes = new Set([
@@ -1022,12 +1023,12 @@
           setPill(micStatus, "面试已结束", "ready");
         } else if (state.micError) {
           setPill(micStatus, state.micError, "");
+        } else if (connected) {
+          setPill(micStatus, "麦克风未开启", "");
         } else if (state.interview) {
           setPill(micStatus, "等待重连通道", "");
-        } else if (!connected) {
-          setPill(micStatus, "先创建实时面试", "");
         } else {
-          setPill(micStatus, "麦克风未开启", "");
+          setPill(micStatus, "先创建实时面试", "");
         }
       }
 
@@ -1347,11 +1348,12 @@
         return readJsonResponse(response);
       }
 
-      async function postJson(url, payload) {
+      async function postJson(url, payload, options = {}) {
         const response = await fetchGateway(url, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify(payload),
+          ...options,
         });
         return readJsonResponse(response);
       }
@@ -2006,16 +2008,22 @@
           const job = await postJson("/api/jobs", {
             title: form.job_title.value.trim(),
             jd_text: form.jd_text.value.trim(),
+          }, {
+            timeoutMs: prepareSessionTimeoutMs,
           });
           if (!prepareSessionStillCurrent(prepareToken)) return;
           const candidate = await postJson("/api/candidates", {
             name: form.candidate_name.value.trim(),
             resume_text: form.resume_text.value.trim(),
+          }, {
+            timeoutMs: prepareSessionTimeoutMs,
           });
           if (!prepareSessionStillCurrent(prepareToken)) return;
           const interview = await postJson("/api/interviews", {
             job_id: job.id,
             candidate_id: candidate.id,
+          }, {
+            timeoutMs: prepareSessionTimeoutMs,
           });
           if (!prepareSessionStillCurrent(prepareToken)) return;
           state.job = job;

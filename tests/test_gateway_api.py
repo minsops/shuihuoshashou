@@ -470,7 +470,9 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "const { timeoutMs, ...fetchOptions } = options" in response.text
     assert "timeoutMs: documentParseTimeoutMs" in response.text
     assert "documentParseTimeoutMs = 45_000" in response.text
+    assert "prepareSessionTimeoutMs = 90_000" in response.text
     assert "externalCheckTimeoutMs = 65_000" in response.text
+    assert 'else if (connected) {\n          setPill(micStatus, "麦克风未开启", "");' in response.text
     assert "input.disabled = true" in response.text
     assert "input.value = \"\"" in response.text
     assert ".log,.pdf" in response.text
@@ -543,6 +545,8 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "当前已有面试或资料正在处理，请重置后再加载样例资料" in response.text
     assert "prepareSessionToken" in response.text
     assert "prepareSessionStillCurrent" in response.text
+    assert "async function postJson(url, payload, options = {})" in response.text
+    assert "timeoutMs: prepareSessionTimeoutMs" in response.text
     assert "if (!prepareSessionStillCurrent(prepareToken)) return" in response.text
     assert "openSocketWithLatestGateway(interview.id, () =>" in response.text
     assert "validateSetupForm" in response.text
