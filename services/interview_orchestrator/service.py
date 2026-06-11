@@ -43,6 +43,28 @@ def create_candidate(payload: CandidateCreate) -> CandidateRecord:
     return record
 
 
+def get_or_create_candidate(payload: CandidateCreate) -> CandidateRecord:
+    init_db()
+    with connect() as conn:
+        row = conn.execute(
+            """
+            SELECT * FROM candidates
+            WHERE name = ? AND resume_text = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (payload.name, payload.resume_text),
+        ).fetchone()
+    if row is None:
+        return create_candidate(payload)
+    return CandidateRecord(
+        id=row["id"],
+        name=row["name"],
+        resume_text=row["resume_text"],
+        created_at=datetime.fromisoformat(row["created_at"]),
+    )
+
+
 def get_candidate(candidate_id: str) -> CandidateRecord:
     init_db()
     with connect() as conn:

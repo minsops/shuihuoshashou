@@ -26,6 +26,7 @@ from libs.common.observability import (
     request_id_from_header,
     trace_context_from_header,
 )
+from libs.common.prompts import load_prompt
 from libs.common.runtime import RuntimeStatus, get_runtime_status
 from libs.common.storage import get_artifact_store
 from libs.schemas import (
@@ -39,12 +40,15 @@ from libs.schemas import (
     OfflineInterviewResult,
     ProbeResponse,
     OfflineTaskAccepted,
+    QuickSetupRequest,
+    QuickSetupResponse,
     ProbeRequest,
     ProbeSuggestion,
     QATurn,
     ResumeClaim,
     ReportBuildRequest,
     ScoringRequest,
+    SetupExtraction,
     TranscriptSegment,
     new_id,
 )
@@ -68,6 +72,7 @@ from services.interview_orchestrator.service import (
     end_interview,
     get_interview,
     get_report,
+    get_or_create_candidate,
     has_active_consent,
     should_probe_turn,
     start_interview,
@@ -584,6 +589,36 @@ def _resume_claims_for_probe(record) -> list[ResumeClaim]:
     return claims
 
 
+def _extract_quick_setup_fields(payload: QuickSetupRequest) -> tuple[SetupExtraction, bool]:
+    fallback = SetupExtraction(job_title="未命名岗位", candidate_name="候选人")
+    messages = [
+        LLMMessage(role="system", content=load_prompt("setup_extract.md")),
+        LLMMessage(
+            role="user",
+            content=json.dumps(
+                {"jd_text": payload.jd_text, "resume_text": payload.resume_text},
+                ensure_ascii=False,
+            ),
+        ),
+    ]
+    client = get_llm_client()
+    if hasattr(client, "complete_json_sync_with_meta"):
+        extraction, used_fallback = client.complete_json_sync_with_meta(
+            messages,
+            SetupExtraction,
+            fallback,
+        )
+    else:
+        extraction = client.complete_json_sync(messages, SetupExtraction, fallback)
+        used_fallback = extraction == fallback
+    confident = (
+        not used_fallback
+        and extraction.job_title != "未命名岗位"
+        and extraction.candidate_name != "候选人"
+    )
+    return extraction, confident
+
+
 def _schedule_probe_task(
     websocket: WebSocket,
     record,
@@ -920,6 +955,25 @@ def api_create_interview(payload: InterviewCreate):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+
+@app.post("/api/interviews/quick-setup", response_model=QuickSetupResponse)
+def api_quick_setup(payload: QuickSetupRequest) -> QuickSetupResponse:
+    extraction, extraction_confident = _extract_quick_setup_fields(payload)
+    job = create_job(JobCreate(title=extraction.job_title, jd_text=payload.jd_text))
+    candidate = get_or_create_candidate(
+        CandidateCreate(name=extraction.candidate_name, resume_text=payload.resume_text)
+    )
+    interview = create_interview(InterviewCreate(job_id=job.id, candidate_id=candidate.id))
+    return QuickSetupResponse(
+        interview_id=interview.id,
+        job_id=job.id,
+        job_title=job.title,
+        candidate_id=candidate.id,
+        candidate_name=candidate.name,
+        extraction_confident=extraction_confident,
+        question_bank=None,
+    )
 
 
 @app.get("/api/interviews/{interview_id}")

@@ -16,7 +16,7 @@ from libs.common.events import event_bus
 from libs.common.observability import metrics_registry, reset_rate_limiters
 from libs.common.storage import ArtifactContent
 from libs.common.tasks import task_queue
-from libs.schemas import TranscriptSegment
+from libs.schemas import SetupExtraction, TranscriptSegment
 from services.asr_service.service import asr_session_manager
 from services.gateway.app import app
 
@@ -156,6 +156,59 @@ def test_gateway_document_parse_returns_clear_kind_error(tmp_path: Path, monkeyp
 
     assert response.status_code == 400
     assert response.json() == {"detail": "kind must be jd or resume"}
+
+
+def test_gateway_quick_setup_extracts_fields_and_creates_interview(
+    tmp_path: Path, monkeypatch
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+
+    class FakeClient:
+        def complete_json_sync_with_meta(self, messages, schema, fallback):
+            assert schema is SetupExtraction
+            assert "job_title" in messages[0].content
+            return SetupExtraction(job_title="高级 AI 后端", candidate_name="张三"), False
+
+    monkeypatch.setattr("services.gateway.app.get_llm_client", lambda: FakeClient())
+
+    response = client.post(
+        "/api/interviews/quick-setup",
+        json={
+            "jd_text": "岗位名称：高级 AI 后端。职责：FastAPI 和 LLM 编排。",
+            "resume_text": "姓名：张三\n独立主导网关优化，响应时间提升 50%。",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["job_title"] == "高级 AI 后端"
+    assert payload["candidate_name"] == "张三"
+    assert payload["extraction_confident"] is True
+    assert payload["question_bank"] is None
+    interview = client.get(f"/api/interviews/{payload['interview_id']}").json()
+    assert interview["job_id"] == payload["job_id"]
+    assert interview["candidate_id"] == payload["candidate_id"]
+    assert interview["context"]["candidate_resume_text"].startswith("姓名：张三")
+
+
+def test_gateway_quick_setup_falls_back_when_extraction_is_unavailable(
+    tmp_path: Path, monkeypatch
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+
+    response = client.post(
+        "/api/interviews/quick-setup",
+        json={
+            "jd_text": "负责后端服务、模型接入和报告链路。",
+            "resume_text": "做过 Python 和 FastAPI 项目。",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["job_title"] == "未命名岗位"
+    assert payload["candidate_name"] == "候选人"
+    assert payload["extraction_confident"] is False
 
 
 def test_gateway_report_json_falls_back_to_persisted_payload_when_artifact_missing(

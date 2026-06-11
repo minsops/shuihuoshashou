@@ -623,6 +623,41 @@ class CandidateRecord(BaseModel):
         return _not_blank(value, "candidate id")
 
 
+class SetupExtraction(BaseModel):
+    job_title: str
+    candidate_name: str
+
+    @field_validator("job_title", "candidate_name")
+    @classmethod
+    def text_fields_are_not_blank(cls, value: str, info: ValidationInfo) -> str:
+        return _not_blank(value, f"setup extraction {info.field_name}")
+
+
+class QuickSetupRequest(BaseModel):
+    jd_text: str
+    resume_text: str
+
+    @field_validator("jd_text", "resume_text")
+    @classmethod
+    def text_fields_are_not_blank(cls, value: str, info: ValidationInfo) -> str:
+        return _not_blank(value, f"quick setup {info.field_name}")
+
+
+class QuickSetupResponse(BaseModel):
+    interview_id: str
+    job_id: str
+    job_title: str
+    candidate_id: str
+    candidate_name: str
+    extraction_confident: bool
+    question_bank: dict | None = None
+
+    @field_validator("interview_id", "job_id", "job_title", "candidate_id", "candidate_name")
+    @classmethod
+    def text_fields_are_not_blank(cls, value: str, info: ValidationInfo) -> str:
+        return _not_blank(value, f"quick setup response {info.field_name}")
+
+
 class ConsentCreate(BaseModel):
     candidate_id: str
     consent_type: Literal["behavior_signal"] = "behavior_signal"
