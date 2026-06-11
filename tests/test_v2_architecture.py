@@ -103,6 +103,30 @@ def test_dialogue_assembler_uses_explicit_fallback_for_candidate_first() -> None
     assert result.turns[0].question == FALLBACK_QUESTION
 
 
+def test_dialogue_assembler_applies_pending_question_annotation() -> None:
+    assembler = DialogueAssembler()
+    question_result = assembler.feed(
+        _segment("interviewer", "网关系统你亲自写了哪段代码？", 0, 900),
+        force_close=True,
+    )
+
+    assert question_result.utterances[0].speaker == "interviewer"
+    assembler.annotate_pending_question(
+        "请讲你在网关系统里亲自写了哪段代码？",
+        asked_option_id="option-1",
+        question_origin="system_suggested",
+    )
+    answer_result = assembler.feed(
+        _segment("candidate", "我写了限流中间件和降级开关。", 1000, 1800),
+        force_close=True,
+    )
+
+    turn = answer_result.turns[0]
+    assert turn.question == "请讲你在网关系统里亲自写了哪段代码？"
+    assert turn.asked_option_id == "option-1"
+    assert turn.question_origin == "system_suggested"
+
+
 def test_dialogue_assembler_closes_same_speaker_after_long_silence() -> None:
     assembler = DialogueAssembler(silence_close_ms=2500)
 

@@ -2009,6 +2009,76 @@ def test_gateway_websocket_text_turn_probe_flow(tmp_path: Path, monkeypatch) -> 
         assert report["payload"]["transcript"][0]["probe_target"] == "验证项目真实性"
 
 
+def test_gateway_websocket_question_flow_events_with_question_bank(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("QUESTION_MATCH_THRESHOLD", "0.30")
+    client = _client(tmp_path, monkeypatch)
+    setup = client.post(
+        "/api/interviews/quick-setup",
+        json={
+            "jd_text": "负责 Python FastAPI 网关、限流、降级和 LLM 编排。",
+            "resume_text": "姓名：候选人\n独立主导网关优化，响应时间提升 50%。",
+        },
+    ).json()
+    interview_id = setup["interview_id"]
+
+    with client.websocket_connect(f"/ws/interview/{interview_id}") as websocket:
+        current = websocket.receive_json()
+        assert current["type"] == "current_question"
+        current_payload = current["payload"]
+
+        websocket.send_json(
+            {
+                "type": "text_turn",
+                "seq": 1,
+                "speaker": "interviewer",
+                "answer": current_payload["question"],
+                "start_ms": 0,
+                "end_ms": 800,
+            }
+        )
+        question_transcript = websocket.receive_json()
+        matched, _ = _receive_until(websocket, "question_matched")
+        assert question_transcript["type"] == "transcript"
+        assert question_transcript["payload"]["speaker"] == "interviewer"
+        assert matched["payload"]["matched_option_id"] == current_payload["option_id"]
+        assert matched["payload"]["asked_text"] == current_payload["question"]
+
+        websocket.send_json(
+            {
+                "type": "text_turn",
+                "seq": 2,
+                "speaker": "candidate",
+                "answer": "我亲自写了限流中间件、降级开关和监控指标，线上 P95 下降 50%。",
+                "start_ms": 1000,
+                "end_ms": 2200,
+            }
+        )
+        answer_transcript = websocket.receive_json()
+        turn, _ = _receive_until(websocket, "turn")
+        next_options, _ = _receive_until(websocket, "next_options")
+        assert answer_transcript["payload"]["speaker"] == "candidate"
+        assert turn["payload"]["question"] == current_payload["question"]
+        assert turn["payload"]["asked_option_id"] == current_payload["option_id"]
+        assert turn["payload"]["question_origin"] == "system_suggested"
+        assert len(next_options["payload"]["follow_up"]) >= 1
+        assert len(next_options["payload"]["alternatives"]) >= 2
+
+        selected = next_options["payload"]["alternatives"][0]
+        websocket.send_json({"type": "pick_option", "option_id": selected["option_id"]})
+        picked, _ = _receive_until(websocket, "current_question", limit=12)
+        assert picked["payload"]["option_id"] == selected["option_id"]
+        assert picked["payload"]["question"] == selected["question"]
+
+    persisted_bank = client.get(f"/api/interviews/{interview_id}/question-bank").json()
+    current_bank_id = current_payload["bank_question_id"]
+    assert any(
+        item["question_id"] == current_bank_id and item["asked"] is True
+        for item in persisted_bank["items"]
+    )
+
+
 def test_gateway_text_turn_works_with_aliyun_ws_provider(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("ASR_PROVIDER", "aliyun_ws")
     monkeypatch.setenv("ALIYUN_ASR_API_KEY", "dashscope-secret")

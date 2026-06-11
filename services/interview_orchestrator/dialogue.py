@@ -30,6 +30,9 @@ class DialogueAssembler:
         self._question_source: Literal["interviewer", "ai_probe"] = "interviewer"
         self._probe_target: str | None = None
         self._probe_chain_id: str | None = None
+        self._pending_question_text: str | None = None
+        self._pending_asked_option_id: str | None = None
+        self._pending_question_origin: Literal["system_suggested", "interviewer_custom"] | None = None
 
     def feed(
         self,
@@ -89,6 +92,22 @@ class DialogueAssembler:
             return DialogueFeedResult()
         return self._seal_current()
 
+    def annotate_pending_question(
+        self,
+        question: str,
+        *,
+        asked_option_id: str | None,
+        question_origin: Literal["system_suggested", "interviewer_custom"],
+    ) -> None:
+        if self._pending_question is None:
+            return
+        clean_question = question.strip()
+        if not clean_question:
+            return
+        self._pending_question_text = clean_question
+        self._pending_asked_option_id = _clean_optional(asked_option_id)
+        self._pending_question_origin = question_origin
+
     def _start_buffer(
         self,
         segment: TranscriptSegment,
@@ -144,15 +163,21 @@ class DialogueAssembler:
         result = DialogueFeedResult(utterances=[utterance])
         if utterance.speaker == "interviewer":
             self._pending_question = utterance
+            self._pending_question_text = None
+            self._pending_asked_option_id = None
+            self._pending_question_origin = None
             return result
         if utterance.speaker != "candidate":
             return result
 
-        turn_question, source, question_utterance_id, resolved_probe_target = self._resolve_question(
-            fallback_question,
-            question_source,
-            probe_target,
-        )
+        (
+            turn_question,
+            source,
+            question_utterance_id,
+            resolved_probe_target,
+            asked_option_id,
+            question_origin,
+        ) = self._resolve_question(fallback_question, question_source, probe_target)
         result.turns.append(
             QATurn(
                 question=turn_question,
@@ -162,9 +187,11 @@ class DialogueAssembler:
                 answer_end_ms=utterance.end_ms,
                 probe_target=resolved_probe_target,
                 question_utterance_id=question_utterance_id,
-            answer_utterance_id=utterance.utterance_id,
-            probe_chain_id=probe_chain_id,
-        )
+                answer_utterance_id=utterance.utterance_id,
+                probe_chain_id=probe_chain_id,
+                asked_option_id=asked_option_id,
+                question_origin=question_origin,
+            )
         )
         return result
 
@@ -173,14 +200,34 @@ class DialogueAssembler:
         fallback_question: str,
         question_source: Literal["interviewer", "ai_probe"],
         probe_target: str | None,
-    ) -> tuple[str, Literal["interviewer", "ai_probe"], str | None, str | None]:
+    ) -> tuple[
+        str,
+        Literal["interviewer", "ai_probe"],
+        str | None,
+        str | None,
+        str | None,
+        Literal["system_suggested", "interviewer_custom"] | None,
+    ]:
         if question_source == "ai_probe":
-            return fallback_question, "ai_probe", None, probe_target or "AI 追问建议"
+            return fallback_question, "ai_probe", None, probe_target or "AI 追问建议", None, None
         if self._pending_question is not None:
             question = self._pending_question
+            annotated_question = self._pending_question_text or question.text
+            asked_option_id = self._pending_asked_option_id
+            question_origin = self._pending_question_origin
             self._pending_question = None
-            return question.text, "interviewer", question.utterance_id, None
-        return fallback_question, "interviewer", None, None
+            self._pending_question_text = None
+            self._pending_asked_option_id = None
+            self._pending_question_origin = None
+            return (
+                annotated_question,
+                "interviewer",
+                question.utterance_id,
+                None,
+                asked_option_id,
+                question_origin,
+            )
+        return fallback_question, "interviewer", None, None, None, None
 
     def _build_utterance(self) -> Utterance:
         start_ms = min(segment.start_ms for segment in self._buffer)

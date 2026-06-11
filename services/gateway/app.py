@@ -36,6 +36,7 @@ from libs.schemas import (
     CredibilitySignal,
     InterviewCreate,
     JobCreate,
+    NextOption,
     OfflineInterviewInput,
     OfflineInterviewResult,
     ProbeResponse,
@@ -63,6 +64,13 @@ from services.asr_service.service import (
 )
 from services.document_service import parse_document
 from services.interview_orchestrator.dialogue import DialogueAssembler
+from services.interview_orchestrator.question_flow import (
+    QuestionFlowState,
+    fallback_next_options,
+    find_option,
+    initial_question,
+)
+from services.interview_orchestrator.question_match import match_asked_question
 from services.interview_orchestrator.service import (
     add_turn,
     add_utterance,
@@ -135,6 +143,7 @@ class _DialogueSessionRuntime:
     senders: set[_LockedWebSocketSender] = field(default_factory=set)
     epoch: int = 0
     flush_task: asyncio.Task[None] | None = None
+    question_flow: QuestionFlowState | None = None
 
     async def send_json(self, payload: dict) -> None:
         stale: list[_LockedWebSocketSender] = []
@@ -163,6 +172,27 @@ def _dialogue_runtime(interview_id: str, silence_close_ms: int) -> _DialogueSess
 def _discard_dialogue_runtime(interview_id: str, runtime: _DialogueSessionRuntime) -> None:
     if _dialogue_runtimes.get(interview_id) is runtime:
         _dialogue_runtimes.pop(interview_id, None)
+
+
+async def _send_initial_question_if_available(
+    sender: _LockedWebSocketSender,
+    runtime: _DialogueSessionRuntime,
+    interview_id: str,
+) -> None:
+    current: NextOption | None = None
+    async with runtime.lock:
+        if runtime.question_flow is None:
+            try:
+                bank = get_question_bank(interview_id)
+            except KeyError:
+                return
+            runtime.question_flow = QuestionFlowState(
+                bank=bank,
+                current_question=initial_question(bank),
+            )
+        current = runtime.question_flow.current_question
+    if current is not None:
+        await sender.send_json({"type": "current_question", "payload": current.model_dump()})
 
 
 @dataclass(frozen=True)
@@ -1252,6 +1282,33 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
         nonlocal record
         for utterance in result.utterances:
             record = add_utterance(interview_id, utterance)
+            if utterance.speaker == "interviewer" and runtime.question_flow is not None:
+                matched_id, stored_question = match_asked_question(
+                    utterance.text,
+                    runtime.question_flow.current_question,
+                    runtime.question_flow.last_options,
+                    runtime.question_flow.bank,
+                )
+                question_origin = (
+                    "system_suggested" if matched_id is not None else "interviewer_custom"
+                )
+                runtime.assembler.annotate_pending_question(
+                    stored_question,
+                    asked_option_id=matched_id,
+                    question_origin=question_origin,
+                )
+                if matched_id is not None:
+                    save_question_bank(runtime.question_flow.bank)
+                await runtime.send_json(
+                    {
+                        "type": "question_matched",
+                        "payload": {
+                            "utterance_id": utterance.utterance_id,
+                            "matched_option_id": matched_id,
+                            "asked_text": utterance.text,
+                        },
+                    }
+                )
         for turn in result.turns:
             record = add_turn(interview_id, turn)
             await runtime.send_json({"type": "turn", "payload": turn.model_dump()})
@@ -1261,6 +1318,10 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                     "payload": [chain.model_dump() for chain in record.context.probe_chains],
                 }
             )
+            if runtime.question_flow is not None:
+                options = fallback_next_options(record, runtime.question_flow.bank, turn)
+                runtime.question_flow.last_options = options
+                await runtime.send_json({"type": "next_options", "payload": options.model_dump()})
             if emit_probe and (force_probe or should_probe_turn(turn, record)):
                 _schedule_probe_task(runtime, record, turn)
 
@@ -1314,6 +1375,7 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
 
     try:
         record = start_interview(interview_id)
+        await _send_initial_question_if_available(sender, runtime, interview_id)
         while True:
             try:
                 event = await websocket.receive_json()
@@ -1495,6 +1557,27 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                     force_close=True,
                     force_probe=True,
                 )
+            elif event.get("type") == "pick_option":
+                option_id = str(event.get("option_id") or "").strip()
+                if not option_id:
+                    await sender.send_json({"type": "error", "detail": "pick_option requires option_id"})
+                    continue
+                async with runtime.lock:
+                    if runtime.question_flow is None:
+                        await sender.send_json(
+                            {"type": "error", "detail": "question flow is not available"}
+                        )
+                        continue
+                    option = find_option(runtime.question_flow, option_id)
+                    if option is None:
+                        await sender.send_json(
+                            {"type": "error", "detail": "unknown question option_id"}
+                        )
+                        continue
+                    runtime.question_flow.current_question = option
+                    await runtime.send_json(
+                        {"type": "current_question", "payload": option.model_dump()}
+                    )
             elif event.get("type") == "end":
                 try:
                     cancel_dialogue_silence_flush()
