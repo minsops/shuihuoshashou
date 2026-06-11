@@ -3024,6 +3024,63 @@ def test_gateway_websocket_maps_audio_channel_to_speaker(tmp_path: Path, monkeyp
         assert report["type"] == "report"
 
 
+def test_gateway_dual_device_streams_share_dialogue_and_sequence_space(
+    tmp_path: Path, monkeypatch
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+    job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
+    candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
+    interview = client.post(
+        "/api/interviews",
+        json={"job_id": job["id"], "candidate_id": candidate["id"]},
+    ).json()
+    question = "请介绍你负责的网关模块。"
+    answer = "我负责限流和降级。"
+
+    with client.websocket_connect(f"/ws/interview/{interview['id']}") as interviewer_ws:
+        with client.websocket_connect(f"/ws/interview/{interview['id']}") as candidate_ws:
+            interviewer_ws.send_json(
+                {
+                    "type": "text_turn",
+                    "seq": 1,
+                    "speaker": "interviewer",
+                    "answer": question,
+                    "start_ms": 0,
+                    "end_ms": 1000,
+                }
+            )
+            assert interviewer_ws.receive_json()["payload"]["speaker"] == "interviewer"
+            assert candidate_ws.receive_json()["payload"]["speaker"] == "interviewer"
+
+            candidate_ws.send_json(
+                {
+                    "type": "text_turn",
+                    "seq": 1,
+                    "speaker": "candidate",
+                    "answer": answer,
+                    "start_ms": 1200,
+                    "end_ms": 2200,
+                }
+            )
+            assert interviewer_ws.receive_json()["payload"]["speaker"] == "candidate"
+            assert candidate_ws.receive_json()["payload"]["speaker"] == "candidate"
+
+            candidate_ws.send_json({"type": "end"})
+            candidate_report, candidate_messages = _receive_until(candidate_ws, "report")
+            interviewer_report, interviewer_messages = _receive_until(interviewer_ws, "report")
+
+    assert all(message.get("type") != "asr_warning" for message in candidate_messages)
+    assert all(message.get("type") != "asr_warning" for message in interviewer_messages)
+    assert candidate_report["payload"] == interviewer_report["payload"]
+    report = candidate_report["payload"]
+    assert report["transcript"][0]["question"] == question
+    assert report["transcript"][0]["answer"] == answer
+    assert [item["speaker"] for item in report["utterances"]] == [
+        "interviewer",
+        "candidate",
+    ]
+
+
 def test_gateway_websocket_deduplicates_final_audio_segments(
     tmp_path: Path, monkeypatch
 ) -> None:

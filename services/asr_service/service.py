@@ -145,9 +145,11 @@ class ASRSessionManager:
         segment: TranscriptSegment,
         *,
         audio_b64: str | None = None,
+        stream_id: str | None = None,
     ) -> ASRSessionDecision:
         with self._lock:
-            state = self._sessions.setdefault(segment.session_id, ASRSessionState())
+            state_key = stream_id or segment.session_id
+            state = self._sessions.setdefault(state_key, ASRSessionState())
             existing = state.chunks.get(seq)
             if existing is not None and existing.segment.is_final and segment.is_final:
                 return ASRSessionDecision(False, reason="duplicate_final_segment")
@@ -155,7 +157,7 @@ class ASRSessionManager:
                 return ASRSessionDecision(False, reason="late_final_segment")
 
             resolved_speaker = self.speaker_diarizer.resolve_speaker(
-                segment.session_id,
+                state_key,
                 audio_b64,
                 segment.speaker,
             )
@@ -170,10 +172,11 @@ class ASRSessionManager:
                 state.last_known_end_ms = segment.end_ms
             return ASRSessionDecision(True, segment=segment)
 
-    def close(self, session_id: str) -> None:
+    def close(self, session_id: str, *, stream_id: str | None = None) -> None:
         with self._lock:
-            self._sessions.pop(session_id, None)
-            self.speaker_diarizer.close(session_id)
+            state_key = stream_id or session_id
+            self._sessions.pop(state_key, None)
+            self.speaker_diarizer.close(state_key)
 
     def reset(self) -> None:
         with self._lock:

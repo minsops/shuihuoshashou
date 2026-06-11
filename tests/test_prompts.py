@@ -10,6 +10,8 @@ def test_load_prompt_reads_prompt_file() -> None:
 
     assert prompt.startswith("你是资深面试官教练")
     assert "严格 JSON" in prompt
+    assert "resume_claims" in prompt
+    assert "简历对质型追问" in prompt
     assert prompt == prompt.strip()
 
 

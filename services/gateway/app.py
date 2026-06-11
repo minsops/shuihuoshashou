@@ -6,7 +6,7 @@ import binascii
 import json
 import re
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from time import perf_counter
 
@@ -46,6 +46,7 @@ from libs.schemas import (
     ReportBuildRequest,
     ScoringRequest,
     TranscriptSegment,
+    new_id,
 )
 from libs.llm_client import LLMMessage, get_llm_client
 from services.asr_service.nls_token import AliyunNLSTokenProvider
@@ -118,6 +119,43 @@ class _LockedWebSocketSender:
     async def send_json(self, payload: dict) -> None:
         async with self._lock:
             await self._websocket.send_json(payload)
+
+
+@dataclass
+class _DialogueSessionRuntime:
+    assembler: DialogueAssembler
+    lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    senders: set[_LockedWebSocketSender] = field(default_factory=set)
+    epoch: int = 0
+    flush_task: asyncio.Task[None] | None = None
+
+    async def send_json(self, payload: dict) -> None:
+        stale: list[_LockedWebSocketSender] = []
+        for sender in tuple(self.senders):
+            try:
+                await sender.send_json(payload)
+            except Exception:
+                stale.append(sender)
+        for sender in stale:
+            self.senders.discard(sender)
+
+
+_dialogue_runtimes: dict[str, _DialogueSessionRuntime] = {}
+
+
+def _dialogue_runtime(interview_id: str, silence_close_ms: int) -> _DialogueSessionRuntime:
+    runtime = _dialogue_runtimes.get(interview_id)
+    if runtime is None:
+        runtime = _DialogueSessionRuntime(
+            assembler=DialogueAssembler(silence_close_ms=silence_close_ms)
+        )
+        _dialogue_runtimes[interview_id] = runtime
+    return runtime
+
+
+def _discard_dialogue_runtime(interview_id: str, runtime: _DialogueSessionRuntime) -> None:
+    if _dialogue_runtimes.get(interview_id) is runtime:
+        _dialogue_runtimes.pop(interview_id, None)
 
 
 @dataclass(frozen=True)
@@ -1074,41 +1112,38 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
         return
     await websocket.accept()
     sender = _LockedWebSocketSender(websocket)
+    runtime = _dialogue_runtime(interview_id, settings.dialogue_silence_close_ms)
+    runtime.senders.add(sender)
+    asr_stream_id = f"{interview_id}:{new_id()}"
     engine = get_asr_engine()
     aliyun_session = None
     aliyun_reader_task: asyncio.Task[None] | None = None
     aliyun_result_seq = 1
     aliyun_audio_contexts: list[_AliyunAudioContext] = []
-    assembler = DialogueAssembler(silence_close_ms=settings.dialogue_silence_close_ms)
-    dialogue_lock = asyncio.Lock()
-    dialogue_epoch = 0
-    dialogue_flush_task: asyncio.Task[None] | None = None
 
     def cancel_dialogue_silence_flush() -> None:
-        nonlocal dialogue_flush_task
-        if dialogue_flush_task is not None and not dialogue_flush_task.done():
-            dialogue_flush_task.cancel()
-        dialogue_flush_task = None
+        if runtime.flush_task is not None and not runtime.flush_task.done():
+            runtime.flush_task.cancel()
+        runtime.flush_task = None
 
     def schedule_dialogue_silence_flush() -> None:
-        nonlocal dialogue_epoch, dialogue_flush_task
         if settings.dialogue_silence_close_ms < 0:
             return
-        dialogue_epoch += 1
-        scheduled_epoch = dialogue_epoch
+        runtime.epoch += 1
+        scheduled_epoch = runtime.epoch
         cancel_dialogue_silence_flush()
 
         async def _flush_after_silence() -> None:
             try:
                 await asyncio.sleep(settings.dialogue_silence_close_ms / 1000)
-                async with dialogue_lock:
-                    if scheduled_epoch != dialogue_epoch:
+                async with runtime.lock:
+                    if scheduled_epoch != runtime.epoch:
                         return
-                    await persist_dialogue_result(assembler.flush())
+                    await persist_dialogue_result(runtime.assembler.flush())
             except asyncio.CancelledError:
                 return
 
-        dialogue_flush_task = asyncio.create_task(_flush_after_silence())
+        runtime.flush_task = asyncio.create_task(_flush_after_silence())
 
     async def handle_dialogue_segment(
         segment: TranscriptSegment,
@@ -1121,12 +1156,11 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
         emit_probe: bool = True,
         force_probe: bool = False,
     ) -> None:
-        nonlocal dialogue_epoch
-        async with dialogue_lock:
+        async with runtime.lock:
             if segment.is_final:
-                dialogue_epoch += 1
+                runtime.epoch += 1
                 cancel_dialogue_silence_flush()
-            result = assembler.feed(
+            result = runtime.assembler.feed(
                 segment,
                 fallback_question=fallback_question,
                 question_source=question_source,
@@ -1149,14 +1183,15 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
             record = add_utterance(interview_id, utterance)
         for turn in result.turns:
             record = add_turn(interview_id, turn)
-            await sender.send_json(
+            await runtime.send_json({"type": "turn", "payload": turn.model_dump()})
+            await runtime.send_json(
                 {
                     "type": "probe_chains",
                     "payload": [chain.model_dump() for chain in record.context.probe_chains],
                 }
             )
             if emit_probe and (force_probe or should_probe_turn(turn, record)):
-                _schedule_probe_task(sender, record, turn)
+                _schedule_probe_task(runtime, record, turn)
 
     async def ensure_aliyun_session():
         nonlocal aliyun_session, aliyun_reader_task
@@ -1165,7 +1200,7 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
         if aliyun_session is not None and not getattr(aliyun_session, "finished", False):
             return aliyun_session
         try:
-            aliyun_session = await engine.get_or_create_session(interview_id)  # type: ignore[attr-defined]
+            aliyun_session = await engine.get_or_create_session(asr_stream_id)  # type: ignore[attr-defined]
         except Exception as exc:
             await _send_asr_warning(sender, _aliyun_warning_reason(exc), 0)
             return None
@@ -1183,18 +1218,21 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
             seq = aliyun_result_seq
             aliyun_result_seq += 1
             context = _select_aliyun_audio_context(aliyun_audio_contexts, item)
+            if item.session_id != interview_id:
+                item = item.model_copy(update={"session_id": interview_id})
             if context is not None and context.speaker_hint is not None and item.speaker == "unknown":
                 item = item.model_copy(update={"speaker": context.speaker_hint})
             decision = asr_session_manager.accept_segment(
                 seq,
                 item,
                 audio_b64=context.audio_b64 if context is not None else None,
+                stream_id=asr_stream_id,
             )
             if not decision.accepted or decision.segment is None:
                 await _send_asr_warning(sender, decision.reason, seq)
                 continue
             segment = decision.segment
-            await sender.send_json({"type": "transcript", "payload": segment.model_dump()})
+            await runtime.send_json({"type": "transcript", "payload": segment.model_dump()})
             await handle_dialogue_segment(
                 segment,
                 fallback_question=context.question if context is not None else "实时语音片段",
@@ -1266,7 +1304,7 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                         if aliyun_session is not None:
                             await aliyun_session.close()
                         if hasattr(engine, "close_session"):
-                            await engine.close_session(interview_id)  # type: ignore[attr-defined]
+                            await engine.close_session(asr_stream_id)  # type: ignore[attr-defined]
                         aliyun_session = None
                         session = await ensure_aliyun_session()
                         if session is None:
@@ -1294,12 +1332,13 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                     seq,
                     segment,
                     audio_b64=audio_b64,
+                    stream_id=asr_stream_id,
                 )
                 if not decision.accepted or decision.segment is None:
                     await _send_asr_warning(sender, decision.reason, seq)
                     continue
                 segment = decision.segment
-                await sender.send_json({"type": "transcript", "payload": segment.model_dump()})
+                await runtime.send_json({"type": "transcript", "payload": segment.model_dump()})
                 await handle_dialogue_segment(
                     segment,
                     fallback_question=_event_question(event),
@@ -1345,12 +1384,17 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                     )
                     if segment is None:
                         continue
-                decision = asr_session_manager.accept_segment(seq, segment, audio_b64=encoded)
+                decision = asr_session_manager.accept_segment(
+                    seq,
+                    segment,
+                    audio_b64=encoded,
+                    stream_id=asr_stream_id,
+                )
                 if not decision.accepted or decision.segment is None:
                     await _send_asr_warning(sender, decision.reason, seq)
                     continue
                 segment = decision.segment
-                await sender.send_json({"type": "transcript", "payload": segment.model_dump()})
+                await runtime.send_json({"type": "transcript", "payload": segment.model_dump()})
                 await handle_dialogue_segment(
                     segment,
                     fallback_question=_event_question(event),
@@ -1370,7 +1414,7 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                 except ValueError as exc:
                     await sender.send_json({"type": "error", "detail": str(exc)})
                     continue
-                await sender.send_json({"type": "transcript", "payload": segment.model_dump()})
+                await runtime.send_json({"type": "transcript", "payload": segment.model_dump()})
                 await handle_dialogue_segment(
                     segment,
                     fallback_question=_event_question(event),
@@ -1387,32 +1431,48 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                         await aliyun_session.close()
                     if aliyun_reader_task is not None:
                         await aliyun_reader_task
-                    await persist_dialogue_result(assembler.flush(), emit_probe=False)
+                    async with runtime.lock:
+                        runtime.epoch += 1
+                        await persist_dialogue_result(
+                            runtime.assembler.flush(),
+                            emit_probe=False,
+                        )
                     result = await asyncio.to_thread(end_interview, interview_id)
                 except (KeyError, ValueError) as exc:
                     await sender.send_json({"type": "error", "detail": str(exc)})
                     continue
                 event_type = "task_queued" if isinstance(result, OfflineTaskAccepted) else "report"
-                await sender.send_json({"type": event_type, "payload": result.model_dump(mode="json")})
-                asr_session_manager.close(interview_id)
+                await runtime.send_json(
+                    {"type": event_type, "payload": result.model_dump(mode="json")}
+                )
                 break
             else:
                 await sender.send_json({"type": "error", "detail": "unsupported event type"})
     except WebSocketDisconnect:
-        cancel_dialogue_silence_flush()
         if aliyun_session is not None:
             await aliyun_session.close()
-        asr_session_manager.close(interview_id)
         return
     except KeyError as exc:
-        cancel_dialogue_silence_flush()
         if aliyun_session is not None:
             await aliyun_session.close()
-        asr_session_manager.close(interview_id)
         await sender.send_json({"type": "error", "detail": str(exc)})
     except ValueError as exc:
-        cancel_dialogue_silence_flush()
         if aliyun_session is not None:
             await aliyun_session.close()
-        asr_session_manager.close(interview_id)
         await sender.send_json({"type": "error", "detail": str(exc)})
+    finally:
+        runtime.senders.discard(sender)
+        asr_session_manager.close(interview_id, stream_id=asr_stream_id)
+        if hasattr(engine, "close_session"):
+            try:
+                await engine.close_session(asr_stream_id)  # type: ignore[attr-defined]
+            except Exception:
+                pass
+        if not runtime.senders:
+            cancel_dialogue_silence_flush()
+            try:
+                async with runtime.lock:
+                    await persist_dialogue_result(runtime.assembler.flush(), emit_probe=False)
+            except (KeyError, ValueError):
+                pass
+            _discard_dialogue_runtime(interview_id, runtime)

@@ -107,9 +107,12 @@ def _fluency_anomaly(answer: str, polished_markers: list[str]) -> float:
         return 0.0
     filler_count = sum(answer.count(marker) for marker in ("嗯", "呃", "这个", "然后"))
     marker_score = min(1.0, sum(marker in answer for marker in polished_markers) / 3)
-    long_polished = 1.0 if len(answer) >= 80 and filler_count == 0 else 0.0
+    smooth_delivery = 1.0 if len(answer) >= 24 and filler_count == 0 else 0.0
     punctuation_density = min(1.0, sum(answer.count(item) for item in ("，", "。", "；")) / 8)
-    return round(min(1.0, 0.45 * marker_score + 0.4 * long_polished + 0.15 * punctuation_density), 3)
+    return round(
+        min(1.0, 0.45 * marker_score + 0.4 * smooth_delivery + 0.15 * punctuation_density),
+        3,
+    )
 
 
 def _http_detect_turn(

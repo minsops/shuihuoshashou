@@ -117,6 +117,8 @@ def test_offline_interview_chain(tmp_path: Path, monkeypatch) -> None:
     assert "data:image/png;base64" in html
     assert "亮点" in html
     assert "背稿与模板化检测" in html
+    assert "本报告由确定性规则生成" in html
+    assert "ai_generated_prob" not in html
     assert "疑似注水/模板化" in html
     assert "完整转写" in html
     assert report.transcript[0].answer in html
@@ -734,6 +736,7 @@ def test_report_pdf_fallback_preserves_chinese_text(tmp_path: Path, monkeypatch)
         total_score=80.0,
         risk_notes=["需要继续追问线上故障细节"],
         recommendation="yes",
+        analysis_mode="fallback",
     )
     aigc = [
         AIGCResult(
@@ -751,6 +754,8 @@ def test_report_pdf_fallback_preserves_chinese_text(tmp_path: Path, monkeypatch)
     assert b"/STSong-Light" in pdf_bytes
     assert "项目真实性".encode("utf-16-be").hex().upper().encode("ascii") in pdf_bytes
     assert "我写了".encode("utf-16-be").hex().upper().encode("ascii") in pdf_bytes
+    warning = "本报告由确定性规则生成（未启用大模型分析）"
+    assert warning.encode("utf-16-be").hex().upper().encode("ascii") in pdf_bytes
 
 
 def test_report_deduplicates_risk_highlights(tmp_path: Path, monkeypatch) -> None:
@@ -1119,7 +1124,7 @@ def test_score_interview_preserves_deterministic_aigc_risk(monkeypatch) -> None:
     assert by_dimension["项目真实性"].score == 73.8
     assert by_dimension["注水风险"].score == 82.0
     assert score.total_score < 99.0
-    assert score.risk_notes == ["部分回答疑似模板化或 AI 生成，需要人工复核。"]
+    assert score.risk_notes == ["部分回答疑似背稿或模板化，需要人工复核。"]
 
 
 def test_competency_generation_uses_prompt_and_overrides_ids(monkeypatch) -> None:
@@ -1298,6 +1303,7 @@ def test_aigc_detection_flags_template() -> None:
     )
     assert results[0].flagged
     assert results[0].template_similarity > 0.9
+    assert results[0].rehearsal_score >= 0.55
 
 
 def test_aigc_detection_uses_template_corpus_for_paraphrase() -> None:
@@ -1309,7 +1315,7 @@ def test_aigc_detection_uses_template_corpus_for_paraphrase() -> None:
             )
         ]
     )
-    assert len(load_templates()) >= 5
+    assert len(load_templates()) >= 40
     assert results[0].matched_template
     assert results[0].template_similarity >= 0.45
 

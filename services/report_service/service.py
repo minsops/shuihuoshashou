@@ -84,7 +84,7 @@ REPORT_TEMPLATE = Template(
       </section>
       <section>
         <h2>追问链</h2>
-        {% if probe_chains %}
+      {% if probe_chains %}
         <table>
           <tr><th>主题</th><th>来源</th><th>层数</th><th>判定</th><th>关键链路</th></tr>
           {% for chain in probe_chains %}
@@ -95,7 +95,9 @@ REPORT_TEMPLATE = Template(
             <td>{{ chain.verdict }}{% if chain.crack_depth %} · 第 {{ chain.crack_depth }} 层{% endif %}</td>
             <td>
               {% for link in chain.links %}
-              {{ loop.index }}. {{ link.probe_question }} / {{ link.credibility_after }}<br>
+              {{ loop.index }}. Q：{{ link.probe_question }}<br>
+              A：{{ link.answer_excerpt }}<br>
+              判定：{{ link.credibility_after }}<br>
               {% endfor %}
             </td>
           </tr>
@@ -217,6 +219,31 @@ def _risk_highlights(score: InterviewScore, flags: list[ConsistencyFlag]) -> lis
     return highlights
 
 
+def _ordered_utterances(ctx: InterviewContext):
+    return sorted(
+        ctx.utterances,
+        key=lambda item: (item.start_ms, item.end_ms, item.utterance_id),
+    )
+
+
+def _probe_chain_rows(ctx: InterviewContext) -> list[dict]:
+    turns_by_id = {turn.turn_id: turn for turn in ctx.turns}
+    rows: list[dict] = []
+    for chain in ctx.probe_chains:
+        payload = chain.model_dump()
+        payload["links"] = [
+            {
+                **link.model_dump(),
+                "answer_excerpt": turns_by_id.get(link.answer_turn_id).answer[:160]
+                if link.answer_turn_id in turns_by_id
+                else "(未找到关联回答)",
+            }
+            for link in chain.links
+        ]
+        rows.append(payload)
+    return rows
+
+
 def _write_pdf(html: str, pdf_path: Path, fallback_lines: list[str]) -> None:
     try:
         with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
@@ -322,6 +349,7 @@ def _write_report_json(report: Report, json_path: Path) -> None:
 
 def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCResult]) -> tuple[Report, str]:
     _validate_report_inputs(ctx, score, aigc)
+    ordered_utterances = _ordered_utterances(ctx)
     summary = (
         f"候选人在本场面试中获得 {score.total_score} 分，系统建议为 {score.recommendation}。"
         "报告中的每项评分均绑定原始回答证据，注水风险需由面试官结合上下文复核。"
@@ -333,9 +361,9 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
         strengths=_strengths(score),
         aigc_results=aigc,
         risk_highlights=_risk_highlights(score, ctx.flags),
-        probe_chains=ctx.probe_chains,
+        probe_chains=_probe_chain_rows(ctx),
         transcript=ctx.turns,
-        utterances=ctx.utterances,
+        utterances=ordered_utterances,
         candidate_resume_text=ctx.candidate_resume_text,
         radar_chart_uri=_radar_chart_uri(score),
     )
@@ -350,7 +378,7 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
         json.dumps(
             {
                 "qa_turns": [turn.model_dump() for turn in ctx.turns],
-                "full_transcript": [utterance.model_dump() for utterance in ctx.utterances],
+                "full_transcript": [utterance.model_dump() for utterance in ordered_utterances],
                 "probe_chains": [chain.model_dump() for chain in ctx.probe_chains],
                 "analysis_mode": score.analysis_mode,
             },
@@ -385,7 +413,7 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
         aigc_results=aigc,
         consistency_flags=ctx.flags,
         transcript=ctx.turns,
-        utterances=ctx.utterances,
+        utterances=ordered_utterances,
         probe_chains=ctx.probe_chains,
         candidate_resume_text=ctx.candidate_resume_text,
         summary=summary,
@@ -421,9 +449,12 @@ def _fallback_pdf_lines(
         f"Total score: {score.total_score}",
         f"Recommendation: {score.recommendation}",
         f"Analysis mode: {score.analysis_mode}",
-        f"Summary: {summary}",
-        "Dimension scores:",
     ]
+    if score.analysis_mode == "fallback":
+        lines.append(
+            "本报告由确定性规则生成（未启用大模型分析），分数仅供链路验证，不可用于招聘决策。"
+        )
+    lines.extend([f"Summary: {summary}", "Dimension scores:"])
     for dimension in score.dimensions:
         evidence = dimension.evidence[0].excerpt if dimension.evidence else ""
         lines.append(
@@ -452,7 +483,7 @@ def _fallback_pdf_lines(
     else:
         lines.append("- None")
     lines.append("Transcript:")
-    for index, utterance in enumerate(ctx.utterances, start=1):
+    for index, utterance in enumerate(_ordered_utterances(ctx), start=1):
         lines.append(f"- U{index} [{utterance.speaker}] {utterance.text}")
     for index, turn in enumerate(ctx.turns, start=1):
         lines.append(f"- T{index} [{turn.question_source}] Q={turn.question} A={turn.answer}")

@@ -3,6 +3,7 @@
 要求：
 - 针对结论性、笼统回答，生成下钻到具体细节、异常处理、决策理由的追问。
 - 识别背稿信号：能复述结论但答不出为什么、遇到什么坑、具体自己写了哪部分。
+- 必须读取输入中的 `resume_claims` 与 `probe_chains`。当简历声明和最近回答存在责任范围、指标或结果口径冲突时，优先生成简历对质型追问，要求候选人明确本人负责边界和可验证证据。
 - suggestions 必须包含 1 到 3 条追问建议，按 priority 从 1 开始排序。
 - 只输出严格 JSON，匹配 ProbeResponse schema，不要额外解释。
 - 顶层字段只能是 `suggestions` 和 `credibility`，不要使用 `probes`、`questions`、`analysis` 或其他字段名。

@@ -37,6 +37,9 @@ def test_docker_compose_declares_required_infrastructure() -> None:
         "AIGC_DETECTOR_API_KEY: ${AIGC_DETECTOR_API_KEY:-}",
         "AIGC_AI_PROB_THRESHOLD: ${AIGC_AI_PROB_THRESHOLD:-0.65}",
         "AIGC_TEMPLATE_SIMILARITY_THRESHOLD: ${AIGC_TEMPLATE_SIMILARITY_THRESHOLD:-0.45}",
+        "REHEARSAL_THRESHOLD: ${REHEARSAL_THRESHOLD:-0.55}",
+        "CHAIN_CRACK_PENALTY: ${CHAIN_CRACK_PENALTY:-8}",
+        "CHAIN_HELD_UP_BONUS: ${CHAIN_HELD_UP_BONUS:-3}",
     ]:
         assert compose.count(key) == 2
     for key in [
@@ -45,6 +48,8 @@ def test_docker_compose_declares_required_infrastructure() -> None:
         "ASR_CONFIDENCE_PATH: ${ASR_CONFIDENCE_PATH:-confidence}",
         "PROBE_MIN_ANSWER_CHARS: ${PROBE_MIN_ANSWER_CHARS:-20}",
         "PROBE_REQUIRE_TOPIC_MATCH: ${PROBE_REQUIRE_TOPIC_MATCH:-true}",
+        "SPEAKER_MODE: ${SPEAKER_MODE:-manual}",
+        "DIALOGUE_SILENCE_CLOSE_MS: ${DIALOGUE_SILENCE_CLOSE_MS:-2500}",
         "RATE_LIMIT_BACKEND: ${RATE_LIMIT_BACKEND:-local}",
         "REDIS_RATE_LIMIT_PREFIX: ${REDIS_RATE_LIMIT_PREFIX:-shuihuo:rate_limit}",
         "ALIYUN_AK_ID: ${ALIYUN_AK_ID:-}",
@@ -175,10 +180,15 @@ def test_env_example_lists_runtime_integration_knobs() -> None:
         "PROBE_MIN_INTERVAL_MS=",
         "PROBE_REQUIRE_TOPIC_MATCH=",
         "PROBE_TOPIC_KEYWORDS=",
+        "SPEAKER_MODE=",
+        "DIALOGUE_SILENCE_CLOSE_MS=",
+        "CHAIN_CRACK_PENALTY=",
+        "CHAIN_HELD_UP_BONUS=",
         "AIGC_DETECTOR_PROVIDER=",
         "AIGC_DETECTOR_BASE_URL=",
         "AIGC_AI_PROB_THRESHOLD=",
         "AIGC_TEMPLATE_SIMILARITY_THRESHOLD=",
+        "REHEARSAL_THRESHOLD=",
         "ALIYUN_AK_ID=",
         "ALIYUN_AK_SECRET=",
         "ALIYUN_NLS_TOKEN_ENDPOINT=",
@@ -211,6 +221,8 @@ def test_postgres_schema_matches_core_spec_tables() -> None:
         "candidates",
         "interviews",
         "qa_turns",
+        "utterances",
+        "probe_chains",
         "scores",
         "aigc_results",
         "reports",
@@ -225,6 +237,9 @@ def test_postgres_schema_matches_core_spec_tables() -> None:
         "ai_generated_prob REAL NOT NULL",
         "template_similarity REAL NOT NULL",
         "signal_enabled BOOLEAN NOT NULL DEFAULT false",
+        "question_utterance_id UUID REFERENCES utterances(id)",
+        "answer_utterance_id UUID REFERENCES utterances(id)",
+        "probe_chain_id UUID REFERENCES probe_chains(id)",
     ]:
         assert column in schema
     assert "REFERENCES jobs(id)" in schema

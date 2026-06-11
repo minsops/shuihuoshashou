@@ -2533,12 +2533,17 @@
 
       function renderLiveMessage(message) {
         if (message.type === "transcript") {
-          state.turns += message.payload.speaker === "candidate" && message.payload.is_final ? 1 : 0;
-          metricTurns.textContent = String(state.turns);
           appendEvent(
             "转写",
             `${escapeHtml(message.payload.speaker)} · ${escapeHtml(message.payload.text)}`
           );
+	        } else if (message.type === "turn") {
+	          state.turns += 1;
+	          metricTurns.textContent = String(state.turns);
+	          appendEvent(
+	            "问答轮次",
+	            `<span class="small">Q</span> ${escapeHtml(message.payload.question)}<br><span class="small">A</span> ${escapeHtml(message.payload.answer)}`
+	          );
 	        } else if (message.type === "probe") {
 	          renderProbeCards(message.payload.suggestions || []);
 	          appendEvent("追问方向", "已生成新的专业问题候选。", "blue");
@@ -2669,6 +2674,7 @@
         const transcriptTurns = Array.isArray(report.transcript) ? report.transcript : [];
         const probeChains = Array.isArray(report.probe_chains) ? report.probe_chains : [];
         const aigcResults = Array.isArray(report.aigc_results) ? report.aigc_results : [];
+        const turnsById = new Map(transcriptTurns.map((turn) => [turn.turn_id, turn]));
         const analysisMode = report.analysis_mode || score.analysis_mode || "llm";
         reportLinks.innerHTML = `
           <button class="secondary" type="button" data-report-format="html" data-report-id="${escapeHtml(reportId)}" title="下载 HTML 报告" aria-label="下载 HTML 报告">HTML</button>
@@ -2704,8 +2710,10 @@
             const linkText = links.length
               ? links
                 .map(
-                  (link, index) =>
-                    `${index + 1}. ${escapeHtml(link.probe_question)} / ${escapeHtml(link.credibility_after)}`
+                  (link, index) => {
+                    const answer = turnsById.get(link.answer_turn_id);
+                    return `${index + 1}. Q：${escapeHtml(link.probe_question)}<br>A：${escapeHtml(answer ? answer.answer : "未找到关联回答")}<br>判定：${escapeHtml(link.credibility_after)}`;
+                  }
                 )
                 .join("<br>")
               : "未进入下钻";
@@ -3052,6 +3060,7 @@
 	          seq: state.seq,
 	          audio: samplesToBase64Pcm16(samples),
 	          speaker: state.currentSpeaker,
+	          channel: state.currentSpeaker,
 	          format: "pcm16",
           sample_rate_hz: micSampleRate,
           channels: 1,

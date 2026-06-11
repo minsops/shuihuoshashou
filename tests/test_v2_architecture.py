@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import asyncio
+from time import perf_counter
+
 from libs.schemas import (
+    AIGCResult,
     CandidateCreate,
     ChainLink,
     CompetencyItem,
@@ -17,6 +21,7 @@ from libs.schemas import (
 from libs.common.config import get_settings
 from libs.common.database import init_db
 from services.aigc_detect_service.service import detect_interview
+from services.gateway.app import _schedule_probe_task
 from services.interview_orchestrator.dialogue import DialogueAssembler, FALLBACK_QUESTION
 from services.interview_orchestrator.service import (
     add_turn,
@@ -26,10 +31,11 @@ from services.interview_orchestrator.service import (
     get_interview,
     list_turns,
     list_utterances,
+    should_probe_v2,
 )
 from services.jd_kb_service.service import create_job
 from services.probe_service.service import fallback_probe
-from services.scoring_service.service import fallback_score_interview
+from services.scoring_service.service import fallback_score_interview, score_interview
 
 
 def _competencies() -> CompetencyModel:
@@ -95,6 +101,19 @@ def test_dialogue_assembler_uses_explicit_fallback_for_candidate_first() -> None
 
     assert result.utterances[0].speaker == "candidate"
     assert result.turns[0].question == FALLBACK_QUESTION
+
+
+def test_dialogue_assembler_closes_same_speaker_after_long_silence() -> None:
+    assembler = DialogueAssembler(silence_close_ms=2500)
+
+    assembler.feed(_segment("candidate", "第一段回答。", 0, 800))
+    result = assembler.feed(_segment("candidate", "第二段回答。", 4000, 4800))
+    flushed = assembler.flush()
+
+    assert [item.text for item in result.utterances] == ["第一段回答。"]
+    assert [item.answer for item in result.turns] == ["第一段回答。"]
+    assert [item.text for item in flushed.utterances] == ["第二段回答。"]
+    assert [item.answer for item in flushed.turns] == ["第二段回答。"]
 
 
 def test_probe_chain_penalty_and_rehearsal_score_are_deterministic() -> None:
@@ -277,3 +296,308 @@ def test_probe_chain_lifecycle_marks_repeated_evasion_as_cracked(tmp_path, monke
     assert len(cracked.links) == 2
     assert cracked.verdict == "cracked"
     assert cracked.crack_depth == 2
+
+
+def test_suspicious_answer_opens_chain_without_counting_as_probe_layer(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'answer-chain.db'}")
+    get_settings.cache_clear()
+    init_db()
+    job = create_job(JobCreate(title="AI 后端", jd_text="FastAPI LLM"))
+    candidate = create_candidate(CandidateCreate(name="候选人", resume_text="普通项目经历"))
+    interview = create_interview(InterviewCreate(job_id=job.id, candidate_id=candidate.id))
+
+    record = add_turn(
+        interview.id,
+        QATurn(
+            question="请介绍项目。",
+            answer="记不清了，主要是团队做的，我只是参与了一些内容。",
+            answer_start_ms=0,
+            answer_end_ms=1000,
+        ),
+    )
+
+    answer_chains = [chain for chain in record.context.probe_chains if chain.origin == "answer_claim"]
+    assert len(answer_chains) == 1
+    assert answer_chains[0].links == []
+    assert record.context.turns[0].probe_chain_id == answer_chains[0].chain_id
+
+
+def test_resume_chain_requires_ownership_and_metric_and_cracks_on_conflict(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'resume-chain.db'}")
+    get_settings.cache_clear()
+    init_db()
+    job = create_job(JobCreate(title="AI 后端", jd_text="FastAPI LLM"))
+    ordinary = create_candidate(
+        CandidateCreate(name="普通候选人", resume_text="负责网关优化，响应时间提升 50%")
+    )
+    no_metric = create_candidate(
+        CandidateCreate(name="无指标候选人", resume_text="独立主导网关架构重构")
+    )
+    high_risk = create_candidate(
+        CandidateCreate(name="高风险候选人", resume_text="独立主导网关优化，响应时间提升 50%")
+    )
+
+    assert create_interview(
+        InterviewCreate(job_id=job.id, candidate_id=ordinary.id)
+    ).context.probe_chains == []
+    assert create_interview(
+        InterviewCreate(job_id=job.id, candidate_id=no_metric.id)
+    ).context.probe_chains == []
+    interview = create_interview(InterviewCreate(job_id=job.id, candidate_id=high_risk.id))
+    chain = interview.context.probe_chains[0]
+
+    record = add_turn(
+        interview.id,
+        QATurn(
+            question="你独立主导的具体部分是什么？",
+            question_source="ai_probe",
+            answer="这块主要是团队负责，我参与了一些优化。",
+            answer_start_ms=0,
+            answer_end_ms=1000,
+            probe_target=chain.topic,
+            probe_chain_id=chain.chain_id,
+        ),
+    )
+
+    cracked = record.context.probe_chains[0]
+    assert cracked.verdict == "cracked"
+    assert cracked.crack_depth == 1
+
+
+def test_should_probe_v2_ignores_deprecated_keyword_gate(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'probe-v2.db'}")
+    monkeypatch.setenv("PROBE_MIN_ANSWER_CHARS", "20")
+    monkeypatch.setenv("PROBE_REQUIRE_TOPIC_MATCH", "true")
+    monkeypatch.setenv("PROBE_TOPIC_KEYWORDS", "绝不会命中的词")
+    get_settings.cache_clear()
+    init_db()
+    job = create_job(JobCreate(title="AI 后端", jd_text="FastAPI LLM"))
+    candidate = create_candidate(CandidateCreate(name="候选人", resume_text="普通项目经历"))
+    record = create_interview(InterviewCreate(job_id=job.id, candidate_id=candidate.id))
+
+    evasive = QATurn(
+        question="具体做了什么？",
+        answer="记不清了，主要是团队做的，我只是参与了一些内容。",
+        answer_start_ms=0,
+        answer_end_ms=1000,
+    )
+    solid = QATurn(
+        question="具体做了什么？",
+        answer="我写了限流模块，因为突发流量会击穿下游，压测指标从 800 QPS 提升到 1500 QPS。",
+        answer_start_ms=2000,
+        answer_end_ms=3000,
+    )
+
+    assert should_probe_v2(evasive, record) is True
+    assert should_probe_v2(solid, record) is True
+    assert should_probe_v2(
+        QATurn(question="继续", answer="嗯，好的。", answer_start_ms=4000, answer_end_ms=4500),
+        record,
+    ) is False
+
+    for index in range(3):
+        record = add_turn(
+            record.id,
+            QATurn(
+                question="继续核验项目真实性。",
+                answer="我写了限流模块，因为下游容量固定，并用压测指标验证了回滚方案。",
+                answer_start_ms=5000 + index * 2000,
+                answer_end_ms=6000 + index * 2000,
+            ),
+        )
+    repeated_dimension = solid.model_copy(update={"answer_start_ms": 12000, "answer_end_ms": 13000})
+    assert should_probe_v2(repeated_dimension, record) is True
+
+
+def test_probe_fallback_is_emitted_without_waiting_for_llm(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'probe-background.db'}")
+    get_settings.cache_clear()
+    init_db()
+    job = create_job(JobCreate(title="AI 后端", jd_text="FastAPI LLM"))
+    candidate = create_candidate(CandidateCreate(name="候选人", resume_text="普通项目经历"))
+    interview = create_interview(InterviewCreate(job_id=job.id, candidate_id=candidate.id))
+    turn = QATurn(
+        question="具体做了什么？",
+        answer="记不清了，主要是团队做的，我只是参与了一些内容。",
+        answer_start_ms=0,
+        answer_end_ms=1000,
+    )
+    record = add_turn(interview.id, turn)
+
+    async def exercise() -> None:
+        llm_release = asyncio.Event()
+        fallback_seen = asyncio.Event()
+
+        class Sender:
+            def __init__(self) -> None:
+                self.messages: list[dict] = []
+
+            async def send_json(self, payload: dict) -> None:
+                self.messages.append(payload)
+                if payload.get("type") == "probe":
+                    fallback_seen.set()
+
+        async def slow_generate(request):
+            await llm_release.wait()
+            return fallback_probe(request)
+
+        monkeypatch.setattr("services.gateway.app.generate_probe", slow_generate)
+        sender = Sender()
+        started = perf_counter()
+        _schedule_probe_task(sender, record, turn)  # type: ignore[arg-type]
+        schedule_elapsed = perf_counter() - started
+
+        await asyncio.wait_for(fallback_seen.wait(), timeout=0.5)
+        assert schedule_elapsed < 0.05
+        assert sender.messages[0]["type"] == "probe"
+        llm_release.set()
+        await asyncio.sleep(0)
+
+    asyncio.run(exercise())
+
+
+def test_each_cracked_chain_applies_exact_project_authenticity_penalty() -> None:
+    first = QATurn(
+        question="你负责什么？",
+        answer="我负责限流模块和故障降级。",
+        answer_start_ms=0,
+        answer_end_ms=1000,
+    )
+    second = QATurn(
+        question="请继续说明。",
+        answer="我补充了压测指标和回滚方案。",
+        answer_start_ms=1500,
+        answer_end_ms=2500,
+    )
+    chain = ProbeChain(
+        interview_id="session-1",
+        topic="网关项目真实性",
+        origin="answer_claim",
+        links=[
+            ChainLink(
+                probe_question=first.question,
+                probe_target="网关项目真实性",
+                answer_turn_id=first.turn_id,
+                credibility_after="suspicious",
+            ),
+            ChainLink(
+                probe_question=second.question,
+                probe_target="网关项目真实性",
+                answer_turn_id=second.turn_id,
+                credibility_after="vague",
+            ),
+        ],
+        verdict="cracked",
+        crack_depth=2,
+    )
+    aigc = [
+        AIGCResult(
+            turn_id=turn.turn_id,
+            ai_generated_prob=0.0,
+            template_similarity=0.0,
+            rehearsal_score=0.0,
+            mode="voice",
+            flagged=False,
+        )
+        for turn in (first, second)
+    ]
+    base_context = InterviewContext(
+        session_id="session-1",
+        job_id="job-1",
+        candidate_id="candidate-1",
+        competency_model=_competencies(),
+        turns=[first, second],
+    )
+    cracked_context = base_context.model_copy(update={"probe_chains": [chain]})
+
+    base_score = fallback_score_interview(base_context, aigc)
+    cracked_score = fallback_score_interview(cracked_context, aigc)
+    base_project = next(item for item in base_score.dimensions if item.dimension == "项目真实性")
+    cracked_project = next(
+        item for item in cracked_score.dimensions if item.dimension == "项目真实性"
+    )
+
+    assert base_project.score - cracked_project.score == get_settings().chain_crack_penalty
+
+
+def test_held_up_chain_bonus_cannot_be_erased_by_llm_draft(monkeypatch) -> None:
+    first = QATurn(
+        question="具体模块是什么？",
+        answer="我实现了令牌桶限流，并补充了压测和回滚开关。",
+        answer_start_ms=0,
+        answer_end_ms=1000,
+    )
+    second = QATurn(
+        question="为什么这样设计？",
+        answer="因为下游容量固定，我用压测数据确定阈值，并验证了故障降级。",
+        answer_start_ms=1500,
+        answer_end_ms=2600,
+    )
+    chain = ProbeChain(
+        interview_id="session-held",
+        topic="网关限流设计",
+        origin="answer_claim",
+        links=[
+            ChainLink(
+                probe_question=first.question,
+                probe_target="网关限流设计",
+                answer_turn_id=first.turn_id,
+                credibility_after="solid",
+            ),
+            ChainLink(
+                probe_question=second.question,
+                probe_target="网关限流设计",
+                answer_turn_id=second.turn_id,
+                credibility_after="solid",
+            ),
+        ],
+        verdict="held_up",
+    )
+    ctx = InterviewContext(
+        session_id="session-held",
+        job_id="job-1",
+        candidate_id="candidate-1",
+        competency_model=_competencies(),
+        turns=[first, second],
+        probe_chains=[chain],
+    )
+    aigc = [
+        AIGCResult(
+            turn_id=turn.turn_id,
+            ai_generated_prob=0.0,
+            template_similarity=0.0,
+            rehearsal_score=0.0,
+            mode="voice",
+            flagged=False,
+        )
+        for turn in (first, second)
+    ]
+    fallback = fallback_score_interview(ctx, aigc)
+    draft = fallback.model_copy(
+        update={
+            "dimensions": [
+                item.model_copy(update={"score": 20.0 if item.dimension == "项目真实性" else item.score})
+                for item in fallback.dimensions
+            ],
+            "analysis_mode": "llm",
+        }
+    )
+
+    class FakeClient:
+        def complete_json_sync(self, messages, schema, fallback_score):
+            return draft
+
+    monkeypatch.setattr("services.scoring_service.service.get_llm_client", lambda: FakeClient())
+
+    score = score_interview(ctx, aigc)
+    project = next(item for item in score.dimensions if item.dimension == "项目真实性")
+    fallback_project = next(
+        item for item in fallback.dimensions if item.dimension == "项目真实性"
+    )
+
+    assert project.score == fallback_project.score
+    assert project.score == 81.0

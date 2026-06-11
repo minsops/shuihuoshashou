@@ -66,12 +66,15 @@ def fallback_score_interview(
     flagged_aigc = [item for item in aigc_results if item.flagged]
     if flagged_aigc:
         risk_penalty += min(18.0, 6.0 * len(flagged_aigc))
-        risk_notes.append("部分回答疑似模板化或 AI 生成，需要人工复核。")
+        if all(item.mode == "voice" for item in flagged_aigc):
+            risk_notes.append("部分回答疑似背稿或模板化，需要人工复核。")
+        else:
+            risk_notes.append("部分文字回答疑似模板化或 AI 生成，需要人工复核。")
     settings = get_settings()
     cracked_chains = [chain for chain in ctx.probe_chains if chain.verdict == "cracked"]
     held_up_chains = [chain for chain in ctx.probe_chains if chain.verdict == "held_up"]
+    chain_penalty = min(24.0, settings.chain_crack_penalty * len(cracked_chains))
     if cracked_chains:
-        risk_penalty += min(24.0, settings.chain_crack_penalty * len(cracked_chains))
         for chain in cracked_chains:
             depth = chain.crack_depth or len(chain.links)
             risk_notes.append(f"声明「{chain.topic}」在第 {depth} 层追问露馅。")
@@ -82,9 +85,10 @@ def fallback_score_interview(
         base = 78.0
         if item.name == "项目真实性":
             base -= risk_penalty * 0.7
+            base -= chain_penalty
             base += held_up_bonus
         elif item.name == "注水风险":
-            base = max(0.0, 100.0 - risk_penalty * 3)
+            base = max(0.0, 100.0 - (risk_penalty + chain_penalty) * 3)
         elif item.name == "沟通与逻辑":
             avg_len = sum(len(turn.answer) for turn in ctx.turns) / max(1, len(ctx.turns))
             base += 5.0 if avg_len > 80 else -8.0
@@ -185,6 +189,8 @@ def _normalize_score(
     turns_by_id = {turn.turn_id: turn for turn in ctx.turns}
     fallback_by_dimension = {dimension.dimension: dimension for dimension in fallback.dimensions}
     deterministic_risk_present = bool(fallback.risk_notes)
+    has_cracked_chain = any(chain.verdict == "cracked" for chain in ctx.probe_chains)
+    has_held_up_chain = any(chain.verdict == "held_up" for chain in ctx.probe_chains)
     normalized_dimensions: list[DimensionScore] = []
     for item in ctx.competency_model.items:
         draft_dimension = next(
@@ -206,6 +212,8 @@ def _normalize_score(
                     draft_dimension,
                     fallback_dimension,
                     deterministic_risk_present=deterministic_risk_present,
+                    has_cracked_chain=has_cracked_chain,
+                    has_held_up_chain=has_held_up_chain,
                 ),
                 weight=item.weight,
                 evidence=evidence,
@@ -238,10 +246,16 @@ def _normalize_dimension_score(
     fallback_dimension: DimensionScore,
     *,
     deterministic_risk_present: bool,
+    has_cracked_chain: bool,
+    has_held_up_chain: bool,
 ) -> float:
     score = round(max(0.0, min(100.0, draft_dimension.score)), 2)
     if deterministic_risk_present and dimension_name in {"项目真实性", "注水风险"}:
         score = min(score, fallback_dimension.score)
+    elif dimension_name == "项目真实性" and has_cracked_chain:
+        score = min(score, fallback_dimension.score)
+    elif dimension_name == "项目真实性" and has_held_up_chain:
+        score = max(score, fallback_dimension.score)
     return score
 
 

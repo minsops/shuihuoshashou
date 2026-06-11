@@ -284,6 +284,28 @@ def test_asr_session_manager_accepts_partial_then_final_same_seq() -> None:
     assert duplicate.reason == "duplicate_final_segment"
 
 
+def test_asr_session_manager_isolates_sequence_numbers_by_stream() -> None:
+    manager = ASRSessionManager()
+    segment = TranscriptSegment(
+        session_id="interview-1",
+        speaker="candidate",
+        text="回答",
+        start_ms=0,
+        end_ms=1000,
+        is_final=True,
+        confidence=0.9,
+    )
+
+    first = manager.accept_segment(1, segment, stream_id="device-a")
+    second = manager.accept_segment(1, segment, stream_id="device-b")
+    duplicate = manager.accept_segment(1, segment, stream_id="device-a")
+
+    assert first.accepted is True
+    assert second.accepted is True
+    assert duplicate.accepted is False
+    assert duplicate.reason == "duplicate_final_segment"
+
+
 def test_asr_session_manager_smooths_unknown_speaker_by_continuity() -> None:
     manager = ASRSessionManager(speaker_continuity_gap_ms=1000)
     known = TranscriptSegment(

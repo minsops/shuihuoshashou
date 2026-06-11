@@ -60,10 +60,16 @@ class Settings(BaseSettings):
     dialogue_silence_close_ms: int = Field(default=2500, ge=0)
     probe_min_answer_chars: int = Field(default=20, ge=0)
     probe_min_interval_ms: int = Field(default=1000, ge=0)
-    probe_require_topic_match: bool = True
-    probe_topic_keywords: str = (
-        "项目,技术,架构,方案,决策,优化,性能,指标,数据,负责,实现,"
-        "上线,故障,异常,成本,延迟,吞吐,FastAPI,LLM,Python"
+    probe_require_topic_match: bool = Field(
+        default=True,
+        description="Deprecated compatibility option; v2 probing does not read it.",
+    )
+    probe_topic_keywords: str = Field(
+        default=(
+            "项目,技术,架构,方案,决策,优化,性能,指标,数据,负责,实现,"
+            "上线,故障,异常,成本,延迟,吞吐,FastAPI,LLM,Python"
+        ),
+        description="Deprecated compatibility option; v2 probing does not read it.",
     )
     chain_crack_penalty: float = Field(default=8.0, ge=0.0)
     chain_held_up_bonus: float = Field(default=3.0, ge=0.0)

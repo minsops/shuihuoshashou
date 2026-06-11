@@ -94,6 +94,12 @@ def _chain_for_suggestion(
         return None
     unresolved = [chain for chain in chains if chain.verdict == "unresolved"]
     candidates = unresolved or chains
+    direct_match = next(
+        (chain for chain in candidates if competency.lower() in chain.topic.lower()),
+        None,
+    )
+    if direct_match is not None:
+        return direct_match
     if competency == "项目真实性":
         resume_chain = next((chain for chain in candidates if chain.origin == "resume_claim"), None)
         if resume_chain is not None:

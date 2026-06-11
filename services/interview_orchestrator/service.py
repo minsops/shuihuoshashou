@@ -429,26 +429,42 @@ def should_probe(segment: TranscriptSegment, record: InterviewRecord) -> bool:
     return assess_credibility(segment.text).level in {"suspicious", "vague"} or _has_competency_coverage_gap(record)
 
 
-def _is_drill_down_topic(text: str) -> bool:
-    normalized = text.strip().lower()
-    keywords = [
-        item.strip().lower()
-        for item in get_settings().probe_topic_keywords.split(",")
-        if item.strip()
-    ]
-    return any(keyword in normalized for keyword in keywords)
-
-
 def _has_competency_coverage_gap(record: InterviewRecord) -> bool:
-    target_turns = max(1, len(record.context.competency_model.items))
-    return len(record.context.turns) < target_turns
+    return any(count < 1 for count in _competency_coverage(record).values())
+
+
+def _competency_coverage(record: InterviewRecord) -> dict[str, int]:
+    items = record.context.competency_model.items
+    coverage = {item.name: 0 for item in items}
+    for turn in record.context.turns:
+        haystack = f"{turn.question} {turn.probe_target or ''}".lower()
+        matched = [
+            item.name
+            for item in items
+            if item.name.lower() in haystack
+            or any(keyword in haystack for keyword in _coverage_keywords(item.name))
+        ]
+        if not matched and coverage:
+            matched = [min(coverage, key=coverage.get)]  # type: ignore[arg-type]
+        for name in matched:
+            coverage[name] += 1
+    return coverage
+
+
+def _coverage_keywords(dimension: str) -> tuple[str, ...]:
+    mapping = {
+        "项目真实性": ("项目", "本人负责", "主导", "独立", "上线指标"),
+        "注水风险": ("注水", "真实性", "记不清", "团队做", "个人贡献"),
+        "沟通与逻辑": ("逻辑", "取舍", "复盘", "为什么", "表达"),
+    }
+    return mapping.get(dimension, ())
 
 
 def _open_competency_gap_chain(record: InterviewRecord) -> ProbeChain:
-    asked = len(record.context.turns)
-    missing = record.context.competency_model.items[
-        min(asked, len(record.context.competency_model.items) - 1)
-    ]
+    coverage = _competency_coverage(record)
+    missing = next(
+        item for item in record.context.competency_model.items if coverage[item.name] < 1
+    )
     topic = f"覆盖缺口：{missing.name}"
     return _find_or_create_probe_chain(record, topic, origin="competency_gap")
 
@@ -470,11 +486,20 @@ def _preopen_resume_chains(interview_id: str, resume_text: str) -> list[ProbeCha
 
 
 def _high_risk_resume_claims(resume_text: str) -> list[str]:
-    markers = ("独立", "主导", "负责", "提升", "优化", "上线", "%", "qps", "ms", "指标")
+    ownership_markers = ("独立", "主导")
+    metric_pattern = re.compile(
+        r"(?:\d+(?:\.\d+)?\s*(?:%|％|倍|ms|毫秒|秒|qps|tps|万|亿))|"
+        r"(?:提升|降低|减少|增长|优化).{0,12}\d",
+        re.IGNORECASE,
+    )
     claims: list[str] = []
     for raw in re.split(r"[。\n；;]", resume_text):
         claim = raw.strip()
-        if len(claim) >= 8 and any(marker in claim for marker in markers):
+        if (
+            len(claim) >= 8
+            and any(marker in claim for marker in ownership_markers)
+            and metric_pattern.search(claim)
+        ):
             claims.append(claim[:160])
     return claims
 
@@ -494,7 +519,11 @@ def _update_probe_chains_for_turn(record: InterviewRecord, turn: QATurn) -> None
             record.context.probe_chains.append(chain)
         _append_probe_chain_link(chain, turn, target, credibility.level)
         return
-    if turn.question_source != "ai_probe" and not turn.probe_target and credibility.level != "suspicious":
+    if turn.question_source != "ai_probe" and not turn.probe_target:
+        if credibility.level == "suspicious":
+            chain = _find_or_create_probe_chain(record, target, origin="answer_claim")
+            turn.probe_chain_id = chain.chain_id
+            return
         if _has_competency_coverage_gap(record):
             _open_competency_gap_chain(record)
         return
@@ -521,6 +550,29 @@ def _append_probe_chain_link(
         )
     )
     _refresh_probe_chain_verdict(chain)
+    if _resume_claim_conflicts_with_answer(chain, turn.answer):
+        chain.verdict = "cracked"
+        chain.crack_depth = len(chain.links)
+
+
+def _resume_claim_conflicts_with_answer(chain: ProbeChain, answer: str) -> bool:
+    if chain.origin != "resume_claim" or not chain.resume_claim_ref:
+        return False
+    claim = chain.resume_claim_ref
+    if not any(marker in claim for marker in ("独立", "主导")):
+        return False
+    normalized = re.sub(r"\s+", "", answer.lower())
+    conflict_markers = (
+        "团队做的",
+        "团队负责",
+        "主要是团队",
+        "我只是参与",
+        "我参与了一些",
+        "别人负责",
+        "同事负责",
+        "协助完成",
+    )
+    return any(marker in normalized for marker in conflict_markers)
 
 
 def _chain_target_for_turn(turn: QATurn) -> str:

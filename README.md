@@ -222,7 +222,7 @@ curl -s http://127.0.0.1:8001/api/config/status
 - `GET /api/interviews/{id}/report.transcript.json`
 - `WS /ws/interview/{id}`
 
-WebSocket `audio_chunk` 事件可以包含 `speaker`、`channel`/`audio_channel`/`track`、`is_final`、`start_ms`、`end_ms` 和 `confidence`。默认 `SPEAKER_MODE=manual`，网页会通过“面试官发言 / 候选人发言”按钮把当前角色作为 `speaker` 上报；双设备链接会带 `?role=interviewer` 或 `?role=candidate`，各自默认发送对应角色。若省略 `speaker`，列在 `ASR_INTERVIEWER_CHANNELS` 中的 channel 会映射为 `interviewer`，列在 `ASR_CANDIDATE_CHANNELS` 中的 channel 会映射为 `candidate`。所有 final segment 都会进入对话装配层；候选人完整回答会无条件入库，追问触发单独由 credibility/覆盖缺口判断。下行事件包括 `transcript`、`probe_chains`、`probe`、`probe_update`、`credibility`、可选 `signal`、`report`，以及 async 模式下的 `task_queued`。
+WebSocket `audio_chunk` 事件可以包含 `speaker`、`channel`/`audio_channel`/`track`、`is_final`、`start_ms`、`end_ms` 和 `confidence`。默认 `SPEAKER_MODE=manual`，网页会通过“面试官发言 / 候选人发言”按钮把当前角色作为 `speaker` 和 `channel` 上报；双设备链接会带 `?role=interviewer` 或 `?role=candidate`，各自默认发送对应角色。双设备连接共享同一套对话装配状态，但 ASR 序号和云端流按设备隔离，因此两端都从 `seq=1` 开始也不会互相去重，面试官设备的问题可以与候选人设备的回答自动配对。若省略 `speaker`，列在 `ASR_INTERVIEWER_CHANNELS` 中的 channel 会映射为 `interviewer`，列在 `ASR_CANDIDATE_CHANNELS` 中的 channel 会映射为 `candidate`。所有 final segment 都会进入对话装配层；候选人完整回答会无条件入库，追问触发单独由 credibility/覆盖缺口判断。下行事件包括句子级 `transcript`、装配完成的 `turn`、`probe_chains`、`probe`、`probe_update`、`credibility`、可选 `signal`、`report`，以及 async 模式下的 `task_queued`。
 
 网页实时面板的“开始麦克风”按钮会请求浏览器麦克风权限，把当前角色语音降采样为 16k 单声道 PCM16，并通过同一个 `audio_chunk` 协议发送。默认 `ASR_PROVIDER=stub` 只能验证链路；要获得真实转写，可配置 `ASR_PROVIDER=http` 对接普通 HTTP ASR endpoint，配置 `ASR_PROVIDER=aliyun_ws` 对接阿里云 DashScope Paraformer 实时 WebSocket ASR，或配置 `ASR_PROVIDER=aliyun_nls_ws` 对接阿里云智能语音交互 NLS WebSocket ASR。
 
@@ -234,9 +234,11 @@ WebSocket `audio_chunk` 事件可以包含 `speaker`、`channel`/`audio_channel`
 
 通过 `PROBE_MIN_ANSWER_CHARS` 和 `PROBE_MIN_INTERVAL_MS` 控制完整候选人回答何时有资格触发自动追问。触发方向由本地 credibility 评估和能力覆盖缺口决定：逃避、含糊回答会触发追问，solid 回答在能力维度覆盖不足时继续追问。`PROBE_REQUIRE_TOPIC_MATCH` 和 `PROBE_TOPIC_KEYWORDS` 仍保留为兼容旧部署脚本的废弃变量，但不再参与追问判断。发送 WebSocket `manual_probe` 事件并带 `answer`，可模拟面试官点击“立即追问”；manual probe 会绕过自动长度和间隔 gate。
 
+v2 对话与风险阈值通过 `DIALOGUE_SILENCE_CLOSE_MS=2500`、`REHEARSAL_THRESHOLD=0.55`、`CHAIN_CRACK_PENALTY=8` 和 `CHAIN_HELD_UP_BONUS=3` 配置。语音模式报告展示“背稿与模板化检测”，不展示面向异步文字场景的 AI 代答概率；LLM 不可用时，HTML、PDF 和网页报告都会标明确定性规则降级模式。
+
 设置 `ASR_PROVIDER=http`、`ASR_BASE_URL`、`ASR_API_PATH` 和 `ASR_API_KEY` 后，音频 chunk 会转发给云 ASR endpoint。响应映射可通过 `ASR_TEXT_PATH`、`ASR_SPEAKER_PATH`、`ASR_START_MS_PATH`、`ASR_END_MS_PATH`、`ASR_IS_FINAL_PATH` 和 `ASR_CONFIDENCE_PATH` 配置。`partial`、`interim`、`provisional` 等 finality 字符串会被视为非 final，避免临时 ASR 输出触发追问。ASR 时间戳会归一化为非负毫秒区间，并满足 `end_ms >= start_ms`；共享 transcript、Q&A 和 scoring evidence schema 也会在 API 边界拒绝非法时间区间。Interview context 和 record 也拒绝早于 `started_at` 的 `ended_at`。
 
-设置 `ASR_PROVIDER=aliyun_ws` 和 `ALIYUN_ASR_API_KEY` 后，gateway 会为每场面试建立一个阿里云 DashScope Paraformer 实时 ASR WebSocket 会话。浏览器音频帧会以二进制 PCM 持续发送，阿里云 `result-generated` 事件会异步转换为 `transcript` 下行事件。默认模型为 `ALIYUN_ASR_MODEL=paraformer-realtime-v2`，endpoint 为 `wss://dashscope.aliyuncs.com/api-ws/v1/inference`。Paraformer 实时接口不返回说话人分离结果，因此演示环境应使用手动角色按钮或双设备角色链接；若 `speaker=unknown`，本地只做短间隔连续性平滑，不做假声纹。真实 key 冒烟检查：
+设置 `ASR_PROVIDER=aliyun_ws` 和 `ALIYUN_ASR_API_KEY` 后，gateway 会为每个接入设备建立独立的阿里云 DashScope Paraformer 实时 ASR WebSocket 流，并在同一面试会话内汇总转写。浏览器音频帧会以二进制 PCM 持续发送，阿里云 `result-generated` 事件会异步转换为 `transcript` 下行事件。默认模型为 `ALIYUN_ASR_MODEL=paraformer-realtime-v2`，endpoint 为 `wss://dashscope.aliyuncs.com/api-ws/v1/inference`。Paraformer 实时接口不返回说话人分离结果，因此演示环境应使用手动角色按钮或双设备角色链接；若 `speaker=unknown`，本地只做短间隔连续性平滑，不做假声纹。真实 key 冒烟检查：
 
 `ALIYUN_ASR_API_KEY` 必须是百炼/DashScope API Key，不是智能语音交互 NLS 的 AppKey。NLS AppKey 单独不能用于当前 DashScope WebSocket Bearer 鉴权。
 
