@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import math
-import re
-from collections import Counter
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -10,6 +7,7 @@ from typing import Any
 import httpx
 
 from libs.common.config import get_settings
+from libs.common.textsim import cosine_similarity
 from libs.schemas import AIGCResult, ProbeChain, QATurn
 
 
@@ -23,30 +21,6 @@ def load_templates() -> tuple[str, ...]:
         for line in TEMPLATE_PATH.read_text(encoding="utf-8").splitlines()
         if line.strip() and not line.strip().startswith("#")
     )
-
-
-def _normalize(text: str) -> str:
-    return "".join(re.findall(r"[a-zA-Z0-9\u4e00-\u9fff]+", text.lower()))
-
-
-def _char_ngrams(text: str, size: int = 2) -> Counter[str]:
-    normalized = _normalize(text)
-    if not normalized:
-        return Counter()
-    if len(normalized) <= size:
-        return Counter([normalized])
-    return Counter(normalized[index : index + size] for index in range(len(normalized) - size + 1))
-
-
-def _cosine_similarity(a: str, b: str) -> float:
-    left = _char_ngrams(a)
-    right = _char_ngrams(b)
-    if not left or not right:
-        return 0.0
-    overlap = sum(left[token] * right[token] for token in left.keys() & right.keys())
-    left_norm = math.sqrt(sum(value * value for value in left.values()))
-    right_norm = math.sqrt(sum(value * value for value in right.values()))
-    return overlap / (left_norm * right_norm)
 
 
 def detect_turn(
@@ -68,8 +42,8 @@ def detect_turn(
 def _local_detect_turn(turn: QATurn, *, cracked_turn_ids: set[str]) -> AIGCResult:
     answer = turn.answer.strip()
     templates = load_templates()
-    max_template = max(templates, key=lambda template: _cosine_similarity(answer, template))
-    template_similarity = _cosine_similarity(answer, max_template)
+    max_template = max(templates, key=lambda template: cosine_similarity(answer, template))
+    template_similarity = cosine_similarity(answer, max_template)
     polished_markers = ["首先", "其次", "最后", "综上", "显著提升", "业务痛点"]
     ai_generated_prob = min(
         1.0,
