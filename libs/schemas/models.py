@@ -633,6 +633,38 @@ class SetupExtraction(BaseModel):
         return _not_blank(value, f"setup extraction {info.field_name}")
 
 
+class QuestionBankItem(BaseModel):
+    question_id: str = Field(default_factory=new_id)
+    category: Literal["technical", "project", "experience", "job_match", "behavior"]
+    question: str
+    basis: Literal["jd", "resume", "jd_resume"]
+    basis_excerpt: str
+    competency: str
+    asked: bool = False
+
+    @field_validator("question_id", "question", "basis_excerpt", "competency")
+    @classmethod
+    def text_fields_are_not_blank(cls, value: str, info: ValidationInfo) -> str:
+        return _not_blank(value, f"question bank item {info.field_name}")
+
+
+class QuestionBank(BaseModel):
+    interview_id: str
+    items: list[QuestionBankItem] = Field(min_length=8, max_length=20)
+
+    @field_validator("interview_id")
+    @classmethod
+    def interview_id_is_not_blank(cls, value: str) -> str:
+        return _not_blank(value, "question bank interview_id")
+
+    @model_validator(mode="after")
+    def question_ids_are_unique(self) -> "QuestionBank":
+        question_ids = [item.question_id for item in self.items]
+        if len(question_ids) != len(set(question_ids)):
+            raise ValueError("question bank items must not contain duplicate question_id values")
+        return self
+
+
 class QuickSetupRequest(BaseModel):
     jd_text: str
     resume_text: str
@@ -650,7 +682,7 @@ class QuickSetupResponse(BaseModel):
     candidate_id: str
     candidate_name: str
     extraction_confident: bool
-    question_bank: dict | None = None
+    question_bank: QuestionBank | None = None
 
     @field_validator("interview_id", "job_id", "job_title", "candidate_id", "candidate_name")
     @classmethod

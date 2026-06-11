@@ -61,6 +61,12 @@ CREATE TABLE IF NOT EXISTS probe_chains (
     UNIQUE (interview_id, chain_index)
 );
 
+CREATE TABLE IF NOT EXISTS question_banks (
+    interview_id UUID PRIMARY KEY REFERENCES interviews(id) ON DELETE CASCADE,
+    payload JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS qa_turns (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     interview_id UUID NOT NULL REFERENCES interviews(id) ON DELETE CASCADE,

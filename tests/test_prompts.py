@@ -15,6 +15,15 @@ def test_load_prompt_reads_prompt_file() -> None:
     assert prompt == prompt.strip()
 
 
+def test_load_question_bank_prompt_reads_prompt_file() -> None:
+    prompt = load_prompt("question_bank.md")
+
+    assert "结构化面试出题专家" in prompt
+    assert "QuestionBank" in prompt
+    assert "12–18" in prompt
+    assert prompt == prompt.strip()
+
+
 def test_load_prompt_rejects_path_separators() -> None:
     with pytest.raises(ValueError):
         load_prompt("../probe_system.md")

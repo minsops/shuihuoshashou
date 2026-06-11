@@ -1,8 +1,20 @@
 from __future__ import annotations
 
+import json
+import re
+
 from libs.common.prompts import load_prompt
 from libs.llm_client import LLMMessage, get_llm_client
-from libs.schemas import CredibilitySignal, ProbeChain, ProbeRequest, ProbeResponse, ProbeSuggestion
+from libs.schemas import (
+    CompetencyModel,
+    CredibilitySignal,
+    ProbeChain,
+    ProbeRequest,
+    ProbeResponse,
+    ProbeSuggestion,
+    QuestionBank,
+    QuestionBankItem,
+)
 from services.jd_kb_service.service import retrieve_job_probe_patterns, retrieve_probe_patterns
 
 
@@ -71,6 +83,206 @@ async def generate_probe(request: ProbeRequest) -> ProbeResponse:
     ]
     draft = await get_llm_client().complete_json(messages, ProbeResponse, fallback)
     return _normalize_probe_response(draft, fallback)
+
+
+async def generate_question_bank(
+    interview_id: str,
+    jd_text: str,
+    resume_text: str,
+    competency_model: CompetencyModel,
+) -> QuestionBank:
+    fallback = fallback_question_bank(interview_id, jd_text, resume_text, competency_model)
+    messages = [
+        LLMMessage(role="system", content=load_prompt("question_bank.md")),
+        LLMMessage(
+            role="user",
+            content=json.dumps(
+                {
+                    "interview_id": interview_id,
+                    "jd_text": jd_text,
+                    "resume_text": resume_text,
+                    "competency_model": competency_model.model_dump(),
+                    "high_risk_resume_claims": _high_risk_resume_claims(resume_text),
+                },
+                ensure_ascii=False,
+            ),
+        ),
+    ]
+    draft = await get_llm_client().complete_json(messages, QuestionBank, fallback)
+    if draft.interview_id != interview_id:
+        return fallback
+    return draft
+
+
+def fallback_question_bank(
+    interview_id: str,
+    jd_text: str,
+    resume_text: str,
+    competency_model: CompetencyModel,
+) -> QuestionBank:
+    competencies = [item.name for item in competency_model.items]
+    if not competencies:
+        competencies = ["项目真实性"]
+    items: list[QuestionBankItem] = []
+    jd_excerpt = _excerpt(jd_text, fallback="岗位职责")
+    resume_excerpt = _excerpt(resume_text, fallback="候选人简历")
+    for claim in _high_risk_resume_claims(resume_text):
+        items.append(
+            _bank_item(
+                category="project",
+                question=(
+                    f"你简历写到「{claim}」，请说明你本人亲自负责哪一段、"
+                    "关键决策依据是什么，最终指标如何验证？"
+                ),
+                basis="resume",
+                basis_excerpt=claim,
+                competency=_competency_for(competencies, "项目真实性"),
+            )
+        )
+    seed_specs = [
+        (
+            "technical",
+            "结合 JD 里的技术要求，请讲一次你亲手设计或排查的核心技术问题，说明方案取舍和结果指标。",
+            "jd",
+            jd_excerpt,
+            "项目真实性",
+        ),
+        (
+            "technical",
+            "如果这个岗位需要你接手现有后端系统，你会先看哪些接口、日志和监控来判断风险？",
+            "jd",
+            jd_excerpt,
+            "沟通与逻辑",
+        ),
+        (
+            "project",
+            "请选一个简历中最核心的项目，讲清楚你本人写的模块、上线前验证和线上问题处理。",
+            "resume",
+            resume_excerpt,
+            "项目真实性",
+        ),
+        (
+            "project",
+            "你简历里的项目如果去掉团队贡献，只看你个人产出，最能验证能力的是哪一个交付物？",
+            "resume",
+            resume_excerpt,
+            "注水风险",
+        ),
+        (
+            "experience",
+            "请按时间线讲一次从需求不清到上线落地的经历，你在哪些节点做了关键判断？",
+            "resume",
+            resume_excerpt,
+            "沟通与逻辑",
+        ),
+        (
+            "experience",
+            "过去一次项目推进受阻时，你具体做了什么让团队重新对齐并继续交付？",
+            "resume",
+            resume_excerpt,
+            "沟通与逻辑",
+        ),
+        (
+            "job_match",
+            "对照 JD 的核心职责，你认为自己最匹配的一项是什么？请用一个真实项目细节证明。",
+            "jd_resume",
+            jd_excerpt,
+            "项目真实性",
+        ),
+        (
+            "job_match",
+            "这个岗位如果要求快速补齐业务知识，你会如何拆解前三周的学习和交付计划？",
+            "jd",
+            jd_excerpt,
+            "沟通与逻辑",
+        ),
+        (
+            "behavior",
+            "讲一次你主动暴露风险或承认方案错误的经历，当时你如何处理后续影响？",
+            "resume",
+            resume_excerpt,
+            "注水风险",
+        ),
+        (
+            "behavior",
+            "当产品、研发和测试对优先级判断不一致时，你如何推动决策并保证结果可验证？",
+            "jd_resume",
+            jd_excerpt,
+            "沟通与逻辑",
+        ),
+    ]
+    for category, question, basis, basis_excerpt, competency_hint in seed_specs:
+        if len(items) >= 18:
+            break
+        items.append(
+            _bank_item(
+                category=category,
+                question=question,
+                basis=basis,
+                basis_excerpt=basis_excerpt,
+                competency=_competency_for(competencies, competency_hint),
+            )
+        )
+    return QuestionBank(interview_id=interview_id, items=_dedupe_bank_items(items)[:20])
+
+
+def _bank_item(
+    *,
+    category: str,
+    question: str,
+    basis: str,
+    basis_excerpt: str,
+    competency: str,
+) -> QuestionBankItem:
+    return QuestionBankItem(
+        category=category,  # type: ignore[arg-type]
+        question=question,
+        basis=basis,  # type: ignore[arg-type]
+        basis_excerpt=basis_excerpt[:40] or "依据片段",
+        competency=competency,
+    )
+
+
+def _dedupe_bank_items(items: list[QuestionBankItem]) -> list[QuestionBankItem]:
+    seen: set[str] = set()
+    deduped: list[QuestionBankItem] = []
+    for item in items:
+        normalized = re.sub(r"\s+", "", item.question.lower())
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        deduped.append(item)
+    return deduped
+
+
+def _excerpt(text: str, *, fallback: str) -> str:
+    for raw in re.split(r"[。\n；;]", text):
+        clean = raw.strip()
+        if clean:
+            return clean[:40]
+    return fallback
+
+
+def _competency_for(competencies: list[str], preferred: str) -> str:
+    return preferred if preferred in competencies else competencies[0]
+
+
+def _high_risk_resume_claims(resume_text: str) -> list[str]:
+    metric_pattern = re.compile(
+        r"(?:\d+(?:\.\d+)?\s*(?:%|％|倍|ms|毫秒|秒|qps|tps|万|亿))|"
+        r"(?:提升|降低|减少|增长|优化).{0,12}\d",
+        re.IGNORECASE,
+    )
+    claims: list[str] = []
+    for raw in re.split(r"[。\n；;]", resume_text):
+        claim = raw.strip()
+        if (
+            len(claim) >= 8
+            and any(marker in claim for marker in ("独立", "主导"))
+            and metric_pattern.search(claim)
+        ):
+            claims.append(claim[:120])
+    return claims[:8]
 
 
 def _normalize_probe_response(response: ProbeResponse, fallback: ProbeResponse | None = None) -> ProbeResponse:

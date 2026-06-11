@@ -290,6 +290,11 @@ def init_db() -> None:
                 payload TEXT NOT NULL CHECK (json_valid(payload) AND json_type(payload) = 'object'),
                 UNIQUE (interview_id, chain_index)
             );
+            CREATE TABLE IF NOT EXISTS question_banks (
+                interview_id TEXT PRIMARY KEY,
+                payload TEXT NOT NULL CHECK (json_valid(payload) AND json_type(payload) = 'object'),
+                created_at TEXT NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS probe_patterns (
                 id TEXT PRIMARY KEY,
                 job_id TEXT NOT NULL,
@@ -381,6 +386,15 @@ def _ensure_sqlite_columns(conn: sqlite3.Connection) -> None:
             verdict TEXT NOT NULL CHECK (verdict IN ('held_up', 'cracked', 'unresolved')),
             payload TEXT NOT NULL CHECK (json_valid(payload) AND json_type(payload) = 'object'),
             UNIQUE (interview_id, chain_index)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS question_banks (
+            interview_id TEXT PRIMARY KEY,
+            payload TEXT NOT NULL CHECK (json_valid(payload) AND json_type(payload) = 'object'),
+            created_at TEXT NOT NULL
         )
         """
     )

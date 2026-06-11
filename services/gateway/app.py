@@ -72,13 +72,15 @@ from services.interview_orchestrator.service import (
     end_interview,
     get_interview,
     get_report,
+    get_question_bank,
     get_or_create_candidate,
     has_active_consent,
+    save_question_bank,
     should_probe_turn,
     start_interview,
 )
 from services.jd_kb_service.service import create_job, get_job, retrieve_job_probe_patterns
-from services.probe_service.service import fallback_probe, generate_probe
+from services.probe_service.service import fallback_probe, generate_probe, generate_question_bank
 from services.report_service.service import build_report
 from services.scoring_service.service import score_interview
 from services.signal_service.service import extract_behavior_signal
@@ -958,13 +960,20 @@ def api_create_interview(payload: InterviewCreate):
 
 
 @app.post("/api/interviews/quick-setup", response_model=QuickSetupResponse)
-def api_quick_setup(payload: QuickSetupRequest) -> QuickSetupResponse:
+async def api_quick_setup(payload: QuickSetupRequest) -> QuickSetupResponse:
     extraction, extraction_confident = _extract_quick_setup_fields(payload)
     job = create_job(JobCreate(title=extraction.job_title, jd_text=payload.jd_text))
     candidate = get_or_create_candidate(
         CandidateCreate(name=extraction.candidate_name, resume_text=payload.resume_text)
     )
     interview = create_interview(InterviewCreate(job_id=job.id, candidate_id=candidate.id))
+    question_bank = await generate_question_bank(
+        interview.id,
+        payload.jd_text,
+        payload.resume_text,
+        job.competency_model,
+    )
+    save_question_bank(question_bank)
     return QuickSetupResponse(
         interview_id=interview.id,
         job_id=job.id,
@@ -972,7 +981,7 @@ def api_quick_setup(payload: QuickSetupRequest) -> QuickSetupResponse:
         candidate_id=candidate.id,
         candidate_name=candidate.name,
         extraction_confident=extraction_confident,
-        question_bank=None,
+        question_bank=question_bank,
     )
 
 
@@ -980,6 +989,14 @@ def api_quick_setup(payload: QuickSetupRequest) -> QuickSetupResponse:
 def api_get_interview(interview_id: str):
     try:
         return get_interview(interview_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/api/interviews/{interview_id}/question-bank")
+def api_get_question_bank(interview_id: str):
+    try:
+        return get_question_bank(interview_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

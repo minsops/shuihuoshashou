@@ -184,11 +184,21 @@ def test_gateway_quick_setup_extracts_fields_and_creates_interview(
     assert payload["job_title"] == "高级 AI 后端"
     assert payload["candidate_name"] == "张三"
     assert payload["extraction_confident"] is True
-    assert payload["question_bank"] is None
+    assert payload["question_bank"]["interview_id"] == payload["interview_id"]
+    assert 8 <= len(payload["question_bank"]["items"]) <= 20
+    categories = {item["category"] for item in payload["question_bank"]["items"]}
+    assert {"technical", "project", "experience", "job_match", "behavior"} <= categories
+    assert any(
+        item["basis"] == "resume" and "响应时间提升 50%" in item["basis_excerpt"]
+        for item in payload["question_bank"]["items"]
+    )
     interview = client.get(f"/api/interviews/{payload['interview_id']}").json()
     assert interview["job_id"] == payload["job_id"]
     assert interview["candidate_id"] == payload["candidate_id"]
     assert interview["context"]["candidate_resume_text"].startswith("姓名：张三")
+    persisted_bank = client.get(f"/api/interviews/{payload['interview_id']}/question-bank")
+    assert persisted_bank.status_code == 200
+    assert persisted_bank.json() == payload["question_bank"]
 
 
 def test_gateway_quick_setup_falls_back_when_extraction_is_unavailable(
@@ -209,6 +219,7 @@ def test_gateway_quick_setup_falls_back_when_extraction_is_unavailable(
     assert payload["job_title"] == "未命名岗位"
     assert payload["candidate_name"] == "候选人"
     assert payload["extraction_confident"] is False
+    assert len(payload["question_bank"]["items"]) >= 8
 
 
 def test_gateway_report_json_falls_back_to_persisted_payload_when_artifact_missing(

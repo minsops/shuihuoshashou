@@ -19,6 +19,7 @@ from libs.schemas import (
     InterviewStatus,
     OfflineTaskAccepted,
     ProbeChain,
+    QuestionBank,
     QATurn,
     TranscriptSegment,
     Utterance,
@@ -416,6 +417,32 @@ def list_turns(interview_id: str) -> list[QATurn]:
             )
         )
     return turns
+
+
+def save_question_bank(bank: QuestionBank) -> QuestionBank:
+    init_db()
+    get_interview(bank.interview_id)
+    with connect() as conn:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO question_banks (interview_id, payload, created_at)
+            VALUES (?, ?, ?)
+            """,
+            (bank.interview_id, dumps(bank.model_dump()), datetime.now(UTC).isoformat()),
+        )
+    return bank
+
+
+def get_question_bank(interview_id: str) -> QuestionBank:
+    init_db()
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT payload FROM question_banks WHERE interview_id = ?",
+            (interview_id,),
+        ).fetchone()
+    if row is None:
+        raise KeyError(f"question bank not found: {interview_id}")
+    return QuestionBank.model_validate(loads(row["payload"]))
 
 
 def should_probe_v2(turn: QATurn, record: InterviewRecord) -> bool:

@@ -223,6 +223,7 @@ def test_postgres_schema_matches_core_spec_tables() -> None:
         "qa_turns",
         "utterances",
         "probe_chains",
+        "question_banks",
         "scores",
         "aigc_results",
         "reports",
