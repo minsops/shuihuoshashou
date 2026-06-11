@@ -527,6 +527,102 @@
         width: fit-content;
       }
 
+      .auto-tags,
+      .segmented,
+      .question-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-xs);
+        align-items: center;
+      }
+
+      .auto-tag,
+      .question-card {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: color-mix(in oklch, var(--surface), var(--surface-2) 36%);
+      }
+
+      .auto-tag {
+        display: grid;
+        gap: 3px;
+        min-width: min(100%, 180px);
+        padding: 10px 12px;
+      }
+
+      .auto-tag span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .auto-tag strong {
+        font-size: 14px;
+      }
+
+      .question-card {
+        display: grid;
+        gap: var(--space-sm);
+        min-height: 148px;
+        padding: var(--space-md);
+      }
+
+      .question-card .question-text {
+        color: var(--ink);
+        font-size: 20px;
+        font-weight: 760;
+        line-height: 1.45;
+      }
+
+      .segmented {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 4px;
+        background: var(--surface-2);
+      }
+
+      .segmented button {
+        min-height: 30px;
+        border-color: transparent;
+        background: transparent;
+        color: var(--muted);
+      }
+
+      .segmented button.active {
+        border-color: var(--teal);
+        background: var(--teal);
+        color: var(--surface);
+      }
+
+      .option-list {
+        display: grid;
+        gap: var(--space-xs);
+      }
+
+      .option-card {
+        display: grid;
+        gap: var(--space-xs);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 12px;
+        background: var(--surface);
+      }
+
+      .option-card button {
+        justify-self: start;
+      }
+
+      .debug-drawer {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px 12px;
+        background: color-mix(in oklch, var(--surface-2), transparent 30%);
+      }
+
+      .debug-drawer[hidden],
+      [hidden] {
+        display: none !important;
+      }
+
       .question-field {
         min-height: 94px;
       }
@@ -723,15 +819,18 @@
           <span class="status-pill" id="setupStatus"><span class="status-dot"></span><span>未建面试</span></span>
         </div>
         <form id="setupForm">
-          <div class="split">
-            <label>
-              岗位名称
-              <input name="job_title" value="AI 后端工程师" required />
-            </label>
-            <label>
-              候选人
-              <input name="candidate_name" value="候选人A" required />
-            </label>
+          <input type="hidden" name="job_title" value="" />
+          <input type="hidden" name="candidate_name" value="" />
+          <div class="auto-tags" aria-live="polite">
+            <div class="auto-tag">
+              <span>岗位</span>
+              <strong id="extractedJob">待自动提取</strong>
+            </div>
+            <div class="auto-tag">
+              <span>候选人</span>
+              <strong id="extractedCandidate">待自动提取</strong>
+            </div>
+            <span class="status-pill" id="extractionConfidence"><span class="status-dot"></span><span>未提取</span></span>
           </div>
           <label>
             岗位 JD
@@ -798,16 +897,40 @@
           </div>
         </div>
         <form id="interviewForm">
-          <label>
-            当前面试问题
-            <textarea class="question-field" name="current_question" id="currentQuestion" required>请介绍一个你最核心的 AI 后端项目，重点说明你本人负责的模块、关键技术取舍和上线后的指标变化。</textarea>
-            <span class="small text-counter" id="questionCharCount" role="status" aria-live="polite">问题 0 字</span>
-          </label>
-          <label>
-            候选人回答
-            <textarea class="answer-field" name="answer" id="answerText" required>我主要负责优化项目架构，做了很多可靠性提升，最终效果比较明显。</textarea>
-            <span class="small text-counter" id="answerCharCount" role="status" aria-live="polite">回答 0 字</span>
-          </label>
+          <div class="question-card" id="currentQuestionCard">
+            <div class="dimension-top">
+              <h3>当前问题</h3>
+              <span class="tag blue" id="currentQuestionMeta">等待题库</span>
+            </div>
+            <p class="question-text" id="currentQuestionText">创建面试后自动生成首题。</p>
+            <div class="segmented" role="group" aria-label="问题策略">
+              <button type="button" data-steering-focus="balanced" class="active">均衡</button>
+              <button type="button" data-steering-focus="resume_drill">深挖简历</button>
+              <button type="button" data-steering-focus="jd_professional">JD 专业题</button>
+            </div>
+          </div>
+          <div class="stack">
+            <div class="dimension-top">
+              <h3>下一步选项</h3>
+              <span class="tag blue" id="nextOptionCount">0 条</span>
+            </div>
+            <div class="option-list" id="nextOptionList">
+              <div class="empty">候选人回答后显示深挖与换题选项</div>
+            </div>
+          </div>
+          <details class="debug-drawer" id="debugTextPanel" open>
+            <summary>文字调试</summary>
+            <label>
+              当前面试问题
+              <textarea class="question-field" name="current_question" id="currentQuestion">请介绍一个你最核心的 AI 后端项目，重点说明你本人负责的模块、关键技术取舍和上线后的指标变化。</textarea>
+              <span class="small text-counter" id="questionCharCount" role="status" aria-live="polite">问题 0 字</span>
+            </label>
+            <label>
+              候选人回答
+              <textarea class="answer-field" name="answer" id="answerText">我主要负责优化项目架构，做了很多可靠性提升，最终效果比较明显。</textarea>
+              <span class="small text-counter" id="answerCharCount" role="status" aria-live="polite">回答 0 字</span>
+            </label>
+          </details>
           <div class="toolbar">
             <div class="speaker-switch" role="group" aria-label="当前麦克风说话人">
               <button type="button" id="speakerCandidate" class="active">候选人发言</button>
@@ -881,6 +1004,14 @@
       const interviewForm = document.querySelector("#interviewForm");
       const jdText = document.querySelector("#jdText");
       const resumeText = document.querySelector("#resumeText");
+      const extractedJob = document.querySelector("#extractedJob");
+      const extractedCandidate = document.querySelector("#extractedCandidate");
+      const extractionConfidence = document.querySelector("#extractionConfidence");
+      const currentQuestionText = document.querySelector("#currentQuestionText");
+      const currentQuestionMeta = document.querySelector("#currentQuestionMeta");
+      const nextOptionList = document.querySelector("#nextOptionList");
+      const nextOptionCount = document.querySelector("#nextOptionCount");
+      const debugTextPanel = document.querySelector("#debugTextPanel");
       const currentQuestion = document.querySelector("#currentQuestion");
       const answerText = document.querySelector("#answerText");
       const questionCharCount = document.querySelector("#questionCharCount");
@@ -939,6 +1070,11 @@
         selectedProbeTarget: null,
         selectedProbeChainId: null,
         selectedCompetency: null,
+        currentQuestionOption: null,
+        nextOptions: null,
+        questionBank: null,
+        steeringFocus: "balanced",
+        debugTextInputEnabled: true,
         interviewEnded: false,
         endingInterview: false,
         reportReady: false,
@@ -1051,7 +1187,119 @@
         );
       }
 
+      function applyDebugTextVisibility() {
+        debugTextPanel.hidden = !state.debugTextInputEnabled;
+        sendAnswer.hidden = !state.debugTextInputEnabled;
+        manualProbe.hidden = !state.debugTextInputEnabled;
+      }
+
+      function renderExtractionTags(jobTitle = "待自动提取", candidateName = "待自动提取", confident = null) {
+        extractedJob.textContent = jobTitle || "待自动提取";
+        extractedCandidate.textContent = candidateName || "待自动提取";
+        if (confident === true) {
+          setPill(extractionConfidence, "提取可信", "ready");
+        } else if (confident === false) {
+          setPill(extractionConfidence, "低置信", "");
+        } else {
+          setPill(extractionConfidence, "未提取", "");
+        }
+      }
+
+      function optionKindLabel(kind) {
+        return {
+          follow_up: "深挖",
+          bank: "题库",
+          generated: "生成",
+        }[kind] || "建议";
+      }
+
+      function steeringLabel(focus) {
+        return {
+          balanced: "均衡",
+          resume_drill: "深挖简历",
+          jd_professional: "JD 专业题",
+        }[focus] || focus;
+      }
+
+      function setSteeringFocus(focus) {
+        state.steeringFocus = focus || "balanced";
+        document.querySelectorAll("[data-steering-focus]").forEach((button) => {
+          const active = button.dataset.steeringFocus === state.steeringFocus;
+          button.classList.toggle("active", active);
+          button.setAttribute("aria-pressed", active ? "true" : "false");
+        });
+      }
+
+      function renderCurrentQuestionOption(option) {
+        state.currentQuestionOption = option || null;
+        const question = option && option.question ? option.question : "创建面试后自动生成首题。";
+        currentQuestionText.textContent = question;
+        currentQuestion.value = option && option.question ? option.question : "";
+        currentQuestionMeta.textContent = option
+          ? `${optionKindLabel(option.kind)}${option.category ? ` · ${option.category}` : ""}`
+          : "等待题库";
+        state.selectedQuestionSource = "interviewer";
+        state.selectedProbeTarget = option && option.reason ? option.reason : null;
+        state.selectedProbeChainId = option && option.chain_id ? option.chain_id : null;
+        state.selectedCompetency = option && option.category ? option.category : null;
+        updateTextCounters();
+      }
+
+      function renderNextOptions(options, label = "下一步选项") {
+        state.nextOptions = options || null;
+        const followUp = Array.isArray(options && options.follow_up) ? options.follow_up : [];
+        const alternatives = Array.isArray(options && options.alternatives) ? options.alternatives : [];
+        const items = [
+          ...followUp.map((option) => ({ ...option, groupLabel: "深挖" })),
+          ...alternatives.map((option) => ({ ...option, groupLabel: "换题" })),
+        ];
+        nextOptionCount.textContent = `${items.length} 条`;
+        if (!items.length) {
+          nextOptionList.innerHTML = '<div class="empty">候选人回答后显示深挖与换题选项</div>';
+          return;
+        }
+        nextOptionList.innerHTML = items
+          .map(
+            (option, index) => `
+              <div class="option-card">
+                <div class="probe-top">
+                  <span class="tag amber">${escapeHtml(option.groupLabel)}</span>
+                  <span class="tag blue">${escapeHtml(optionKindLabel(option.kind))}</span>
+                  ${option.category ? `<span class="tag">${escapeHtml(option.category)}</span>` : ""}
+                </div>
+                <h3>${escapeHtml(option.question)}</h3>
+                <p>${escapeHtml(option.reason || "")}</p>
+                <button class="secondary" type="button" data-option-index="${index}" title="设为当前问题">设为当前问题</button>
+              </div>
+            `
+          )
+          .join("");
+        nextOptionList.querySelectorAll("[data-option-index]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const option = items[Number(button.dataset.optionIndex)];
+            pickQuestionOption(option);
+          });
+        });
+        appendEvent(label, `已收到 ${items.length} 条问题建议。`, "blue");
+      }
+
+      function pickQuestionOption(option) {
+        if (!option) return;
+        if (!liveChannelReadyForInput()) return;
+        if (sendLiveSocketPayload({ type: "pick_option", option_id: option.option_id }, "选题失败")) {
+          renderCurrentQuestionOption(option);
+          appendEvent("当前问题", escapeHtml(option.question), "blue");
+        }
+      }
+
+      function sendSteeringFocus(focus) {
+        setSteeringFocus(focus);
+        if (!state.interview || !state.socket || state.socket.readyState !== WebSocket.OPEN) return;
+        sendLiveSocketPayload({ type: "set_steering", focus }, "策略切换失败");
+      }
+
       function setControls() {
+        applyDebugTextVisibility();
         const socketState = state.socket ? state.socket.readyState : WebSocket.CLOSED;
         const connected = socketState === WebSocket.OPEN;
         const connecting = socketState === WebSocket.CONNECTING;
@@ -1511,6 +1759,7 @@
           if (gatewayError) return;
           const config = await fetchGatewayJson("/api/config/status");
           if (!runtimeCheckStillCurrent(checkToken)) return;
+          applyRuntimeConfig(config);
           applyModelStatusFromConfig(config);
           applyAsrStatusFromConfig(config);
         } catch (error) {
@@ -1540,6 +1789,11 @@
           status.status === "ok" ? "ready" : ""
         );
         runtimeStatus.title = `当前 gateway：${state.apiOrigin}`;
+      }
+
+      function applyRuntimeConfig(config) {
+        state.debugTextInputEnabled = config.debug_text_input_enabled !== false;
+        applyDebugTextVisibility();
       }
 
       function setRuntimeStatusGatewayUnavailable(error) {
@@ -2064,6 +2318,9 @@
 
       function selectQuestion(question, meta = {}) {
         currentQuestion.value = question;
+        currentQuestionText.textContent = question;
+        currentQuestionMeta.textContent = meta.competency || "自定义";
+        state.currentQuestionOption = null;
         answerText.value = "";
         updateTextCounters();
         state.selectedQuestionSource = meta.questionSource || "interviewer";
@@ -2087,6 +2344,7 @@
         state.selectedProbeTarget = null;
         state.selectedProbeChainId = null;
         state.selectedCompetency = null;
+        state.currentQuestionOption = null;
         if (hadProbeMeta) {
           appendEvent("下一问", "已改为手动编辑问题，将按面试官自定义问题记录。");
         }
@@ -2128,35 +2386,41 @@
         credibilityLevel.textContent = "待观察";
         credibilityBox.innerHTML = "<p>等待候选人首个回答。</p>";
         liveFeed.innerHTML = '<div class="empty">实时转写、回答和追问事件会出现在这里</div>';
+        renderCurrentQuestionOption(null);
+        renderNextOptions(null);
+        setSteeringFocus("balanced");
         setPill(setupStatus, "创建中", "live");
         setControls();
         try {
-          const job = await postJson("/api/jobs", {
-            title: form.job_title.value.trim(),
+          const setup = await postJson("/api/interviews/quick-setup", {
             jd_text: form.jd_text.value.trim(),
-          }, {
-            timeoutMs: prepareSessionTimeoutMs,
-          });
-          if (!prepareSessionStillCurrent(prepareToken)) return;
-          const candidate = await postJson("/api/candidates", {
-            name: form.candidate_name.value.trim(),
             resume_text: form.resume_text.value.trim(),
           }, {
             timeoutMs: prepareSessionTimeoutMs,
           });
           if (!prepareSessionStillCurrent(prepareToken)) return;
-          const interview = await postJson("/api/interviews", {
-            job_id: job.id,
-            candidate_id: candidate.id,
-          }, {
+          const job = await fetchGatewayJson(`/api/jobs/${encodeURIComponent(setup.job_id)}`, {
             timeoutMs: prepareSessionTimeoutMs,
           });
           if (!prepareSessionStillCurrent(prepareToken)) return;
+          const interview = await fetchGatewayJson(`/api/interviews/${encodeURIComponent(setup.interview_id)}`, {
+            timeoutMs: prepareSessionTimeoutMs,
+          });
+          if (!prepareSessionStillCurrent(prepareToken)) return;
+          const candidate = {
+            id: setup.candidate_id,
+            name: setup.candidate_name,
+            resume_text: form.resume_text.value.trim(),
+          };
           state.job = job;
           state.candidate = candidate;
           state.interview = interview;
+          state.questionBank = setup.question_bank || null;
+          form.job_title.value = setup.job_title;
+          form.candidate_name.value = setup.candidate_name;
           metricJob.textContent = job.title;
           metricCandidate.textContent = candidate.name;
+          renderExtractionTags(setup.job_title, setup.candidate_name, setup.extraction_confident);
           renderRoleLinks();
           renderCompetencies(job);
           renderProbeChains((interview.context && interview.context.probe_chains) || []);
@@ -2274,8 +2538,6 @@
 
       function validateSetupForm(form) {
         const fields = [
-          [form.job_title, "岗位名称"],
-          [form.candidate_name, "候选人"],
           [form.jd_text, "岗位 JD"],
           [form.resume_text, "简历摘要"],
         ];
@@ -2486,22 +2748,36 @@
           return;
         }
         const timing = turnTiming();
-	        const payload = manual
-	          ? {
-	              type: "manual_probe",
-	              answer,
-	              confidence: 1,
-	              ...timing,
-	              ...eventQuestionMeta(),
-	            }
-	          : {
-	              type: "text_turn",
-	              seq: state.seq,
-	              answer,
-	              confidence: 1,
-	              ...timing,
-	              ...eventQuestionMeta(),
-	            };
+        if (!manual && state.currentQuestionOption) {
+          const questionPayload = {
+            type: "text_turn",
+            seq: state.seq,
+            speaker: "interviewer",
+            answer: question,
+            confidence: 1,
+            start_ms: timing.start_ms,
+            end_ms: timing.start_ms + 800,
+          };
+          if (!sendLiveSocketPayload(questionPayload, "问题发送失败")) return;
+          state.seq += 1;
+        }
+        const payload = manual
+          ? {
+              type: "manual_probe",
+              answer,
+              confidence: 1,
+              ...timing,
+              ...eventQuestionMeta(),
+            }
+          : {
+              type: "text_turn",
+              seq: state.seq,
+              speaker: "candidate",
+              answer,
+              confidence: 1,
+              ...timing,
+              ...eventQuestionMeta(),
+            };
         if (!sendLiveSocketPayload(payload, manual ? "追问触发失败" : "回答发送失败")) return;
         if (!manual) state.seq += 1;
         appendEvent(
@@ -2536,6 +2812,21 @@
           appendEvent(
             "转写",
             `${escapeHtml(message.payload.speaker)} · ${escapeHtml(message.payload.text)}`
+          );
+        } else if (message.type === "current_question") {
+          renderCurrentQuestionOption(message.payload);
+          appendEvent("当前问题", escapeHtml(message.payload.question), "blue");
+        } else if (message.type === "next_options") {
+          renderNextOptions(message.payload, "下一步选项");
+        } else if (message.type === "next_options_update") {
+          renderNextOptions(message.payload, "下一步选项更新");
+        } else if (message.type === "question_matched") {
+          appendEvent(
+            "问题匹配",
+            message.payload.matched_option_id
+              ? `已匹配系统建议：${escapeHtml(message.payload.matched_option_id)}`
+              : `自定义问题：${escapeHtml(message.payload.asked_text)}`,
+            message.payload.matched_option_id ? "green" : "amber"
           );
 	        } else if (message.type === "turn") {
 	          state.turns += 1;
@@ -2676,6 +2967,11 @@
         const aigcResults = Array.isArray(report.aigc_results) ? report.aigc_results : [];
         const turnsById = new Map(transcriptTurns.map((turn) => [turn.turn_id, turn]));
         const analysisMode = report.analysis_mode || score.analysis_mode || "llm";
+        const adoption = report.question_adoption || {};
+        const adoptionRate =
+          typeof adoption.adoption_rate === "number"
+            ? `${(adoption.adoption_rate * 100).toFixed(1)}%`
+            : "0.0%";
         reportLinks.innerHTML = `
           <button class="secondary" type="button" data-report-format="html" data-report-id="${escapeHtml(reportId)}" title="下载 HTML 报告" aria-label="下载 HTML 报告">HTML</button>
           <button class="secondary" type="button" data-report-format="pdf" data-report-id="${escapeHtml(reportId)}" title="下载 PDF 报告" aria-label="下载 PDF 报告">PDF</button>
@@ -2773,6 +3069,11 @@
               </div>
             </div>
             <div>${risks}</div>
+            <div class="report-box">
+              <h3>问题采纳统计</h3>
+              <p>系统建议 ${escapeHtml(adoption.suggested_unique_count ?? 0)} 题 · 采纳 ${escapeHtml(adoption.adopted_suggested_count ?? 0)} 题 · 自定义 ${escapeHtml(adoption.custom_question_count ?? 0)} 题 · 采纳率 ${escapeHtml(adoptionRate)}</p>
+              <p>当前策略：${escapeHtml(steeringLabel(adoption.steering_focus || "balanced"))}</p>
+            </div>
             <table>
               <thead><tr><th>维度</th><th>分数</th><th>证据</th></tr></thead>
               <tbody>${rows}</tbody>
@@ -3242,12 +3543,15 @@
         }
         setupForm.job_title.value = "高级 AI 后端工程师";
         setupForm.candidate_name.value = "张三";
+        renderExtractionTags("高级 AI 后端工程师", "张三", null);
         jdText.value =
           "负责 LLM 应用平台、FastAPI 微服务、模型调用编排、可靠性治理、评估报告与线上故障排查。要求能独立做技术方案、指标设计、降级策略和跨团队协作。";
         resumeText.value =
           "候选人自述 5 年 Python 后端经验，最近负责 AI 面试评估系统，涉及 FastAPI 网关、LLM JSON 解析、重试降级、报告生成和可观测性指标。";
         currentQuestion.value =
           "请讲一个最近负责的 LLM 后端项目，说明你本人写了哪些模块，核心技术取舍是什么，上线后哪些指标发生了变化？";
+        currentQuestionText.textContent = currentQuestion.value;
+        currentQuestionMeta.textContent = "样例";
         resetQuestionMetaForManualEdit();
         answerText.value =
           "我主要写了 FastAPI 网关和模型调用编排，处理过 JSON 解析失败、超时重试和报告生成。我把失败重试从固定次数改成按错误类型分流，P95 延迟从 3.8 秒降到 2.4 秒。";
@@ -3275,6 +3579,10 @@
         state.selectedProbeTarget = null;
         state.selectedProbeChainId = null;
         state.selectedCompetency = null;
+        state.currentQuestionOption = null;
+        state.nextOptions = null;
+        state.questionBank = null;
+        state.steeringFocus = "balanced";
         state.currentSpeaker = "candidate";
         state.micStarting = false;
         state.micError = "";
@@ -3283,10 +3591,16 @@
         resetDocumentUploadInputs();
         metricJob.textContent = "待创建";
         metricCandidate.textContent = "待创建";
+        renderExtractionTags();
         metricTurns.textContent = "0";
         renderRoleLinks();
         currentQuestion.value = "";
+        currentQuestionText.textContent = "创建面试后自动生成首题。";
+        currentQuestionMeta.textContent = "等待题库";
         answerText.value = "";
+        nextOptionCount.textContent = "0 条";
+        nextOptionList.innerHTML = '<div class="empty">候选人回答后显示深挖与换题选项</div>';
+        setSteeringFocus("balanced");
         updateTextCounters();
         resetQuestionMetaForManualEdit();
         competencyList.innerHTML = '<div class="empty">创建面试后显示岗位能力维度</div>';
@@ -3335,6 +3649,9 @@
       endInterview.addEventListener("click", requestEndInterview);
       speakerCandidate.addEventListener("click", () => setCurrentSpeaker("candidate"));
       speakerInterviewer.addEventListener("click", () => setCurrentSpeaker("interviewer"));
+      document.querySelectorAll("[data-steering-focus]").forEach((button) => {
+        button.addEventListener("click", () => sendSteeringFocus(button.dataset.steeringFocus));
+      });
       currentQuestion.addEventListener("input", () => {
         resetQuestionMetaForManualEdit();
         updateTextCounters();

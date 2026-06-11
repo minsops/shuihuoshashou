@@ -349,7 +349,17 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "/api/jobs" in response.text
     assert "创建实时面试" in response.text
     assert "专业追问" in response.text
+    assert "/api/interviews/quick-setup" in response.text
     assert "/ws/interview/" in response.text
+    assert 'id="currentQuestionText"' in response.text
+    assert 'id="nextOptionList"' in response.text
+    assert 'id="debugTextPanel"' in response.text
+    assert 'data-steering-focus="resume_drill"' in response.text
+    assert "current_question" in response.text
+    assert "next_options_update" in response.text
+    assert "set_steering" in response.text
+    assert "debug_text_input_enabled" in response.text
+    assert "问题采纳统计" in response.text
     assert 'id="roleLinks"' in response.text
     assert "joinExistingInterviewFromUrl" in response.text
     assert "joinInterviewIdFromUrl" in response.text

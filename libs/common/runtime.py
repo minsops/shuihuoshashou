@@ -66,6 +66,7 @@ class RuntimeStatus(BaseModel):
     aigc_ai_prob_threshold: float
     aigc_template_similarity_threshold: float
     signal_enabled: bool
+    debug_text_input_enabled: bool
     rate_limit_enabled: bool
     rate_limit_backend: str
     rate_limit_requests_per_minute: int
@@ -147,6 +148,7 @@ def get_runtime_status() -> RuntimeStatus:
         aigc_ai_prob_threshold=settings.aigc_ai_prob_threshold,
         aigc_template_similarity_threshold=settings.aigc_template_similarity_threshold,
         signal_enabled=settings.signal_enabled,
+        debug_text_input_enabled=settings.debug_text_input_enabled,
         rate_limit_enabled=settings.rate_limit_enabled,
         rate_limit_backend=settings.rate_limit_backend,
         rate_limit_requests_per_minute=settings.rate_limit_requests_per_minute,
