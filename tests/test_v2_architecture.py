@@ -235,3 +235,45 @@ def test_probe_suggestion_chain_id_is_persisted_when_answered(tmp_path, monkeypa
     assert persisted.context.turns[0].probe_chain_id == chain.chain_id
     assert persisted_chain.links[0].answer_turn_id == persisted.context.turns[0].turn_id
     assert persisted_chain.links[0].credibility_after == "suspicious"
+
+
+def test_probe_chain_lifecycle_marks_repeated_evasion_as_cracked(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'chain-crack.db'}")
+    get_settings.cache_clear()
+    init_db()
+    job = create_job(JobCreate(title="AI 后端", jd_text="FastAPI LLM"))
+    candidate = create_candidate(
+        CandidateCreate(name="候选人", resume_text="独立主导网关优化，响应时间提升 50%")
+    )
+    interview = create_interview(InterviewCreate(job_id=job.id, candidate_id=candidate.id))
+    chain = interview.context.probe_chains[0]
+
+    add_turn(
+        interview.id,
+        QATurn(
+            question="你独立主导的具体模块是什么？",
+            question_source="ai_probe",
+            answer="记不清了，主要是团队一起做的。",
+            answer_start_ms=0,
+            answer_end_ms=1000,
+            probe_target=chain.topic,
+            probe_chain_id=chain.chain_id,
+        ),
+    )
+    record = add_turn(
+        interview.id,
+        QATurn(
+            question="那你本人写过哪段核心代码？",
+            question_source="ai_probe",
+            answer="这块主要也是团队负责，我参与了一些优化。",
+            answer_start_ms=3000,
+            answer_end_ms=4200,
+            probe_target=chain.topic,
+            probe_chain_id=chain.chain_id,
+        ),
+    )
+    cracked = record.context.probe_chains[0]
+
+    assert len(cracked.links) == 2
+    assert cracked.verdict == "cracked"
+    assert cracked.crack_depth == 2

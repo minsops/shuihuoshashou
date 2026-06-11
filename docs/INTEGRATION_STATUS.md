@@ -8,7 +8,8 @@ The local implementation is complete as a runnable MVP:
 - Optional gateway API-key authentication for `/api/*` and WebSocket traffic.
 - Local demo UI at `/` for offline evaluation and realtime WebSocket probe sessions.
 - One-shot offline evaluation at `/api/offline/evaluate`.
-- WebSocket real-time text/audio-stub probe flow with speaker/finality/timestamp metadata and channel-based speaker mapping.
+- WebSocket real-time text/audio probe flow with speaker/finality/timestamp metadata, manual role
+  switching, dual-device role links, and channel-based speaker mapping.
 - Invalid or empty WebSocket audio chunks are rejected with `asr_warning` before transcription.
 - WebSocket audio/text events with invalid sequence numbers return recoverable warning/error events
   instead of terminating the realtime session.
@@ -20,8 +21,9 @@ The local implementation is complete as a runnable MVP:
   transcripts.
 - Optional WebSocket audio metadata is validated against the startup contract: PCM/Opus-style
   payloads, 16 kHz sample rate, and one channel.
-- Configurable real-time probe trigger rules for candidate answer length, drill-down topic matching,
-  minimum interval, and interviewer-initiated manual probes.
+- Configurable real-time probe trigger rules for candidate answer length, minimum interval,
+  credibility-driven evasive/vague answers, competency coverage gaps, and interviewer-initiated
+  manual probes. Topic keyword matching is retained only as a deprecated compatibility setting.
 - Configurable HTTP cloud ASR adapter behind the `ASREngine` interface.
 - HTTP ASR responses normalize string finality flags, treat provisional labels as non-final, clamp
   confidence values, and enforce non-negative monotonic timestamp ranges.
@@ -31,10 +33,10 @@ The local implementation is complete as a runnable MVP:
 - Shared TranscriptSegment schemas also reject blank `session_id` and transcript text so empty ASR
   output cannot enter orchestration.
 - ASR session manager supports partial-to-final chunk updates, repeated-final deduplication,
-  stale-final rejection, local audio-cluster speaker resolution, and conservative short-gap
-  speaker continuity smoothing.
-- Speaker diarization is pluggable: local deterministic audio clusters for development, or an
-  HTTP provider for production voice embedding / cloud diarization services.
+  stale-final rejection, explicit speaker/channel attribution, and conservative short-gap speaker
+  continuity smoothing. Local mode does not do voiceprint or audio-hash matching.
+- Speaker diarization is pluggable: local explicit attribution for development/demo, or an HTTP
+  provider for production voice embedding / cloud diarization services.
 - Docker Compose forwards `SPEAKER_DIARIZATION_*` settings to the gateway, and gateway startup
   reloads the ASR session diarizer from runtime configuration.
 - Separate `credibility` WebSocket event after probe generation.
@@ -224,5 +226,6 @@ LLM smoke test ok
 
 ## Remaining Production Gaps
 
-- Use a real production diarization endpoint or pyannote-backed service behind the HTTP provider in
-  deployed environments.
+- Use manual role switching or dual-device links for demos; use a real production diarization
+  endpoint or pyannote-backed service behind the HTTP provider in deployed environments where
+  automatic speaker separation is required.

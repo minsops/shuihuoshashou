@@ -54,6 +54,17 @@ def _client(
     return TestClient(app)
 
 
+def _receive_until(websocket, expected_type: str, *, limit: int = 8) -> tuple[dict, list[dict]]:
+    messages: list[dict] = []
+    for _ in range(limit):
+        message = websocket.receive_json()
+        messages.append(message)
+        if message.get("type") == expected_type:
+            return message, messages
+    seen = [message.get("type") for message in messages]
+    raise AssertionError(f"expected {expected_type!r} message, saw {seen!r}")
+
+
 def test_gateway_offline_report_flow(tmp_path: Path, monkeypatch) -> None:
     client = _client(tmp_path, monkeypatch)
 
@@ -1039,10 +1050,14 @@ def test_gateway_websocket_requires_api_key_when_enabled(tmp_path: Path, monkeyp
             }
         )
         assert websocket.receive_json()["type"] == "transcript"
-        assert websocket.receive_json()["type"] == "probe"
-        assert websocket.receive_json()["type"] == "credibility"
+        probe, probe_messages = _receive_until(websocket, "probe")
+        assert any(message["type"] == "probe_chains" for message in probe_messages)
+        assert probe["payload"]["suggestions"]
+        credibility, _ = _receive_until(websocket, "credibility")
+        assert credibility["payload"]["level"] == probe["payload"]["credibility"]["level"]
         websocket.send_json({"type": "end"})
-        assert websocket.receive_json()["type"] == "report"
+        report, _ = _receive_until(websocket, "report")
+        assert report["type"] == "report"
 
 
 def test_gateway_websocket_accepts_api_key_subprotocol(tmp_path: Path, monkeypatch) -> None:
@@ -1853,6 +1868,7 @@ def test_gateway_websocket_end_returns_task_queued_in_async_mode(
 
 
 def test_gateway_websocket_probe_flow(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("DIALOGUE_SILENCE_CLOSE_MS", "20")
     client = _client(tmp_path, monkeypatch)
     job = client.post("/api/jobs", json={"title": "Backend", "jd_text": "Python"}).json()
     candidate = client.post("/api/candidates", json={"name": "Candidate"}).json()
@@ -1876,9 +1892,10 @@ def test_gateway_websocket_probe_flow(tmp_path: Path, monkeypatch) -> None:
             }
         )
         transcript = websocket.receive_json()
-        probe = websocket.receive_json()
-        credibility = websocket.receive_json()
+        probe, probe_messages = _receive_until(websocket, "probe")
+        credibility, _ = _receive_until(websocket, "credibility")
         assert transcript["type"] == "transcript"
+        assert any(message["type"] == "probe_chains" for message in probe_messages)
         assert probe["type"] == "probe"
         assert probe["payload"]["credibility"]["level"] in {"vague", "suspicious"}
         assert credibility["type"] == "credibility"
@@ -1906,12 +1923,13 @@ def test_gateway_websocket_text_turn_probe_flow(tmp_path: Path, monkeypatch) -> 
             }
         )
         transcript = websocket.receive_json()
-        probe = websocket.receive_json()
-        credibility = websocket.receive_json()
+        probe, probe_messages = _receive_until(websocket, "probe")
+        credibility, _ = _receive_until(websocket, "credibility")
         websocket.send_json({"type": "end"})
-        report = websocket.receive_json()
+        report, _ = _receive_until(websocket, "report")
         assert transcript["type"] == "transcript"
         assert transcript["payload"]["speaker"] == "candidate"
+        assert any(message["type"] == "probe_chains" for message in probe_messages)
         assert probe["type"] == "probe"
         assert probe["payload"]["suggestions"]
         assert credibility["type"] == "credibility"
@@ -2640,8 +2658,11 @@ def test_gateway_websocket_manual_probe_bypasses_auto_gates(
 
     with client.websocket_connect(f"/ws/interview/{interview['id']}") as websocket:
         websocket.send_json({"type": "manual_probe", "answer": "好"})
-        probe = websocket.receive_json()
-        credibility = websocket.receive_json()
+        transcript = websocket.receive_json()
+        probe, probe_messages = _receive_until(websocket, "probe")
+        credibility, _ = _receive_until(websocket, "credibility")
+        assert transcript["type"] == "transcript"
+        assert any(message["type"] == "probe_chains" for message in probe_messages)
         assert probe["type"] == "probe"
         assert probe["payload"]["suggestions"]
         assert credibility["type"] == "credibility"

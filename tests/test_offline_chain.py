@@ -1499,8 +1499,9 @@ def test_should_probe_uses_configurable_thresholds(monkeypatch) -> None:
     assert should_probe(late, record) is True
 
 
-def test_should_probe_requires_drill_down_topic_by_default(monkeypatch) -> None:
+def test_should_probe_ignores_deprecated_topic_keywords(monkeypatch) -> None:
     monkeypatch.delenv("PROBE_REQUIRE_TOPIC_MATCH", raising=False)
+    monkeypatch.setenv("PROBE_TOPIC_KEYWORDS", "FastAPI,架构")
     monkeypatch.setenv("PROBE_MIN_ANSWER_CHARS", "5")
     get_settings.cache_clear()
     model = generate_competency_model("job-local", "Backend", "Python 服务端岗位")
@@ -1515,16 +1516,18 @@ def test_should_probe_requires_drill_down_topic_by_default(monkeypatch) -> None:
             competency_model=model,
         ),
     )
-    casual = TranscriptSegment(
+    evasive_without_keyword = TranscriptSegment(
         session_id=record.id,
         speaker="candidate",
-        text="今天状态还可以，整体感觉比较顺利。",
+        text="记不清了，主要是团队做的。",
         start_ms=0,
         end_ms=1000,
         is_final=True,
         confidence=0.9,
     )
-    project = casual.model_copy(update={"text": "我负责项目里的 FastAPI 架构优化。"})
+    explicit_keyword = evasive_without_keyword.model_copy(
+        update={"text": "我负责项目里的 FastAPI 架构优化。"}
+    )
 
-    assert should_probe(casual, record) is False
-    assert should_probe(project, record) is True
+    assert should_probe(evasive_without_keyword, record) is True
+    assert should_probe(explicit_keyword, record) is True
