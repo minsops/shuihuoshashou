@@ -1478,9 +1478,22 @@
         asrStatus.title = asr.title || asr.text;
       }
 
+      function dependencyStatusAlreadyVerified(peer) {
+        const node = peer === "model" ? modelStatus : asrStatus;
+        const text = node.textContent || "";
+        return (
+          node.classList.contains("ready") &&
+          !text.includes("已配置，未测试") &&
+          !text.includes("未配置") &&
+          !text.includes("等待")
+        );
+      }
+
       async function refreshPeerDependencyStatusFromConfig(peer) {
+        if (dependencyStatusAlreadyVerified(peer)) return;
         try {
           const config = await fetchGatewayJson("/api/config/status");
+          if (dependencyStatusAlreadyVerified(peer)) return;
           if (peer === "model") {
             applyModelStatusFromConfig(config);
           } else if (peer === "asr") {
@@ -1641,8 +1654,9 @@
 
       function asrCheckStatusText(result) {
         if (!result.ok) return "ASR 异常";
+        if (result.mode === "fixed_token_auto_ready") return "ASR 固定 Token 已配置，自动刷新可用";
         if (result.mode === "token_ready") return "ASR Token 可生成，未跑音频";
-        if (result.mode === "fixed_token") return "ASR 固定 Token 已配置，未验有效期";
+        if (result.mode === "fixed_token") return "ASR 固定 Token 已配置";
         if (result.mode === "configured") return "ASR 配置存在，未跑音频";
         return "ASR 检查通过";
       }

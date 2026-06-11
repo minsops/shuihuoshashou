@@ -452,10 +452,34 @@ async def check_asr_readiness() -> dict[str, str | bool]:
                 "message": "阿里云 NLS ASR 配置不完整，请检查 AppKey 和 Endpoint。",
             }
         if status.aliyun_nls_token_configured:
+            if status.aliyun_nls_token_auto_configured:
+                try:
+                    token = await asyncio.to_thread(
+                        AliyunNLSTokenProvider(
+                            access_key_id=settings.aliyun_ak_id,
+                            access_key_secret=settings.aliyun_ak_secret,
+                            endpoint=settings.aliyun_nls_token_endpoint,
+                            region_id=settings.aliyun_nls_token_region,
+                        ).get_token
+                    )
+                except Exception as exc:
+                    return {
+                        "ok": True,
+                        "mode": "fixed_token",
+                        "message": _safe_public_error(
+                            f"阿里云 NLS ASR 固定 Token 已配置；AK 自动 Token 创建失败: {exc}"
+                        ),
+                    }
+                if token.strip():
+                    return {
+                        "ok": True,
+                        "mode": "fixed_token_auto_ready",
+                        "message": "阿里云 NLS ASR 就绪：固定 Token 已配置，AK 自动 Token 可生成；固定 Token 被拒绝时会自动刷新重试。",
+                    }
             return {
                 "ok": True,
                 "mode": "fixed_token",
-                "message": "阿里云 NLS ASR 基本配置存在：固定 Token 已配置；此检查未验证 Token 有效期。",
+                "message": "阿里云 NLS ASR 基本配置存在：固定 Token 已配置；此轻量检查不打开音频识别会话。",
             }
         if status.aliyun_nls_token_auto_configured:
             try:

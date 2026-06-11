@@ -335,6 +335,8 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "function setDependentStatusWaitingForGateway(error)" in response.text
     assert "applyModelStatusFromConfig(config)" in response.text
     assert "applyAsrStatusFromConfig(config)" in response.text
+    assert "function dependencyStatusAlreadyVerified(peer)" in response.text
+    assert "if (dependencyStatusAlreadyVerified(peer)) return" in response.text
     assert "function refreshPeerDependencyStatusFromConfig(peer)" in response.text
     assert 'await refreshPeerDependencyStatusFromConfig("asr")' in response.text
     assert 'await refreshPeerDependencyStatusFromConfig("model")' in response.text
@@ -363,8 +365,9 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "ASR 配置已填写但尚未验证依赖、Token 和音频链路" in response.text
     assert "点击“检查 ASR”后才会确认" in response.text
     assert "asrCheckStatusText" in response.text
+    assert "ASR 固定 Token 已配置，自动刷新可用" in response.text
     assert "ASR Token 可生成，未跑音频" in response.text
-    assert "ASR 固定 Token 已配置，未验有效期" in response.text
+    assert "ASR 固定 Token 已配置" in response.text
     assert "ASR 配置存在，未跑音频" in response.text
     assert "ASR 长时间没有收到有效语音" in response.text
     assert "ASR Token 已失效或被拒绝" in response.text
@@ -885,7 +888,7 @@ def test_gateway_asr_check_validates_nls_auto_token(tmp_path: Path, monkeypatch)
     }
 
 
-def test_gateway_asr_check_prefers_fixed_nls_token_over_auto_token(
+def test_gateway_asr_check_validates_auto_token_when_fixed_nls_token_exists(
     tmp_path: Path, monkeypatch
 ) -> None:
     client = _client(tmp_path, monkeypatch)
@@ -896,19 +899,26 @@ def test_gateway_asr_check_prefers_fixed_nls_token_over_auto_token(
     monkeypatch.setenv("ALIYUN_AK_SECRET", "ak-secret")
     get_settings.cache_clear()
 
-    class UnexpectedTokenProvider:
-        def __init__(self, **kwargs):
-            raise AssertionError("fixed NLS token should take priority")
+    class FakeTokenProvider:
+        calls = 0
 
-    monkeypatch.setattr("services.gateway.app.AliyunNLSTokenProvider", UnexpectedTokenProvider)
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+        def get_token(self) -> str:
+            FakeTokenProvider.calls += 1
+            return "created-token"
+
+    monkeypatch.setattr("services.gateway.app.AliyunNLSTokenProvider", FakeTokenProvider)
 
     response = client.post("/api/config/asr/check")
 
     assert response.status_code == 200
+    assert FakeTokenProvider.calls == 1
     assert response.json() == {
         "ok": True,
-        "mode": "fixed_token",
-        "message": "阿里云 NLS ASR 基本配置存在：固定 Token 已配置；此检查未验证 Token 有效期。",
+        "mode": "fixed_token_auto_ready",
+        "message": "阿里云 NLS ASR 就绪：固定 Token 已配置，AK 自动 Token 可生成；固定 Token 被拒绝时会自动刷新重试。",
     }
 
 
