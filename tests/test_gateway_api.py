@@ -1788,10 +1788,12 @@ def test_gateway_websocket_emits_behavior_signal_with_active_consent(
             }
         )
         assert websocket.receive_json()["type"] == "transcript"
-        assert websocket.receive_json()["type"] == "probe"
-        assert websocket.receive_json()["type"] == "credibility"
-        signal = websocket.receive_json()
+        probe, _ = _receive_until(websocket, "probe")
+        credibility, _ = _receive_until(websocket, "credibility")
+        signal, _ = _receive_until(websocket, "signal")
 
+    assert probe["payload"]["suggestions"]
+    assert credibility["payload"]["level"] == probe["payload"]["credibility"]["level"]
     assert signal["type"] == "signal"
     assert set(signal["payload"]) == {"turn_id", "fluency", "hesitation", "evasiveness_hint"}
     assert signal["payload"]["hesitation"] > 0
@@ -1825,12 +1827,13 @@ def test_gateway_websocket_suppresses_behavior_signal_after_consent_revocation(
             }
         )
         assert websocket.receive_json()["type"] == "transcript"
-        assert websocket.receive_json()["type"] == "probe"
-        assert websocket.receive_json()["type"] == "credibility"
+        _receive_until(websocket, "probe")
+        _receive_until(websocket, "credibility")
         websocket.send_json({"type": "end"})
-        report = websocket.receive_json()
+        report, messages = _receive_until(websocket, "report")
 
     assert report["type"] == "report"
+    assert all(message["type"] != "signal" for message in messages)
     assert "signal" not in json.dumps(report["payload"], ensure_ascii=False)
 
 
@@ -1855,10 +1858,10 @@ def test_gateway_websocket_end_returns_task_queued_in_async_mode(
             }
         )
         assert websocket.receive_json()["type"] == "transcript"
-        assert websocket.receive_json()["type"] == "probe"
-        assert websocket.receive_json()["type"] == "credibility"
+        _receive_until(websocket, "probe")
+        _receive_until(websocket, "credibility")
         websocket.send_json({"type": "end"})
-        queued = websocket.receive_json()
+        queued, _ = _receive_until(websocket, "task_queued")
 
     assert queued["type"] == "task_queued"
     assert queued["payload"]["interview_id"] == interview["id"]
@@ -1963,8 +1966,8 @@ def test_gateway_text_turn_works_with_aliyun_ws_provider(tmp_path: Path, monkeyp
             }
         )
         transcript = websocket.receive_json()
-        probe = websocket.receive_json()
-        credibility = websocket.receive_json()
+        probe, _ = _receive_until(websocket, "probe")
+        credibility, _ = _receive_until(websocket, "credibility")
 
         assert transcript["type"] == "transcript"
         assert transcript["payload"]["text"] == "我主要负责优化，做了很多事情，效果比较好。"
@@ -2043,8 +2046,8 @@ def test_gateway_aliyun_ws_audio_chunk_reads_async_results(
             }
         )
         transcript = websocket.receive_json()
-        probe = websocket.receive_json()
-        credibility = websocket.receive_json()
+        probe, _ = _receive_until(websocket, "probe")
+        credibility, _ = _receive_until(websocket, "credibility")
 
     assert engine.session is not None
     assert engine.session.sent_audio == [b"pcm-audio"]
@@ -2141,8 +2144,8 @@ def test_gateway_aliyun_ws_matches_async_result_to_audio_context(
             }
         )
         transcript = websocket.receive_json()
-        probe = websocket.receive_json()
-        credibility = websocket.receive_json()
+        probe, _ = _receive_until(websocket, "probe")
+        credibility, _ = _receive_until(websocket, "credibility")
 
     assert engine.session is not None
     assert engine.session.sent_audio == [b"candidate-audio", b"interviewer-audio"]
@@ -2342,8 +2345,8 @@ def test_gateway_aliyun_nls_ws_audio_chunk_uses_streaming_path(
             }
         )
         transcript = websocket.receive_json()
-        probe = websocket.receive_json()
-        credibility = websocket.receive_json()
+        probe, _ = _receive_until(websocket, "probe")
+        credibility, _ = _receive_until(websocket, "credibility")
 
     assert engine.session is not None
     assert engine.session.sent_audio == [b"nls-audio"]
@@ -2376,11 +2379,11 @@ def test_gateway_websocket_end_error_does_not_close_session(
             }
         )
         transcript = websocket.receive_json()
-        probe = websocket.receive_json()
-        credibility = websocket.receive_json()
+        probe, _ = _receive_until(websocket, "probe")
+        credibility, _ = _receive_until(websocket, "credibility")
 
         websocket.send_json({"type": "end"})
-        report = websocket.receive_json()
+        report, _ = _receive_until(websocket, "report")
 
     assert early_end["type"] == "error"
     assert "cannot finish interview without candidate turns" in early_end["detail"]
@@ -2586,8 +2589,8 @@ def test_gateway_websocket_keeps_session_after_asr_failure(
             }
         )
         transcript = websocket.receive_json()
-        probe = websocket.receive_json()
-        credibility = websocket.receive_json()
+        probe, _ = _receive_until(websocket, "probe")
+        credibility, _ = _receive_until(websocket, "credibility")
 
     assert transcript["type"] == "transcript"
     assert transcript["payload"]["text"] == "我负责 FastAPI 项目里的接口编排、异常重试和 JSON 校验。"
@@ -2707,8 +2710,9 @@ def test_gateway_websocket_manual_probe_rejects_invalid_metadata_without_closing
                 "confidence": 0.9,
             }
         )
-        probe = websocket.receive_json()
-        credibility = websocket.receive_json()
+        transcript = websocket.receive_json()
+        probe, _ = _receive_until(websocket, "probe")
+        credibility, _ = _receive_until(websocket, "credibility")
 
     assert bad_start == {
         "type": "error",
@@ -2718,6 +2722,7 @@ def test_gateway_websocket_manual_probe_rejects_invalid_metadata_without_closing
         "type": "error",
         "detail": "manual_probe confidence must be between 0 and 1",
     }
+    assert transcript["type"] == "transcript"
     assert probe["type"] == "probe"
     assert credibility["type"] == "credibility"
 
@@ -2991,8 +2996,8 @@ def test_gateway_websocket_maps_audio_channel_to_speaker(tmp_path: Path, monkeyp
             }
         )
         transcript = websocket.receive_json()
-        probe = websocket.receive_json()
-        credibility = websocket.receive_json()
+        probe, _ = _receive_until(websocket, "probe")
+        credibility, _ = _receive_until(websocket, "credibility")
         assert transcript["type"] == "transcript"
         assert transcript["payload"]["speaker"] == "candidate"
         assert probe["type"] == "probe"
@@ -3043,16 +3048,17 @@ def test_gateway_websocket_deduplicates_final_audio_segments(
     with client.websocket_connect(f"/ws/interview/{interview['id']}") as websocket:
         websocket.send_json(event)
         assert websocket.receive_json()["type"] == "transcript"
-        assert websocket.receive_json()["type"] == "probe"
-        assert websocket.receive_json()["type"] == "credibility"
+        _receive_until(websocket, "probe")
+        _receive_until(websocket, "credibility")
 
         websocket.send_json(event)
-        warning = websocket.receive_json()
+        warning, _ = _receive_until(websocket, "asr_warning")
         assert warning["type"] == "asr_warning"
         assert warning["payload"]["reason"] == "duplicate_final_segment"
 
         websocket.send_json({"type": "end"})
-        assert websocket.receive_json()["type"] == "report"
+        report, _ = _receive_until(websocket, "report")
+        assert report["type"] == "report"
 
 
 def test_gateway_one_shot_offline_evaluate(tmp_path: Path, monkeypatch) -> None:
