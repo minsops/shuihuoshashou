@@ -70,6 +70,8 @@ from services.interview_orchestrator.question_flow import (
     find_option,
     generate_next_options,
     initial_question,
+    rebuild_next_options_for_steering,
+    suggested_question_key,
 )
 from services.interview_orchestrator.question_match import match_asked_question
 from services.interview_orchestrator.service import (
@@ -85,6 +87,7 @@ from services.interview_orchestrator.service import (
     get_or_create_candidate,
     has_active_consent,
     save_question_bank,
+    save_interview,
     should_probe_turn,
     start_interview,
 )
@@ -179,7 +182,8 @@ async def _send_initial_question_if_available(
     sender: _LockedWebSocketSender,
     runtime: _DialogueSessionRuntime,
     interview_id: str,
-) -> None:
+    record,
+):
     current: NextOption | None = None
     async with runtime.lock:
         if runtime.question_flow is None:
@@ -190,10 +194,28 @@ async def _send_initial_question_if_available(
             runtime.question_flow = QuestionFlowState(
                 bank=bank,
                 current_question=initial_question(bank),
+                steering=record.context.question_steering,
             )
+        else:
+            runtime.question_flow.steering = record.context.question_steering
         current = runtime.question_flow.current_question
     if current is not None:
+        if _register_suggested_questions(record, [current]):
+            save_interview(record)
         await sender.send_json({"type": "current_question", "payload": current.model_dump()})
+    return record
+
+
+def _register_suggested_questions(record, options: list[NextOption]) -> bool:
+    existing = set(record.context.suggested_question_keys)
+    changed = False
+    for option in options:
+        key = suggested_question_key(option)
+        if key and key not in existing:
+            record.context.suggested_question_keys.append(key)
+            existing.add(key)
+            changed = True
+    return changed
 
 
 @dataclass(frozen=True)
@@ -709,6 +731,15 @@ def _schedule_next_options_update(
             if runtime.question_flow is None:
                 return
             runtime.question_flow.last_options = refined
+        try:
+            latest_record = get_interview(record.id)
+            if _register_suggested_questions(
+                latest_record,
+                [*refined.follow_up, *refined.alternatives],
+            ):
+                save_interview(latest_record)
+        except (KeyError, ValueError):
+            return
         await runtime.send_json({"type": "next_options_update", "payload": refined.model_dump()})
 
     asyncio.create_task(_run())
@@ -1349,8 +1380,18 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                 }
             )
             if runtime.question_flow is not None:
-                options = fallback_next_options(record, runtime.question_flow.bank, turn)
+                options = fallback_next_options(
+                    record,
+                    runtime.question_flow.bank,
+                    turn,
+                    steering=runtime.question_flow.steering,
+                )
                 runtime.question_flow.last_options = options
+                if _register_suggested_questions(
+                    record,
+                    [*options.follow_up, *options.alternatives],
+                ):
+                    save_interview(record)
                 await runtime.send_json({"type": "next_options", "payload": options.model_dump()})
                 _schedule_next_options_update(runtime, record, turn, options)
             if emit_probe and (force_probe or should_probe_turn(turn, record)):
@@ -1406,7 +1447,7 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
 
     try:
         record = start_interview(interview_id)
-        await _send_initial_question_if_available(sender, runtime, interview_id)
+        record = await _send_initial_question_if_available(sender, runtime, interview_id, record)
         while True:
             try:
                 event = await websocket.receive_json()
@@ -1606,8 +1647,38 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                         )
                         continue
                     runtime.question_flow.current_question = option
+                    if _register_suggested_questions(record, [option]):
+                        save_interview(record)
                     await runtime.send_json(
                         {"type": "current_question", "payload": option.model_dump()}
+                    )
+            elif event.get("type") == "set_steering":
+                focus = str(event.get("focus") or "").strip()
+                if focus not in {"balanced", "resume_drill", "jd_professional"}:
+                    await sender.send_json({"type": "error", "detail": "invalid steering focus"})
+                    continue
+                next_options = None
+                async with runtime.lock:
+                    record.context.question_steering = focus  # type: ignore[assignment]
+                    record.context.steering_history.append(focus)  # type: ignore[arg-type]
+                    if runtime.question_flow is not None:
+                        runtime.question_flow.steering = focus  # type: ignore[assignment]
+                        if runtime.question_flow.last_options is not None:
+                            next_options = rebuild_next_options_for_steering(
+                                record,
+                                runtime.question_flow.bank,
+                                runtime.question_flow.last_options,
+                                focus,  # type: ignore[arg-type]
+                            )
+                            runtime.question_flow.last_options = next_options
+                            _register_suggested_questions(
+                                record,
+                                [*next_options.follow_up, *next_options.alternatives],
+                            )
+                    save_interview(record)
+                if next_options is not None:
+                    await runtime.send_json(
+                        {"type": "next_options", "payload": next_options.model_dump()}
                     )
             elif event.get("type") == "end":
                 try:

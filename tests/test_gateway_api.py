@@ -2138,6 +2138,59 @@ def test_gateway_websocket_emits_next_options_update_when_llm_refines(
     assert "限流阈值" in update["payload"]["alternatives"][0]["question"]
 
 
+def test_gateway_websocket_set_steering_recomputes_options_and_persists_context(
+    tmp_path: Path, monkeypatch
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+    setup = client.post(
+        "/api/interviews/quick-setup",
+        json={
+            "jd_text": "负责 Python FastAPI 网关、限流、降级和 LLM 编排。",
+            "resume_text": "姓名：候选人\n独立主导网关优化，响应时间提升 50%。",
+        },
+    ).json()
+    interview_id = setup["interview_id"]
+    bank_items = {item["question_id"]: item for item in setup["question_bank"]["items"]}
+
+    with client.websocket_connect(f"/ws/interview/{interview_id}") as websocket:
+        current = websocket.receive_json()
+        websocket.send_json(
+            {
+                "type": "text_turn",
+                "seq": 1,
+                "speaker": "interviewer",
+                "answer": current["payload"]["question"],
+            }
+        )
+        websocket.receive_json()
+        _receive_until(websocket, "question_matched")
+
+        websocket.send_json(
+            {
+                "type": "text_turn",
+                "seq": 2,
+                "speaker": "candidate",
+                "answer": "我亲自写了限流中间件、降级开关和监控指标。",
+            }
+        )
+        websocket.receive_json()
+        _receive_until(websocket, "next_options")
+
+        websocket.send_json({"type": "set_steering", "focus": "resume_drill"})
+        steered, _ = _receive_until(websocket, "next_options", limit=12)
+
+    bank_ids = [
+        option["bank_question_id"]
+        for option in steered["payload"]["alternatives"]
+        if option.get("bank_question_id")
+    ]
+    assert bank_ids
+    assert all(bank_items[question_id]["basis"] in {"resume", "jd_resume"} for question_id in bank_ids)
+    persisted = client.get(f"/api/interviews/{interview_id}").json()
+    assert persisted["context"]["question_steering"] == "resume_drill"
+    assert persisted["context"]["steering_history"][-1] == "resume_drill"
+
+
 def test_gateway_text_turn_works_with_aliyun_ws_provider(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("ASR_PROVIDER", "aliyun_ws")
     monkeypatch.setenv("ALIYUN_ASR_API_KEY", "dashscope-secret")

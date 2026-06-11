@@ -10,7 +10,15 @@ from jinja2 import Template
 
 from libs.common.config import get_settings
 from libs.common.storage import get_artifact_store
-from libs.schemas import AIGCResult, ConsistencyFlag, InterviewContext, InterviewScore, Report
+from libs.common.textsim import normalize_text
+from libs.schemas import (
+    AIGCResult,
+    ConsistencyFlag,
+    InterviewContext,
+    InterviewScore,
+    QuestionAdoptionStats,
+    Report,
+)
 
 
 REPORT_TEMPLATE = Template(
@@ -41,6 +49,16 @@ REPORT_TEMPLATE = Template(
       <section>
         <h2>总评</h2>
         <p>{{ summary }}</p>
+      </section>
+      <section>
+        <h2>问题采纳统计</h2>
+        <p>
+          系统建议 {{ question_adoption.suggested_unique_count }} 题｜
+          采纳 {{ question_adoption.adopted_suggested_count }} 题｜
+          自定义 {{ question_adoption.custom_question_count }} 题｜
+          采纳率 {{ "%.1f"|format(question_adoption.adoption_rate * 100) }}%
+        </p>
+        <p>当前策略：{{ question_adoption.steering_focus }}</p>
       </section>
       {% if candidate_resume_text %}
       <section>
@@ -244,6 +262,28 @@ def _probe_chain_rows(ctx: InterviewContext) -> list[dict]:
     return rows
 
 
+def _question_adoption_stats(ctx: InterviewContext) -> QuestionAdoptionStats:
+    suggested_keys = list(dict.fromkeys(ctx.suggested_question_keys))
+    for turn in ctx.turns:
+        if turn.question_origin != "system_suggested":
+            continue
+        key = turn.asked_option_id or normalize_text(turn.question)
+        if key and key not in suggested_keys:
+            suggested_keys.append(key)
+    adopted_count = sum(1 for turn in ctx.turns if turn.question_origin == "system_suggested")
+    custom_count = sum(1 for turn in ctx.turns if turn.question_origin == "interviewer_custom")
+    asked_count = adopted_count + custom_count
+    adoption_rate = adopted_count / asked_count if asked_count else 0.0
+    return QuestionAdoptionStats(
+        suggested_unique_count=len(suggested_keys),
+        adopted_suggested_count=adopted_count,
+        custom_question_count=custom_count,
+        adoption_rate=round(adoption_rate, 4),
+        steering_focus=ctx.question_steering,
+        steering_history=ctx.steering_history,
+    )
+
+
 def _write_pdf(html: str, pdf_path: Path, fallback_lines: list[str]) -> None:
     try:
         with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
@@ -350,6 +390,7 @@ def _write_report_json(report: Report, json_path: Path) -> None:
 def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCResult]) -> tuple[Report, str]:
     _validate_report_inputs(ctx, score, aigc)
     ordered_utterances = _ordered_utterances(ctx)
+    question_adoption = _question_adoption_stats(ctx)
     summary = (
         f"候选人在本场面试中获得 {score.total_score} 分，系统建议为 {score.recommendation}。"
         "报告中的每项评分均绑定原始回答证据，注水风险需由面试官结合上下文复核。"
@@ -365,6 +406,7 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
         transcript=ctx.turns,
         utterances=ordered_utterances,
         candidate_resume_text=ctx.candidate_resume_text,
+        question_adoption=question_adoption,
         radar_chart_uri=_radar_chart_uri(score),
     )
     settings = get_settings()
@@ -380,6 +422,7 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
                 "qa_turns": [turn.model_dump() for turn in ctx.turns],
                 "full_transcript": [utterance.model_dump() for utterance in ordered_utterances],
                 "probe_chains": [chain.model_dump() for chain in ctx.probe_chains],
+                "question_adoption": question_adoption.model_dump(),
                 "analysis_mode": score.analysis_mode,
             },
             ensure_ascii=False,
@@ -416,6 +459,7 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
         utterances=ordered_utterances,
         probe_chains=ctx.probe_chains,
         candidate_resume_text=ctx.candidate_resume_text,
+        question_adoption=question_adoption,
         summary=summary,
         json_path=str(json_path),
         html_path=str(html_path),
@@ -450,6 +494,14 @@ def _fallback_pdf_lines(
         f"Recommendation: {score.recommendation}",
         f"Analysis mode: {score.analysis_mode}",
     ]
+    question_adoption = _question_adoption_stats(ctx)
+    lines.append(
+        "Question adoption: "
+        f"suggested={question_adoption.suggested_unique_count}, "
+        f"adopted={question_adoption.adopted_suggested_count}, "
+        f"custom={question_adoption.custom_question_count}, "
+        f"rate={question_adoption.adoption_rate:.1%}"
+    )
     if score.analysis_mode == "fallback":
         lines.append(
             "本报告由确定性规则生成（未启用大模型分析），分数仅供链路验证，不可用于招聘决策。"

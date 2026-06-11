@@ -615,6 +615,50 @@ def test_fallback_score_can_build_report_with_risk_penalties(tmp_path: Path, mon
     assert report.score.risk_notes
 
 
+def test_report_includes_question_adoption_stats(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("REPORT_DIR", str(tmp_path / "reports"))
+    get_settings.cache_clear()
+    model = generate_competency_model("job-local", "Backend", "Python FastAPI")
+    suggested = QATurn(
+        question="请讲你在网关系统里亲自写了哪段代码？",
+        answer="我写了限流中间件。",
+        answer_start_ms=100,
+        answer_end_ms=1200,
+        asked_option_id="bank-1",
+        question_origin="system_suggested",
+    )
+    custom = QATurn(
+        question="你怎么看团队协作？",
+        answer="我会主动同步风险。",
+        answer_start_ms=1300,
+        answer_end_ms=1900,
+        question_origin="interviewer_custom",
+    )
+    ctx = InterviewContext(
+        session_id="session-question-adoption",
+        job_id=model.job_id,
+        candidate_id="candidate-local",
+        competency_model=model,
+        turns=[suggested, custom],
+        question_steering="resume_drill",
+        steering_history=["resume_drill"],
+        suggested_question_keys=["bank-1", "bank-2", "bank-2"],
+    )
+    aigc_results = _aigc_results_for(suggested, custom)
+    score = fallback_score_interview(ctx, aigc_results)
+
+    report, html = build_report(ctx, score, aigc_results)
+
+    assert report.question_adoption.suggested_unique_count == 2
+    assert report.question_adoption.adopted_suggested_count == 1
+    assert report.question_adoption.custom_question_count == 1
+    assert report.question_adoption.adoption_rate == 0.5
+    assert report.question_adoption.steering_focus == "resume_drill"
+    assert "问题采纳统计" in html
+    report_json = loads(Path(report.json_path or "").read_text(encoding="utf-8"))
+    assert report_json["question_adoption"]["adoption_rate"] == 0.5
+
+
 def test_report_pdf_fallback_contains_auditable_summary(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("REPORT_DIR", str(tmp_path / "reports"))
     get_settings.cache_clear()

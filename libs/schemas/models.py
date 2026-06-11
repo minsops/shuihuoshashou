@@ -289,6 +289,11 @@ class InterviewContext(BaseModel):
     ended_at: datetime | None = None
     fact_claims: list[FactClaim] = Field(default_factory=list)
     flags: list[ConsistencyFlag] = Field(default_factory=list)
+    question_steering: Literal["balanced", "resume_drill", "jd_professional"] = "balanced"
+    steering_history: list[Literal["balanced", "resume_drill", "jd_professional"]] = Field(
+        default_factory=list
+    )
+    suggested_question_keys: list[str] = Field(default_factory=list)
 
     @field_validator("session_id", "job_id", "candidate_id")
     @classmethod
@@ -308,6 +313,13 @@ class InterviewContext(BaseModel):
         if len(utterance_ids) != len(set(utterance_ids)):
             raise ValueError("interview context utterances must not contain duplicate utterance_id values")
         return self
+
+    @field_validator("suggested_question_keys")
+    @classmethod
+    def suggested_question_keys_are_not_blank(cls, value: list[str]) -> list[str]:
+        for item in value:
+            _not_blank(item, "suggested question key")
+        return value
 
     @model_validator(mode="after")
     def probe_chain_ids_are_unique(self) -> "InterviewContext":
@@ -918,6 +930,17 @@ class OfflineTaskAccepted(BaseModel):
         return _not_blank(value, info.field_name)
 
 
+class QuestionAdoptionStats(BaseModel):
+    suggested_unique_count: int = Field(default=0, ge=0)
+    adopted_suggested_count: int = Field(default=0, ge=0)
+    custom_question_count: int = Field(default=0, ge=0)
+    adoption_rate: float = Field(default=0.0, ge=0.0, le=1.0)
+    steering_focus: Literal["balanced", "resume_drill", "jd_professional"] = "balanced"
+    steering_history: list[Literal["balanced", "resume_drill", "jd_professional"]] = Field(
+        default_factory=list
+    )
+
+
 class Report(BaseModel):
     interview_id: str
     score: InterviewScore
@@ -928,6 +951,7 @@ class Report(BaseModel):
     utterances: list[Utterance] = Field(default_factory=list)
     probe_chains: list[ProbeChain] = Field(default_factory=list)
     candidate_resume_text: str = ""
+    question_adoption: QuestionAdoptionStats = Field(default_factory=QuestionAdoptionStats)
     summary: str
     json_path: str | None = None
     html_path: str | None = None
