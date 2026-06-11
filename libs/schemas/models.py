@@ -235,6 +235,7 @@ class QATurn(BaseModel):
     probe_target: str | None = None
     question_utterance_id: str | None = None
     answer_utterance_id: str | None = None
+    probe_chain_id: str | None = None
 
     @model_validator(mode="after")
     def answer_timestamps_are_monotonic(self) -> "QATurn":
@@ -255,7 +256,7 @@ class QATurn(BaseModel):
     def turn_id_is_not_blank(cls, value: str) -> str:
         return _not_blank(value, "turn_id")
 
-    @field_validator("question_utterance_id", "answer_utterance_id")
+    @field_validator("question_utterance_id", "answer_utterance_id", "probe_chain_id")
     @classmethod
     def utterance_ids_are_not_blank(cls, value: str | None, info: ValidationInfo) -> str | None:
         if value is not None:
@@ -306,9 +307,13 @@ class InterviewContext(BaseModel):
         chain_ids = [chain.chain_id for chain in self.probe_chains]
         if len(chain_ids) != len(set(chain_ids)):
             raise ValueError("interview context probe_chains must not contain duplicate chain_id values")
+        chain_id_set = set(chain_ids)
         for chain in self.probe_chains:
             if chain.interview_id != self.session_id:
                 raise ValueError("probe chain interview_id must match interview context session_id")
+        for turn in self.turns:
+            if turn.probe_chain_id and turn.probe_chain_id not in chain_id_set:
+                raise ValueError(f"QATurn references unknown probe_chain_id: {turn.probe_chain_id}")
         return self
 
     @model_validator(mode="after")
@@ -380,6 +385,7 @@ class ProbeRequest(BaseModel):
     recent_turns: list[QATurn]
     latest_answer: str
     resume_claims: list[ResumeClaim] = Field(default_factory=list)
+    probe_chains: list[ProbeChain] = Field(default_factory=list)
 
     @field_validator("job_id")
     @classmethod
@@ -407,10 +413,14 @@ class ProbeSuggestion(BaseModel):
     target: str
     competency: str
     priority: int = Field(ge=1, le=3)
+    chain_id: str | None = None
+    chain_label: str | None = None
 
-    @field_validator("question", "target", "competency")
+    @field_validator("question", "target", "competency", "chain_id", "chain_label")
     @classmethod
-    def text_fields_are_not_blank(cls, value: str) -> str:
+    def text_fields_are_not_blank(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         return _not_blank(value, "probe suggestion text")
 
 
@@ -874,5 +884,9 @@ class Report(BaseModel):
                     raise ValueError(
                         f"report probe chain link references unknown turn_id: {link.answer_turn_id}"
                     )
+        report_chain_ids = {chain.chain_id for chain in self.probe_chains}
+        for turn in self.transcript:
+            if turn.probe_chain_id and turn.probe_chain_id not in report_chain_ids:
+                raise ValueError(f"report transcript references unknown probe_chain_id: {turn.probe_chain_id}")
         _validate_aigc_results_cover_turn_ids(transcript_turn_ids, self.aigc_results)
         return self

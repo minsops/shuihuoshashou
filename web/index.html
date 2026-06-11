@@ -278,7 +278,7 @@
 
       .session-strip {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: var(--space-xs);
         padding: var(--space-md);
         border-bottom: 1px solid var(--line);
@@ -305,6 +305,18 @@
         text-overflow: ellipsis;
         white-space: nowrap;
         font-size: 14px;
+      }
+
+      .metric-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .metric-links a {
+        color: var(--teal-deep);
+        font-size: 12px;
+        text-decoration: none;
       }
 
       .status-pill {
@@ -780,6 +792,10 @@
             <span>面试轮次</span>
             <strong id="metricTurns">0</strong>
           </div>
+          <div class="metric">
+            <span>双设备</span>
+            <strong class="metric-links" id="roleLinks">待创建</strong>
+          </div>
         </div>
         <form id="interviewForm">
           <label>
@@ -894,6 +910,7 @@
       const metricJob = document.querySelector("#metricJob");
       const metricCandidate = document.querySelector("#metricCandidate");
       const metricTurns = document.querySelector("#metricTurns");
+      const roleLinks = document.querySelector("#roleLinks");
       const prepareInterview = document.querySelector("#prepareInterview");
       const sendAnswer = document.querySelector("#sendAnswer");
       const startMic = document.querySelector("#startMic");
@@ -905,6 +922,8 @@
       const speakerCandidate = document.querySelector("#speakerCandidate");
       const speakerInterviewer = document.querySelector("#speakerInterviewer");
 
+      const initialRole = new URLSearchParams(window.location.search).get("role");
+
       const state = {
         job: null,
         candidate: null,
@@ -915,9 +934,10 @@
         prepareSessionToken: 0,
         seq: 1,
         turns: 0,
-        currentSpeaker: "candidate",
+        currentSpeaker: initialRole === "interviewer" ? "interviewer" : "candidate",
         selectedQuestionSource: "interviewer",
         selectedProbeTarget: null,
+        selectedProbeChainId: null,
         selectedCompetency: null,
         interviewEnded: false,
         endingInterview: false,
@@ -1991,12 +2011,13 @@
         probeList.innerHTML = suggestions
           .map(
             (item, index) => `
-              <div class="probe-card">
-                <div class="probe-top">
-                  <span class="tag amber">P${escapeHtml(item.priority || index + 1)}</span>
-                  <span class="tag blue">${escapeHtml(item.competency)}</span>
-                </div>
-                <h3>${escapeHtml(item.question)}</h3>
+	              <div class="probe-card">
+	                <div class="probe-top">
+	                  <span class="tag amber">P${escapeHtml(item.priority || index + 1)}</span>
+	                  <span class="tag blue">${escapeHtml(item.competency)}</span>
+	                  ${item.chain_label ? `<span class="tag">${escapeHtml(item.chain_label)}</span>` : ""}
+	                </div>
+	                <h3>${escapeHtml(item.question)}</h3>
                 <p>${escapeHtml(item.target)}</p>
                 <button class="secondary" type="button" data-probe-index="${index}" title="将此追问填入当前面试问题" aria-label="将此追问设为下一问">设为下一问</button>
               </div>
@@ -2007,10 +2028,11 @@
           button.addEventListener("click", () => {
             const item = suggestions[Number(button.dataset.probeIndex)];
             selectQuestion(item.question, {
-              questionSource: "ai_probe",
-              probeTarget: item.target,
-              competency: item.competency,
-            });
+	              questionSource: "ai_probe",
+	              probeTarget: item.target,
+	              probeChainId: item.chain_id || null,
+	              competency: item.competency,
+	            });
           });
         });
       }
@@ -2046,6 +2068,7 @@
         updateTextCounters();
         state.selectedQuestionSource = meta.questionSource || "interviewer";
         state.selectedProbeTarget = meta.probeTarget || null;
+        state.selectedProbeChainId = meta.probeChainId || null;
         state.selectedCompetency = meta.competency || null;
         appendEvent(
           "下一问",
@@ -2058,9 +2081,11 @@
         const hadProbeMeta =
           state.selectedQuestionSource !== "interviewer" ||
           state.selectedProbeTarget ||
+          state.selectedProbeChainId ||
           state.selectedCompetency;
         state.selectedQuestionSource = "interviewer";
         state.selectedProbeTarget = null;
+        state.selectedProbeChainId = null;
         state.selectedCompetency = null;
         if (hadProbeMeta) {
           appendEvent("下一问", "已改为手动编辑问题，将按面试官自定义问题记录。");
@@ -2132,6 +2157,7 @@
           state.interview = interview;
           metricJob.textContent = job.title;
           metricCandidate.textContent = candidate.name;
+          renderRoleLinks();
           renderCompetencies(job);
           renderProbeChains((interview.context && interview.context.probe_chains) || []);
           await openSocketWithLatestGateway(interview.id, () =>
@@ -2144,6 +2170,100 @@
           if (!prepareSessionStillCurrent(prepareToken)) return;
           setPill(setupStatus, "创建失败", "");
           appendEvent("错误", escapeHtml(errorText(error)), "red");
+        } finally {
+          if (prepareSessionStillCurrent(prepareToken)) {
+            state.preparingInterview = false;
+            setControls();
+          }
+        }
+      }
+
+      function joinInterviewIdFromUrl() {
+        const params = new URLSearchParams(window.location.search);
+        return (params.get("join") || params.get("interview_id") || "").trim();
+      }
+
+      function roleFromUrl() {
+        const role = new URLSearchParams(window.location.search).get("role");
+        return role === "interviewer" ? "interviewer" : "candidate";
+      }
+
+      function roleJoinUrl(role) {
+        const url = new URL(window.location.href);
+        url.searchParams.set("join", state.interview.id);
+        url.searchParams.set("role", role);
+        return url.toString();
+      }
+
+      function renderRoleLinks() {
+        if (!state.interview) {
+          roleLinks.textContent = "待创建";
+          return;
+        }
+        const interviewerUrl = roleJoinUrl("interviewer");
+        const candidateUrl = roleJoinUrl("candidate");
+        roleLinks.innerHTML = `
+          <a href="${escapeHtml(interviewerUrl)}" target="_blank" rel="noreferrer">面试官</a>
+          <a href="${escapeHtml(candidateUrl)}" target="_blank" rel="noreferrer">候选人</a>
+        `;
+      }
+
+      async function joinExistingInterviewFromUrl() {
+        const interviewId = joinInterviewIdFromUrl();
+        if (!interviewId || state.interview) return;
+        const prepareToken = state.prepareSessionToken + 1;
+        state.prepareSessionToken = prepareToken;
+        state.preparingInterview = true;
+        state.startedAt = Date.now();
+        setCurrentSpeaker(roleFromUrl());
+        setPill(setupStatus, "加入中", "live");
+        setControls();
+        try {
+          await discoverGateway();
+          if (!prepareSessionStillCurrent(prepareToken)) return;
+          const interview = await fetchGatewayJson(`/api/interviews/${encodeURIComponent(interviewId)}`, {
+            timeoutMs: prepareSessionTimeoutMs,
+          });
+          if (!prepareSessionStillCurrent(prepareToken)) return;
+          let job = {
+            id: interview.job_id,
+            title: `岗位 ${String(interview.job_id).slice(0, 8)}`,
+            competency_model: interview.context && interview.context.competency_model,
+          };
+          try {
+            job = await fetchGatewayJson(`/api/jobs/${encodeURIComponent(interview.job_id)}`, {
+              timeoutMs: prepareSessionTimeoutMs,
+            });
+          } catch (error) {
+            appendEvent("加入面试", "岗位详情暂未取回，使用面试上下文中的能力模型。");
+          }
+          if (!prepareSessionStillCurrent(prepareToken)) return;
+          state.interview = interview;
+          state.job = job;
+          state.candidate = {
+            id: interview.candidate_id,
+            name: `候选人 ${String(interview.candidate_id).slice(0, 8)}`,
+          };
+          state.seq = 1;
+          state.turns = Array.isArray(interview.context && interview.context.turns)
+            ? interview.context.turns.length
+            : 0;
+          metricJob.textContent = job.title || "已加入";
+          metricCandidate.textContent = state.candidate.name;
+          metricTurns.textContent = String(state.turns);
+          renderRoleLinks();
+          renderCompetencies(job);
+          renderProbeChains((interview.context && interview.context.probe_chains) || []);
+          await openSocketWithLatestGateway(interview.id, () =>
+            prepareSessionStillCurrent(prepareToken)
+          );
+          if (!prepareSessionStillCurrent(prepareToken)) return;
+          setPill(setupStatus, "已加入面试", "ready");
+          appendEvent("加入面试", `${escapeHtml(metricJob.textContent)} · ${escapeHtml(state.currentSpeaker)}`);
+        } catch (error) {
+          if (!prepareSessionStillCurrent(prepareToken)) return;
+          setPill(setupStatus, "加入失败", "");
+          appendEvent("加入面试失败", escapeHtml(errorText(error)), "red");
         } finally {
           if (prepareSessionStillCurrent(prepareToken)) {
             state.preparingInterview = false;
@@ -2310,6 +2430,7 @@
           question: currentQuestion.value.trim(),
           question_source: state.selectedQuestionSource,
           probe_target: state.selectedProbeTarget,
+          chain_id: state.selectedProbeChainId,
         };
       }
 
@@ -3143,6 +3264,7 @@
         state.reportDownloadInFlight.clear();
         state.selectedQuestionSource = "interviewer";
         state.selectedProbeTarget = null;
+        state.selectedProbeChainId = null;
         state.selectedCompetency = null;
         state.currentSpeaker = "candidate";
         state.micStarting = false;
@@ -3153,6 +3275,7 @@
         metricJob.textContent = "待创建";
         metricCandidate.textContent = "待创建";
         metricTurns.textContent = "0";
+        renderRoleLinks();
         currentQuestion.value = "";
         answerText.value = "";
         updateTextCounters();
@@ -3214,7 +3337,11 @@
 
       gatewayKey.value = state.gatewayApiKey;
       checkRuntime();
-      loadSample();
+      if (joinInterviewIdFromUrl()) {
+        joinExistingInterviewFromUrl();
+      } else {
+        loadSample();
+      }
       updateTextCounters();
       setControls();
     </script>

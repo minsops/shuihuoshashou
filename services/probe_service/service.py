@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from libs.common.prompts import load_prompt
 from libs.llm_client import LLMMessage, get_llm_client
-from libs.schemas import CredibilitySignal, ProbeRequest, ProbeResponse, ProbeSuggestion
+from libs.schemas import CredibilitySignal, ProbeChain, ProbeRequest, ProbeResponse, ProbeSuggestion
 from services.jd_kb_service.service import retrieve_job_probe_patterns, retrieve_probe_patterns
 
 
@@ -41,6 +41,7 @@ def fallback_probe(request: ProbeRequest) -> ProbeResponse:
         pattern_hits = retrieve_probe_patterns(request.competency_model, query, limit=3)
     for index, item in enumerate(request.competency_model.items[:3], start=1):
         hit = next((candidate for candidate in pattern_hits if candidate.competency == item.name), None)
+        chain = _chain_for_suggestion(request.probe_chains, index=index, competency=item.name)
         question = (
             hit.pattern
             if hit is not None
@@ -55,6 +56,8 @@ def fallback_probe(request: ProbeRequest) -> ProbeResponse:
                 target="验证项目真实性" if item.name == "项目真实性" else "测试能力深度",
                 competency=item.name,
                 priority=index,
+                chain_id=chain.chain_id if chain is not None else None,
+                chain_label=_chain_label(chain) if chain is not None else None,
             )
         )
     return ProbeResponse(suggestions=suggestions, credibility=credibility)
@@ -67,15 +70,66 @@ async def generate_probe(request: ProbeRequest) -> ProbeResponse:
         LLMMessage(role="user", content=request.model_dump_json()),
     ]
     draft = await get_llm_client().complete_json(messages, ProbeResponse, fallback)
-    return _normalize_probe_response(draft)
+    return _normalize_probe_response(draft, fallback)
 
 
-def _normalize_probe_response(response: ProbeResponse) -> ProbeResponse:
+def _normalize_probe_response(response: ProbeResponse, fallback: ProbeResponse | None = None) -> ProbeResponse:
     suggestions = [
-        suggestion.model_copy(update={"priority": index})
+        _merge_fallback_chain_fields(suggestion, fallback, index).model_copy(update={"priority": index})
         for index, suggestion in enumerate(
             sorted(response.suggestions, key=lambda item: item.priority),
             start=1,
         )
     ]
     return ProbeResponse(suggestions=suggestions, credibility=response.credibility)
+
+
+def _chain_for_suggestion(
+    chains: list[ProbeChain],
+    *,
+    index: int,
+    competency: str,
+) -> ProbeChain | None:
+    if not chains:
+        return None
+    unresolved = [chain for chain in chains if chain.verdict == "unresolved"]
+    candidates = unresolved or chains
+    if competency == "项目真实性":
+        resume_chain = next((chain for chain in candidates if chain.origin == "resume_claim"), None)
+        if resume_chain is not None:
+            return resume_chain
+    if index - 1 < len(candidates):
+        return candidates[index - 1]
+    return candidates[0]
+
+
+def _chain_label(chain: ProbeChain) -> str:
+    origin_label = {
+        "resume_claim": "简历核验链",
+        "answer_claim": "回答声明链",
+        "competency_gap": "能力缺口链",
+    }[chain.origin]
+    return f"{origin_label} · 第 {len(chain.links) + 1} 层"
+
+
+def _merge_fallback_chain_fields(
+    suggestion: ProbeSuggestion,
+    fallback: ProbeResponse | None,
+    priority: int,
+) -> ProbeSuggestion:
+    if suggestion.chain_id and suggestion.chain_label:
+        return suggestion
+    if fallback is None:
+        return suggestion
+    fallback_suggestion = next(
+        (item for item in fallback.suggestions if item.priority == priority),
+        None,
+    )
+    if fallback_suggestion is None:
+        return suggestion
+    return suggestion.model_copy(
+        update={
+            "chain_id": suggestion.chain_id or fallback_suggestion.chain_id,
+            "chain_label": suggestion.chain_label or fallback_suggestion.chain_label,
+        }
+    )

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from typing import Literal
 
+from libs.common.config import get_settings
 from libs.common.prompts import load_prompt
 from libs.llm_client import LLMMessage, get_llm_client
 from libs.schemas import AIGCResult, DimensionScore, EvidenceRef, InterviewContext, InterviewScore, QATurn
@@ -66,14 +67,15 @@ def fallback_score_interview(
     if flagged_aigc:
         risk_penalty += min(18.0, 6.0 * len(flagged_aigc))
         risk_notes.append("部分回答疑似模板化或 AI 生成，需要人工复核。")
+    settings = get_settings()
     cracked_chains = [chain for chain in ctx.probe_chains if chain.verdict == "cracked"]
     held_up_chains = [chain for chain in ctx.probe_chains if chain.verdict == "held_up"]
     if cracked_chains:
-        risk_penalty += min(24.0, 8.0 * len(cracked_chains))
+        risk_penalty += min(24.0, settings.chain_crack_penalty * len(cracked_chains))
         for chain in cracked_chains:
             depth = chain.crack_depth or len(chain.links)
             risk_notes.append(f"声明「{chain.topic}」在第 {depth} 层追问露馅。")
-    held_up_bonus = min(9.0, 3.0 * len(held_up_chains))
+    held_up_bonus = min(9.0, settings.chain_held_up_bonus * len(held_up_chains))
 
     dimensions: list[DimensionScore] = []
     for item in ctx.competency_model.items:

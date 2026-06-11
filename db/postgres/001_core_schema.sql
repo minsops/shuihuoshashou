@@ -73,6 +73,7 @@ CREATE TABLE IF NOT EXISTS qa_turns (
     probe_target TEXT CHECK (probe_target IS NULL OR btrim(probe_target) <> ''),
     question_utterance_id UUID REFERENCES utterances(id) ON DELETE SET NULL,
     answer_utterance_id UUID REFERENCES utterances(id) ON DELETE SET NULL,
+    probe_chain_id UUID REFERENCES probe_chains(id) ON DELETE SET NULL,
     payload JSONB NOT NULL,
     UNIQUE (interview_id, turn_index)
 );
@@ -81,6 +82,8 @@ ALTER TABLE IF EXISTS qa_turns
     ADD COLUMN IF NOT EXISTS question_utterance_id UUID REFERENCES utterances(id) ON DELETE SET NULL;
 ALTER TABLE IF EXISTS qa_turns
     ADD COLUMN IF NOT EXISTS answer_utterance_id UUID REFERENCES utterances(id) ON DELETE SET NULL;
+ALTER TABLE IF EXISTS qa_turns
+    ADD COLUMN IF NOT EXISTS probe_chain_id UUID REFERENCES probe_chains(id) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS probe_patterns (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

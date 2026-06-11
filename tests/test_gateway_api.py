@@ -70,6 +70,10 @@ def test_gateway_offline_report_flow(tmp_path: Path, monkeypatch) -> None:
         json={"job_id": job["id"], "candidate_id": candidate["id"]},
     ).json()
     assert interview["context"]["candidate_resume_text"] == "AI backend"
+    detail = client.get(f"/api/interviews/{interview['id']}")
+    assert detail.status_code == 200
+    assert detail.json()["id"] == interview["id"]
+    assert detail.json()["context"]["candidate_resume_text"] == "AI backend"
     client.post(
         f"/api/interviews/{interview['id']}/turns",
         json={
@@ -93,7 +97,7 @@ def test_gateway_offline_report_flow(tmp_path: Path, monkeypatch) -> None:
     transcript = client.get(f"/api/interviews/{interview['id']}/report.transcript.json")
     assert transcript.status_code == 200
     assert transcript.headers["content-type"].startswith("application/json")
-    assert transcript.json()[0]["answer"] == "我主要负责整体架构设计并推动项目落地最终取得显著提升"
+    assert transcript.json()["qa_turns"][0]["answer"] == "我主要负责整体架构设计并推动项目落地最终取得显著提升"
     pdf = client.get(f"/api/interviews/{interview['id']}/report.pdf")
     assert pdf.status_code == 200
     assert pdf.headers["content-type"] == "application/pdf"
@@ -257,7 +261,9 @@ def test_gateway_report_transcript_falls_back_to_persisted_payload_when_artifact
     assert response.headers["content-disposition"] == (
         f'attachment; filename="{interview["id"]}.transcript.json"'
     )
-    assert response.json() == report["transcript"]
+    payload = response.json()
+    assert payload["qa_turns"] == report["transcript"]
+    assert payload["full_transcript"] == report["utterances"]
 
 
 def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
@@ -269,6 +275,15 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "创建实时面试" in response.text
     assert "专业追问" in response.text
     assert "/ws/interview/" in response.text
+    assert 'id="roleLinks"' in response.text
+    assert "joinExistingInterviewFromUrl" in response.text
+    assert "joinInterviewIdFromUrl" in response.text
+    assert "roleFromUrl" in response.text
+    assert 'url.searchParams.set("join", state.interview.id)' in response.text
+    assert 'url.searchParams.set("role", role)' in response.text
+    assert 'fetchGatewayJson(`/api/interviews/${encodeURIComponent(interviewId)}`' in response.text
+    assert "selectedProbeChainId" in response.text
+    assert "chain_id: state.selectedProbeChainId" in response.text
     assert "asr_warning" in response.text
     assert "开始麦克风" in response.text
     assert "停止麦克风" in response.text

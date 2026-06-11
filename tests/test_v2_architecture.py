@@ -9,6 +9,7 @@ from libs.schemas import (
     InterviewCreate,
     JobCreate,
     ProbeChain,
+    ProbeRequest,
     QATurn,
     TranscriptSegment,
     Utterance,
@@ -22,10 +23,12 @@ from services.interview_orchestrator.service import (
     add_utterance,
     create_candidate,
     create_interview,
+    get_interview,
     list_turns,
     list_utterances,
 )
 from services.jd_kb_service.service import create_job
+from services.probe_service.service import fallback_probe
 from services.scoring_service.service import fallback_score_interview
 
 
@@ -188,3 +191,47 @@ def test_utterance_and_turn_refs_are_persisted(tmp_path, monkeypatch) -> None:
     persisted_turn = list_turns(interview.id)[0]
     assert persisted_turn.question_utterance_id == question.utterance_id
     assert persisted_turn.answer_utterance_id == answer.utterance_id
+
+
+def test_probe_suggestion_chain_id_is_persisted_when_answered(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'chain.db'}")
+    get_settings.cache_clear()
+    init_db()
+    job = create_job(JobCreate(title="AI 后端", jd_text="FastAPI LLM"))
+    candidate = create_candidate(
+        CandidateCreate(name="候选人", resume_text="独立主导网关优化，响应时间提升 50%")
+    )
+    interview = create_interview(InterviewCreate(job_id=job.id, candidate_id=candidate.id))
+    chain = interview.context.probe_chains[0]
+    response = fallback_probe(
+        ProbeRequest(
+            job_id=job.id,
+            competency_model=job.competency_model,
+            latest_answer="我主要负责优化，效果比较明显。",
+            recent_turns=[],
+            probe_chains=interview.context.probe_chains,
+        )
+    )
+    suggestion = response.suggestions[0]
+
+    assert suggestion.chain_id == chain.chain_id
+    assert suggestion.chain_label
+
+    add_turn(
+        interview.id,
+        QATurn(
+            question=suggestion.question,
+            question_source="ai_probe",
+            answer="记不清了，主要是团队一起做的。",
+            answer_start_ms=0,
+            answer_end_ms=1000,
+            probe_target=suggestion.target,
+            probe_chain_id=suggestion.chain_id,
+        ),
+    )
+    persisted = get_interview(interview.id)
+    persisted_chain = persisted.context.probe_chains[0]
+
+    assert persisted.context.turns[0].probe_chain_id == chain.chain_id
+    assert persisted_chain.links[0].answer_turn_id == persisted.context.turns[0].turn_id
+    assert persisted_chain.links[0].credibility_after == "suspicious"

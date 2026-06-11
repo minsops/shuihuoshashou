@@ -29,6 +29,7 @@ class DialogueAssembler:
         self._fallback_question = FALLBACK_QUESTION
         self._question_source: Literal["interviewer", "ai_probe"] = "interviewer"
         self._probe_target: str | None = None
+        self._probe_chain_id: str | None = None
 
     def feed(
         self,
@@ -37,6 +38,7 @@ class DialogueAssembler:
         fallback_question: str | None = None,
         question_source: str = "interviewer",
         probe_target: str | None = None,
+        probe_chain_id: str | None = None,
         force_close: bool = False,
     ) -> DialogueFeedResult:
         if not segment.is_final:
@@ -46,7 +48,13 @@ class DialogueAssembler:
             "ai_probe" if question_source == "ai_probe" else "interviewer"
         )
         if not self._buffer:
-            self._start_buffer(segment, fallback_question, normalized_source, probe_target)
+            self._start_buffer(
+                segment,
+                fallback_question,
+                normalized_source,
+                probe_target,
+                probe_chain_id,
+            )
             if force_close:
                 return self._seal_current()
             return DialogueFeedResult()
@@ -54,13 +62,24 @@ class DialogueAssembler:
         result = DialogueFeedResult()
         if self._continues_current_utterance(segment):
             self._buffer.append(segment)
-            self._merge_buffer_metadata(fallback_question, normalized_source, probe_target)
+            self._merge_buffer_metadata(
+                fallback_question,
+                normalized_source,
+                probe_target,
+                probe_chain_id,
+            )
             if force_close:
                 result.extend(self._seal_current())
             return result
 
         result.extend(self._seal_current())
-        self._start_buffer(segment, fallback_question, normalized_source, probe_target)
+        self._start_buffer(
+            segment,
+            fallback_question,
+            normalized_source,
+            probe_target,
+            probe_chain_id,
+        )
         if force_close:
             result.extend(self._seal_current())
         return result
@@ -76,17 +95,20 @@ class DialogueAssembler:
         fallback_question: str | None,
         question_source: Literal["interviewer", "ai_probe"],
         probe_target: str | None,
+        probe_chain_id: str | None,
     ) -> None:
         self._buffer = [segment]
         self._fallback_question = _clean_question(fallback_question)
         self._question_source = question_source
         self._probe_target = _clean_optional(probe_target)
+        self._probe_chain_id = _clean_optional(probe_chain_id)
 
     def _merge_buffer_metadata(
         self,
         fallback_question: str | None,
         question_source: Literal["interviewer", "ai_probe"],
         probe_target: str | None,
+        probe_chain_id: str | None,
     ) -> None:
         clean_question = _clean_question(fallback_question)
         if self._fallback_question == FALLBACK_QUESTION and clean_question != FALLBACK_QUESTION:
@@ -96,6 +118,9 @@ class DialogueAssembler:
         clean_probe_target = _clean_optional(probe_target)
         if self._probe_target is None and clean_probe_target is not None:
             self._probe_target = clean_probe_target
+        clean_chain_id = _clean_optional(probe_chain_id)
+        if self._probe_chain_id is None and clean_chain_id is not None:
+            self._probe_chain_id = clean_chain_id
 
     def _continues_current_utterance(self, segment: TranscriptSegment) -> bool:
         last = self._buffer[-1]
@@ -109,10 +134,12 @@ class DialogueAssembler:
         fallback_question = self._fallback_question
         question_source = self._question_source
         probe_target = self._probe_target
+        probe_chain_id = self._probe_chain_id
         self._buffer = []
         self._fallback_question = FALLBACK_QUESTION
         self._question_source = "interviewer"
         self._probe_target = None
+        self._probe_chain_id = None
 
         result = DialogueFeedResult(utterances=[utterance])
         if utterance.speaker == "interviewer":
@@ -135,8 +162,9 @@ class DialogueAssembler:
                 answer_end_ms=utterance.end_ms,
                 probe_target=resolved_probe_target,
                 question_utterance_id=question_utterance_id,
-                answer_utterance_id=utterance.utterance_id,
-            )
+            answer_utterance_id=utterance.utterance_id,
+            probe_chain_id=probe_chain_id,
+        )
         )
         return result
 

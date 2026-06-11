@@ -130,6 +130,7 @@ class _AliyunAudioContext:
     question: str
     question_source: str
     probe_target: str | None
+    probe_chain_id: str | None
 
 
 @asynccontextmanager
@@ -527,6 +528,7 @@ def _probe_request_for_turn(record, turn: QATurn) -> ProbeRequest:
         recent_turns=record.context.turns[-5:],
         latest_answer=turn.answer,
         resume_claims=_resume_claims_for_probe(record),
+        probe_chains=record.context.probe_chains,
     )
 
 
@@ -630,6 +632,11 @@ def _event_question_source(event: dict) -> str:
 
 def _event_probe_target(event: dict) -> str | None:
     value = str(event.get("probe_target") or "").strip()
+    return value or None
+
+
+def _event_probe_chain_id(event: dict) -> str | None:
+    value = str(event.get("chain_id") or event.get("probe_chain_id") or "").strip()
     return value or None
 
 
@@ -877,6 +884,14 @@ def api_create_interview(payload: InterviewCreate):
         raise HTTPException(status_code=403, detail=str(exc)) from exc
 
 
+@app.get("/api/interviews/{interview_id}")
+def api_get_interview(interview_id: str):
+    try:
+        return get_interview(interview_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @app.post("/api/interviews/{interview_id}/start")
 def api_start_interview(interview_id: str):
     try:
@@ -1072,6 +1087,7 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
         fallback_question: str | None = None,
         question_source: str = "interviewer",
         probe_target: str | None = None,
+        probe_chain_id: str | None = None,
         force_close: bool = False,
         emit_probe: bool = True,
     ) -> None:
@@ -1080,6 +1096,7 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
             fallback_question=fallback_question,
             question_source=question_source,
             probe_target=probe_target,
+            probe_chain_id=probe_chain_id,
             force_close=force_close,
         )
         await persist_dialogue_result(result, emit_probe=emit_probe)
@@ -1141,6 +1158,7 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                 fallback_question=context.question if context is not None else "实时语音片段",
                 question_source=context.question_source if context is not None else "interviewer",
                 probe_target=context.probe_target if context is not None else None,
+                probe_chain_id=context.probe_chain_id if context is not None else None,
             )
 
     try:
@@ -1194,6 +1212,7 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                             question=_event_question(event),
                             question_source=_event_question_source(event),
                             probe_target=_event_probe_target(event),
+                            probe_chain_id=_event_probe_chain_id(event),
                         )
                     )
                     if len(aliyun_audio_contexts) > ALIYUN_AUDIO_CONTEXT_LIMIT:
@@ -1244,6 +1263,7 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                     fallback_question=_event_question(event),
                     question_source=_event_question_source(event),
                     probe_target=_event_probe_target(event),
+                    probe_chain_id=_event_probe_chain_id(event),
                 )
             elif event.get("type") == "text_turn":
                 seq = _event_seq(event, 1)
@@ -1294,6 +1314,7 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                     fallback_question=_event_question(event),
                     question_source=_event_question_source(event),
                     probe_target=_event_probe_target(event),
+                    probe_chain_id=_event_probe_chain_id(event),
                     force_close=True,
                 )
             elif event.get("type") == "manual_probe":
@@ -1313,6 +1334,7 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                     fallback_question=_event_question(event),
                     question_source=_event_question_source(event),
                     probe_target=_event_probe_target(event),
+                    probe_chain_id=_event_probe_chain_id(event),
                     force_close=True,
                 )
             elif event.get("type") == "end":

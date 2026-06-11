@@ -292,6 +292,7 @@ def add_turn(interview_id: str, turn: QATurn) -> InterviewRecord:
     record.context.fact_claims.append(extract_fact_claim(turn))
     record.context.flags = detect_claim_conflicts(record.context.fact_claims)
     _update_probe_chains_for_turn(record, turn)
+    _apply_consistency_conflicts_to_chains(record)
     save_interview(record)
     with connect() as conn:
         conn.execute(
@@ -299,8 +300,8 @@ def add_turn(interview_id: str, turn: QATurn) -> InterviewRecord:
             INSERT OR REPLACE INTO qa_turns
             (id, interview_id, turn_index, question, question_source, answer,
              answer_start_ms, answer_end_ms, probe_target, question_utterance_id,
-             answer_utterance_id, payload)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             answer_utterance_id, probe_chain_id, payload)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 turn.turn_id,
@@ -314,6 +315,7 @@ def add_turn(interview_id: str, turn: QATurn) -> InterviewRecord:
                 turn.probe_target,
                 turn.question_utterance_id,
                 turn.answer_utterance_id,
+                turn.probe_chain_id,
                 dumps(turn.model_dump()),
             ),
         )
@@ -365,7 +367,7 @@ def list_turns(interview_id: str) -> list[QATurn]:
         rows = conn.execute(
             """
             SELECT id, question, question_source, answer, answer_start_ms, answer_end_ms,
-                   probe_target, question_utterance_id, answer_utterance_id, payload
+                   probe_target, question_utterance_id, answer_utterance_id, probe_chain_id, payload
             FROM qa_turns
             WHERE interview_id = ?
             ORDER BY turn_index
@@ -388,6 +390,7 @@ def list_turns(interview_id: str) -> list[QATurn]:
                 probe_target=row["probe_target"],
                 question_utterance_id=row["question_utterance_id"],
                 answer_utterance_id=row["answer_utterance_id"],
+                probe_chain_id=row["probe_chain_id"],
             )
         )
     return turns
@@ -418,12 +421,12 @@ def should_probe(segment: TranscriptSegment, record: InterviewRecord) -> bool:
         return False
     if len(segment.text.strip()) < settings.probe_min_answer_chars:
         return False
-    if settings.probe_require_topic_match and not _is_drill_down_topic(segment.text):
-        return False
     if not record.context.turns:
         return True
     last_turn = record.context.turns[-1]
-    return segment.start_ms - last_turn.answer_end_ms >= settings.probe_min_interval_ms
+    if segment.start_ms - last_turn.answer_end_ms < settings.probe_min_interval_ms:
+        return False
+    return assess_credibility(segment.text).level in {"suspicious", "vague"} or _has_competency_coverage_gap(record)
 
 
 def _is_drill_down_topic(text: str) -> bool:
@@ -439,6 +442,15 @@ def _is_drill_down_topic(text: str) -> bool:
 def _has_competency_coverage_gap(record: InterviewRecord) -> bool:
     target_turns = max(1, len(record.context.competency_model.items))
     return len(record.context.turns) < target_turns
+
+
+def _open_competency_gap_chain(record: InterviewRecord) -> ProbeChain:
+    asked = len(record.context.turns)
+    missing = record.context.competency_model.items[
+        min(asked, len(record.context.competency_model.items) - 1)
+    ]
+    topic = f"覆盖缺口：{missing.name}"
+    return _find_or_create_probe_chain(record, topic, origin="competency_gap")
 
 
 def _preopen_resume_chains(interview_id: str, resume_text: str) -> list[ProbeChain]:
@@ -470,9 +482,34 @@ def _high_risk_resume_claims(resume_text: str) -> list[str]:
 def _update_probe_chains_for_turn(record: InterviewRecord, turn: QATurn) -> None:
     credibility = assess_credibility(turn.answer)
     target = _chain_target_for_turn(turn)
+    if turn.probe_chain_id:
+        chain = _find_probe_chain_by_id(record, turn.probe_chain_id)
+        if chain is None:
+            chain = ProbeChain(
+                chain_id=turn.probe_chain_id,
+                interview_id=record.id,
+                topic=target,
+                origin="answer_claim",
+            )
+            record.context.probe_chains.append(chain)
+        _append_probe_chain_link(chain, turn, target, credibility.level)
+        return
     if turn.question_source != "ai_probe" and not turn.probe_target and credibility.level != "suspicious":
+        if _has_competency_coverage_gap(record):
+            _open_competency_gap_chain(record)
         return
     chain = _find_or_create_probe_chain(record, target, origin="answer_claim")
+    if not turn.probe_chain_id:
+        turn.probe_chain_id = chain.chain_id
+    _append_probe_chain_link(chain, turn, target, credibility.level)
+
+
+def _append_probe_chain_link(
+    chain: ProbeChain,
+    turn: QATurn,
+    target: str,
+    credibility_level: str,
+) -> None:
     if any(link.answer_turn_id == turn.turn_id for link in chain.links):
         return
     chain.links.append(
@@ -480,7 +517,7 @@ def _update_probe_chains_for_turn(record: InterviewRecord, turn: QATurn) -> None
             probe_question=turn.question,
             probe_target=target,
             answer_turn_id=turn.turn_id,
-            credibility_after=credibility.level,
+            credibility_after=credibility_level,  # type: ignore[arg-type]
         )
     )
     _refresh_probe_chain_verdict(chain)
@@ -513,6 +550,10 @@ def _find_or_create_probe_chain(
     return chain
 
 
+def _find_probe_chain_by_id(record: InterviewRecord, chain_id: str) -> ProbeChain | None:
+    return next((chain for chain in record.context.probe_chains if chain.chain_id == chain_id), None)
+
+
 def _refresh_probe_chain_verdict(chain: ProbeChain) -> None:
     chain.verdict = "unresolved"
     chain.crack_depth = None
@@ -529,6 +570,27 @@ def _refresh_probe_chain_verdict(chain: ProbeChain) -> None:
             chain.verdict = "cracked"
             chain.crack_depth = index + 2
             return
+
+
+def _apply_consistency_conflicts_to_chains(record: InterviewRecord) -> None:
+    if not record.context.flags:
+        return
+    conflict_turn_ids = {
+        turn_id
+        for flag in record.context.flags
+        for turn_id in (flag.turn_id_a, flag.turn_id_b)
+        if flag.severity == "high"
+    }
+    if not conflict_turn_ids:
+        return
+    for chain in record.context.probe_chains:
+        if chain.verdict == "cracked":
+            continue
+        for index, link in enumerate(chain.links, start=1):
+            if link.answer_turn_id in conflict_turn_ids:
+                chain.verdict = "cracked"
+                chain.crack_depth = index
+                break
 
 
 def _persist_probe_chains(conn, interview_id: str, chains: list[ProbeChain]) -> None:

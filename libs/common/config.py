@@ -65,6 +65,8 @@ class Settings(BaseSettings):
         "项目,技术,架构,方案,决策,优化,性能,指标,数据,负责,实现,"
         "上线,故障,异常,成本,延迟,吞吐,FastAPI,LLM,Python"
     )
+    chain_crack_penalty: float = Field(default=8.0, ge=0.0)
+    chain_held_up_bonus: float = Field(default=3.0, ge=0.0)
     speaker_diarization_provider: Literal["local", "http"] = "local"
     speaker_diarization_base_url: str = ""
     speaker_diarization_api_path: str = "/diarize"

@@ -260,6 +260,9 @@ def init_db() -> None:
                 answer_utterance_id TEXT CHECK (
                     answer_utterance_id IS NULL OR trim(answer_utterance_id) <> ''
                 ),
+                probe_chain_id TEXT CHECK (
+                    probe_chain_id IS NULL OR trim(probe_chain_id) <> ''
+                ),
                 payload TEXT NOT NULL CHECK (json_valid(payload) AND json_type(payload) = 'object'),
                 UNIQUE (interview_id, turn_index)
             );
@@ -397,6 +400,7 @@ def _ensure_sqlite_columns(conn: sqlite3.Connection) -> None:
         "payload": "TEXT",
         "question_utterance_id": "TEXT",
         "answer_utterance_id": "TEXT",
+        "probe_chain_id": "TEXT",
     }
     for column, column_type in turn_columns.items():
         if column not in existing_turns:
