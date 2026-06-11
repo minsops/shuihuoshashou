@@ -113,6 +113,28 @@ class TranscriptSegment(BaseModel):
         return _not_blank(value, f"transcript segment {info.field_name}")
 
 
+class Utterance(BaseModel):
+    """一个说话人的一段连续发言，由一个或多个 final ASR 句子合并而成。"""
+
+    utterance_id: str = Field(default_factory=new_id)
+    speaker: Literal["interviewer", "candidate", "unknown"]
+    text: str
+    start_ms: int = Field(ge=0)
+    end_ms: int = Field(ge=0)
+    sentence_count: int = Field(ge=1)
+
+    @model_validator(mode="after")
+    def timestamps_are_monotonic(self) -> "Utterance":
+        if self.end_ms < self.start_ms:
+            raise ValueError("utterance end_ms must be greater than or equal to start_ms")
+        return self
+
+    @field_validator("utterance_id", "text")
+    @classmethod
+    def required_text_fields_are_not_blank(cls, value: str, info: ValidationInfo) -> str:
+        return _not_blank(value, f"utterance {info.field_name}")
+
+
 class ConsistencyFlag(BaseModel):
     turn_id_a: str
     turn_id_b: str
@@ -156,6 +178,53 @@ class FactClaim(BaseModel):
         return value
 
 
+class ChainLink(BaseModel):
+    """追问链上的一环：一次追问与对应回答。"""
+
+    probe_question: str
+    probe_target: str
+    answer_turn_id: str
+    credibility_after: Literal["solid", "vague", "suspicious"]
+
+    @field_validator("probe_question", "probe_target", "answer_turn_id")
+    @classmethod
+    def text_fields_are_not_blank(cls, value: str, info: ValidationInfo) -> str:
+        return _not_blank(value, f"chain link {info.field_name}")
+
+
+class ProbeChain(BaseModel):
+    """围绕一个主题或声明的下钻追问链。"""
+
+    chain_id: str = Field(default_factory=new_id)
+    interview_id: str
+    topic: str
+    origin: Literal["resume_claim", "answer_claim", "competency_gap"]
+    resume_claim_ref: str | None = None
+    links: list[ChainLink] = Field(default_factory=list)
+    verdict: Literal["held_up", "cracked", "unresolved"] = "unresolved"
+    crack_depth: int | None = Field(default=None, ge=1)
+
+    @field_validator("chain_id", "interview_id", "topic")
+    @classmethod
+    def text_fields_are_not_blank(cls, value: str, info: ValidationInfo) -> str:
+        return _not_blank(value, f"probe chain {info.field_name}")
+
+    @field_validator("resume_claim_ref")
+    @classmethod
+    def resume_claim_ref_is_not_blank(cls, value: str | None) -> str | None:
+        if value is not None:
+            return _not_blank(value, "resume_claim_ref")
+        return value
+
+    @model_validator(mode="after")
+    def verdict_matches_crack_depth(self) -> "ProbeChain":
+        if self.verdict == "cracked" and self.crack_depth is None:
+            raise ValueError("cracked probe chains must include crack_depth")
+        if self.verdict != "cracked" and self.crack_depth is not None:
+            raise ValueError("only cracked probe chains may include crack_depth")
+        return self
+
+
 class QATurn(BaseModel):
     turn_id: str = Field(default_factory=new_id)
     question: str
@@ -164,6 +233,8 @@ class QATurn(BaseModel):
     answer_start_ms: int = Field(default=0, ge=0)
     answer_end_ms: int = Field(default=0, ge=0)
     probe_target: str | None = None
+    question_utterance_id: str | None = None
+    answer_utterance_id: str | None = None
 
     @model_validator(mode="after")
     def answer_timestamps_are_monotonic(self) -> "QATurn":
@@ -184,6 +255,13 @@ class QATurn(BaseModel):
     def turn_id_is_not_blank(cls, value: str) -> str:
         return _not_blank(value, "turn_id")
 
+    @field_validator("question_utterance_id", "answer_utterance_id")
+    @classmethod
+    def utterance_ids_are_not_blank(cls, value: str | None, info: ValidationInfo) -> str | None:
+        if value is not None:
+            return _not_blank(value, info.field_name)
+        return value
+
     @field_validator("question", "answer")
     @classmethod
     def text_fields_are_not_blank(cls, value: str) -> str:
@@ -196,7 +274,9 @@ class InterviewContext(BaseModel):
     candidate_id: str
     competency_model: CompetencyModel
     candidate_resume_text: str = ""
+    utterances: list[Utterance] = Field(default_factory=list)
     turns: list[QATurn] = Field(default_factory=list)
+    probe_chains: list[ProbeChain] = Field(default_factory=list)
     started_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     ended_at: datetime | None = None
     fact_claims: list[FactClaim] = Field(default_factory=list)
@@ -215,6 +295,37 @@ class InterviewContext(BaseModel):
         return self
 
     @model_validator(mode="after")
+    def utterance_ids_are_unique(self) -> "InterviewContext":
+        utterance_ids = [utterance.utterance_id for utterance in self.utterances]
+        if len(utterance_ids) != len(set(utterance_ids)):
+            raise ValueError("interview context utterances must not contain duplicate utterance_id values")
+        return self
+
+    @model_validator(mode="after")
+    def probe_chain_ids_are_unique(self) -> "InterviewContext":
+        chain_ids = [chain.chain_id for chain in self.probe_chains]
+        if len(chain_ids) != len(set(chain_ids)):
+            raise ValueError("interview context probe_chains must not contain duplicate chain_id values")
+        for chain in self.probe_chains:
+            if chain.interview_id != self.session_id:
+                raise ValueError("probe chain interview_id must match interview context session_id")
+        return self
+
+    @model_validator(mode="after")
+    def turns_reference_known_utterances(self) -> "InterviewContext":
+        utterance_ids = {utterance.utterance_id for utterance in self.utterances}
+        for turn in self.turns:
+            if turn.question_utterance_id and turn.question_utterance_id not in utterance_ids:
+                raise ValueError(
+                    f"QATurn question references unknown utterance_id: {turn.question_utterance_id}"
+                )
+            if turn.answer_utterance_id and turn.answer_utterance_id not in utterance_ids:
+                raise ValueError(
+                    f"QATurn answer references unknown utterance_id: {turn.answer_utterance_id}"
+                )
+        return self
+
+    @model_validator(mode="after")
     def fact_claims_and_flags_reference_known_turns(self) -> "InterviewContext":
         turn_ids = {turn.turn_id for turn in self.turns}
         for claim in self.fact_claims:
@@ -225,6 +336,12 @@ class InterviewContext(BaseModel):
                 raise ValueError(f"consistency flag references unknown turn_id: {flag.turn_id_a}")
             if flag.turn_id_b not in turn_ids:
                 raise ValueError(f"consistency flag references unknown turn_id: {flag.turn_id_b}")
+        for chain in self.probe_chains:
+            for link in chain.links:
+                if link.answer_turn_id not in turn_ids:
+                    raise ValueError(
+                        f"probe chain link references unknown turn_id: {link.answer_turn_id}"
+                    )
         return self
 
     @model_validator(mode="after")
@@ -239,11 +356,30 @@ class InterviewContext(BaseModel):
         return self
 
 
+class ResumeClaim(BaseModel):
+    claim_id: str = Field(default_factory=new_id)
+    text: str
+    tags: list[str] = Field(default_factory=list)
+
+    @field_validator("claim_id", "text")
+    @classmethod
+    def text_fields_are_not_blank(cls, value: str, info: ValidationInfo) -> str:
+        return _not_blank(value, f"resume claim {info.field_name}")
+
+    @field_validator("tags")
+    @classmethod
+    def tags_are_not_blank(cls, value: list[str]) -> list[str]:
+        if any(not item.strip() for item in value):
+            raise ValueError("resume claim tags must not contain blank text")
+        return value
+
+
 class ProbeRequest(BaseModel):
     job_id: str
     competency_model: CompetencyModel
     recent_turns: list[QATurn]
     latest_answer: str
+    resume_claims: list[ResumeClaim] = Field(default_factory=list)
 
     @field_validator("job_id")
     @classmethod
@@ -260,6 +396,9 @@ class ProbeRequest(BaseModel):
         turn_ids = [turn.turn_id for turn in self.recent_turns]
         if len(turn_ids) != len(set(turn_ids)):
             raise ValueError("probe request recent_turns must not contain duplicate turn_id values")
+        claim_ids = [claim.claim_id for claim in self.resume_claims]
+        if len(claim_ids) != len(set(claim_ids)):
+            raise ValueError("probe request resume_claims must not contain duplicate claim_id values")
         return self
 
 
@@ -332,6 +471,7 @@ class InterviewScore(BaseModel):
     total_score: float = Field(ge=0.0, le=100.0)
     risk_notes: list[str] = Field(default_factory=list)
     recommendation: Literal["strong_yes", "yes", "hold", "no"]
+    analysis_mode: Literal["llm", "fallback"] = "llm"
 
     @field_validator("session_id")
     @classmethod
@@ -357,6 +497,8 @@ class AIGCResult(BaseModel):
     turn_id: str
     ai_generated_prob: float = Field(ge=0.0, le=1.0)
     template_similarity: float = Field(ge=0.0, le=1.0)
+    rehearsal_score: float = Field(default=0.0, ge=0.0, le=1.0)
+    mode: Literal["voice", "written"] = "voice"
     matched_template: str | None = None
     flagged: bool = False
 
@@ -645,9 +787,12 @@ class OfflineTaskAccepted(BaseModel):
 class Report(BaseModel):
     interview_id: str
     score: InterviewScore
+    analysis_mode: Literal["llm", "fallback"] = "llm"
     aigc_results: list[AIGCResult] = Field(min_length=1)
     consistency_flags: list[ConsistencyFlag]
     transcript: list[QATurn] = Field(min_length=1)
+    utterances: list[Utterance] = Field(default_factory=list)
+    probe_chains: list[ProbeChain] = Field(default_factory=list)
     candidate_resume_text: str = ""
     summary: str
     json_path: str | None = None
@@ -686,6 +831,8 @@ class Report(BaseModel):
     def interview_id_matches_score_session(self) -> "Report":
         if self.interview_id != self.score.session_id:
             raise ValueError("report interview_id must match score session_id")
+        if self.analysis_mode != self.score.analysis_mode:
+            raise ValueError("report analysis_mode must match score analysis_mode")
         return self
 
     @model_validator(mode="after")
@@ -693,7 +840,20 @@ class Report(BaseModel):
         turn_ids = [turn.turn_id for turn in self.transcript]
         if len(turn_ids) != len(set(turn_ids)):
             raise ValueError("report transcript must not contain duplicate turn_id values")
+        utterance_ids = [utterance.utterance_id for utterance in self.utterances]
+        if len(utterance_ids) != len(set(utterance_ids)):
+            raise ValueError("report utterances must not contain duplicate utterance_id values")
+        utterance_id_set = set(utterance_ids)
         transcript_turn_ids = set(turn_ids)
+        for turn in self.transcript:
+            if turn.question_utterance_id and turn.question_utterance_id not in utterance_id_set:
+                raise ValueError(
+                    f"report transcript question references unknown utterance_id: {turn.question_utterance_id}"
+                )
+            if turn.answer_utterance_id and turn.answer_utterance_id not in utterance_id_set:
+                raise ValueError(
+                    f"report transcript answer references unknown utterance_id: {turn.answer_utterance_id}"
+                )
         for dimension in self.score.dimensions:
             for evidence in dimension.evidence:
                 if evidence.turn_id not in transcript_turn_ids:
@@ -703,5 +863,16 @@ class Report(BaseModel):
                 raise ValueError(f"report consistency flag references unknown turn_id: {flag.turn_id_a}")
             if flag.turn_id_b not in transcript_turn_ids:
                 raise ValueError(f"report consistency flag references unknown turn_id: {flag.turn_id_b}")
+        chain_ids = [chain.chain_id for chain in self.probe_chains]
+        if len(chain_ids) != len(set(chain_ids)):
+            raise ValueError("report probe_chains must not contain duplicate chain_id values")
+        for chain in self.probe_chains:
+            if chain.interview_id != self.interview_id:
+                raise ValueError("report probe chain interview_id must match report interview_id")
+            for link in chain.links:
+                if link.answer_turn_id not in transcript_turn_ids:
+                    raise ValueError(
+                        f"report probe chain link references unknown turn_id: {link.answer_turn_id}"
+                    )
         _validate_aigc_results_cover_turn_ids(transcript_turn_ids, self.aigc_results)
         return self

@@ -116,9 +116,9 @@ def test_offline_interview_chain(tmp_path: Path, monkeypatch) -> None:
     transcript_json = loads(Path(report.transcript_path or "").read_text(encoding="utf-8"))
     assert "data:image/png;base64" in html
     assert "亮点" in html
-    assert "AIGC 察重" in html
+    assert "背稿与模板化检测" in html
     assert "疑似注水/模板化" in html
-    assert "转写全文" in html
+    assert "完整转写" in html
     assert report.transcript[0].answer in html
     assert report_json["interview_id"] == interview.id
     assert report_json["artifact_uris"]["json"].startswith("file://")
@@ -127,7 +127,8 @@ def test_offline_interview_chain(tmp_path: Path, monkeypatch) -> None:
     assert report.artifact_uris["pdf"].startswith("file://")
     assert report.artifact_uris["transcript"].startswith("file://")
     assert pdf_bytes.startswith(b"%PDF")
-    assert transcript_json[0]["answer"] == report.transcript[0].answer
+    assert transcript_json["qa_turns"][0]["answer"] == report.transcript[0].answer
+    assert "full_transcript" in transcript_json
     assert persisted.status == InterviewStatus.reported
     assert persisted.context.fact_claims
     assert persisted.context.fact_claims[0].turn_id == report.transcript[0].turn_id

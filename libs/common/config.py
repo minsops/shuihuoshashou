@@ -56,6 +56,8 @@ class Settings(BaseSettings):
     aliyun_ak_secret: str = ""
     aliyun_nls_token_endpoint: str = "https://nls-meta.cn-shanghai.aliyuncs.com/"
     aliyun_nls_token_region: str = "cn-shanghai"
+    speaker_mode: Literal["manual", "dual_channel", "http_diarization"] = "manual"
+    dialogue_silence_close_ms: int = Field(default=2500, ge=0)
     probe_min_answer_chars: int = Field(default=20, ge=0)
     probe_min_interval_ms: int = Field(default=1000, ge=0)
     probe_require_topic_match: bool = True
@@ -82,6 +84,7 @@ class Settings(BaseSettings):
     aigc_detector_timeout_seconds: int = Field(default=10, gt=0)
     aigc_ai_prob_threshold: float = Field(default=0.65, ge=0.0, le=1.0)
     aigc_template_similarity_threshold: float = Field(default=0.45, ge=0.0, le=1.0)
+    rehearsal_threshold: float = Field(default=0.55, ge=0.0, le=1.0)
     signal_enabled: bool = False
     rate_limit_enabled: bool = False
     rate_limit_backend: Literal["local", "redis"] = "local"

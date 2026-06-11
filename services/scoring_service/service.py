@@ -9,17 +9,46 @@ from libs.schemas import AIGCResult, DimensionScore, EvidenceRef, InterviewConte
 
 
 def _evidence_for_dimension(ctx: InterviewContext, dimension: str) -> list[EvidenceRef]:
+    keywords = _dimension_keywords(dimension)
+    chain_turn_ids = {
+        link.answer_turn_id
+        for chain in ctx.probe_chains
+        for link in chain.links
+        if any(keyword in chain.topic for keyword in keywords)
+    }
+    matched = [
+        turn
+        for turn in ctx.turns
+        if turn.turn_id in chain_turn_ids
+        or any(keyword in f"{turn.question} {turn.answer}" for keyword in keywords)
+    ]
+    auto_selected = False
+    if not matched and ctx.turns:
+        matched = sorted(ctx.turns, key=lambda item: len(item.answer), reverse=True)[:1]
+        auto_selected = True
     refs: list[EvidenceRef] = []
-    for turn in ctx.turns[:3]:
+    for turn in matched[:3]:
+        excerpt = turn.answer[:120]
+        if auto_selected:
+            excerpt = f"[自动选取]{excerpt}"
         refs.append(
             EvidenceRef(
                 turn_id=turn.turn_id,
                 quote_start_ms=turn.answer_start_ms,
                 quote_end_ms=turn.answer_end_ms,
-                excerpt=turn.answer[:120],
+                excerpt=excerpt,
             )
         )
     return refs
+
+
+def _dimension_keywords(dimension: str) -> list[str]:
+    mapping = {
+        "项目真实性": ["项目", "负责", "主导", "独立", "上线", "指标", "真实性"],
+        "注水风险": ["记不清", "团队", "别人", "主要", "差不多", "风险"],
+        "沟通与逻辑": ["因为", "所以", "取舍", "复盘", "逻辑"],
+    }
+    return [dimension, *mapping.get(dimension, [])]
 
 
 def fallback_score_interview(
@@ -37,12 +66,21 @@ def fallback_score_interview(
     if flagged_aigc:
         risk_penalty += min(18.0, 6.0 * len(flagged_aigc))
         risk_notes.append("部分回答疑似模板化或 AI 生成，需要人工复核。")
+    cracked_chains = [chain for chain in ctx.probe_chains if chain.verdict == "cracked"]
+    held_up_chains = [chain for chain in ctx.probe_chains if chain.verdict == "held_up"]
+    if cracked_chains:
+        risk_penalty += min(24.0, 8.0 * len(cracked_chains))
+        for chain in cracked_chains:
+            depth = chain.crack_depth or len(chain.links)
+            risk_notes.append(f"声明「{chain.topic}」在第 {depth} 层追问露馅。")
+    held_up_bonus = min(9.0, 3.0 * len(held_up_chains))
 
     dimensions: list[DimensionScore] = []
     for item in ctx.competency_model.items:
         base = 78.0
         if item.name == "项目真实性":
             base -= risk_penalty * 0.7
+            base += held_up_bonus
         elif item.name == "注水风险":
             base = max(0.0, 100.0 - risk_penalty * 3)
         elif item.name == "沟通与逻辑":
@@ -72,6 +110,7 @@ def fallback_score_interview(
         total_score=total,
         risk_notes=risk_notes,
         recommendation=recommendation,
+        analysis_mode="fallback",
     )
 
 
@@ -86,8 +125,13 @@ def score_interview(ctx: InterviewContext, aigc_results: list[AIGCResult]) -> In
             content=_scoring_payload(ctx, aigc_results),
         ),
     ]
-    draft = get_llm_client().complete_json_sync(messages, InterviewScore, fallback)
-    return _normalize_score(ctx, draft, fallback)
+    client = get_llm_client()
+    if hasattr(client, "complete_json_sync_with_meta"):
+        draft, used_fallback = client.complete_json_sync_with_meta(messages, InterviewScore, fallback)
+    else:
+        draft = client.complete_json_sync(messages, InterviewScore, fallback)
+        used_fallback = draft == fallback
+    return _normalize_score(ctx, draft, fallback, used_fallback=used_fallback)
 
 
 def _scoring_payload(ctx: InterviewContext, aigc_results: list[AIGCResult]) -> str:
@@ -97,6 +141,7 @@ def _scoring_payload(ctx: InterviewContext, aigc_results: list[AIGCResult]) -> s
         "candidate_resume_text": ctx.candidate_resume_text,
         "competency_model": ctx.competency_model.model_dump(),
         "turns": [turn.model_dump() for turn in ctx.turns],
+        "probe_chains": [chain.model_dump() for chain in ctx.probe_chains],
         "consistency_flags": [flag.model_dump() for flag in ctx.flags],
         "aigc_results": [item.model_dump() for item in aigc_results],
         "instructions": (
@@ -132,6 +177,8 @@ def _normalize_score(
     ctx: InterviewContext,
     draft: InterviewScore,
     fallback: InterviewScore,
+    *,
+    used_fallback: bool = False,
 ) -> InterviewScore:
     turns_by_id = {turn.turn_id: turn for turn in ctx.turns}
     fallback_by_dimension = {dimension.dimension: dimension for dimension in fallback.dimensions}
@@ -170,6 +217,7 @@ def _normalize_score(
         total_score=total,
         risk_notes=_merge_risk_notes(fallback.risk_notes, draft.risk_notes),
         recommendation=_recommendation(total),
+        analysis_mode="fallback" if used_fallback else "llm",
     )
 
 
@@ -207,7 +255,8 @@ def _normalize_evidence_refs(
             continue
         answer = turn.answer
         excerpt = ref.excerpt.strip()
-        if excerpt not in answer:
+        comparable_excerpt = excerpt.removeprefix("[自动选取]")
+        if comparable_excerpt not in answer:
             excerpt = answer[:120]
         answer_start_ms = turn.answer_start_ms
         answer_end_ms = turn.answer_end_ms

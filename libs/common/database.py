@@ -41,6 +41,8 @@ def _sqlite_path() -> Path:
 
 
 _POSTGRES_UPSERT_KEYS = {
+    "utterances": "id",
+    "probe_chains": "id",
     "qa_turns": "id",
     "scores": "interview_id",
     "aigc_results": "id",
@@ -50,6 +52,8 @@ _POSTGRES_UPSERT_KEYS = {
 _POSTGRES_JSON_COLUMNS = {
     ("jobs", "competency_model"),
     ("interviews", "context"),
+    ("utterances", "payload"),
+    ("probe_chains", "payload"),
     ("qa_turns", "payload"),
     ("scores", "dimensions"),
     ("scores", "risk_notes"),
@@ -250,8 +254,38 @@ def init_db() -> None:
                 answer_start_ms INTEGER NOT NULL CHECK (answer_start_ms >= 0),
                 answer_end_ms INTEGER NOT NULL CHECK (answer_end_ms >= answer_start_ms),
                 probe_target TEXT CHECK (probe_target IS NULL OR trim(probe_target) <> ''),
+                question_utterance_id TEXT CHECK (
+                    question_utterance_id IS NULL OR trim(question_utterance_id) <> ''
+                ),
+                answer_utterance_id TEXT CHECK (
+                    answer_utterance_id IS NULL OR trim(answer_utterance_id) <> ''
+                ),
                 payload TEXT NOT NULL CHECK (json_valid(payload) AND json_type(payload) = 'object'),
                 UNIQUE (interview_id, turn_index)
+            );
+            CREATE TABLE IF NOT EXISTS utterances (
+                id TEXT PRIMARY KEY,
+                interview_id TEXT NOT NULL,
+                utterance_index INTEGER NOT NULL CHECK (utterance_index >= 0),
+                speaker TEXT NOT NULL CHECK (speaker IN ('interviewer', 'candidate', 'unknown')),
+                text TEXT NOT NULL CHECK (trim(text) <> ''),
+                start_ms INTEGER NOT NULL CHECK (start_ms >= 0),
+                end_ms INTEGER NOT NULL CHECK (end_ms >= start_ms),
+                sentence_count INTEGER NOT NULL CHECK (sentence_count >= 1),
+                payload TEXT NOT NULL CHECK (json_valid(payload) AND json_type(payload) = 'object'),
+                UNIQUE (interview_id, utterance_index)
+            );
+            CREATE TABLE IF NOT EXISTS probe_chains (
+                id TEXT PRIMARY KEY,
+                interview_id TEXT NOT NULL,
+                chain_index INTEGER NOT NULL CHECK (chain_index >= 0),
+                topic TEXT NOT NULL CHECK (trim(topic) <> ''),
+                origin TEXT NOT NULL CHECK (
+                    origin IN ('resume_claim', 'answer_claim', 'competency_gap')
+                ),
+                verdict TEXT NOT NULL CHECK (verdict IN ('held_up', 'cracked', 'unresolved')),
+                payload TEXT NOT NULL CHECK (json_valid(payload) AND json_type(payload) = 'object'),
+                UNIQUE (interview_id, chain_index)
             );
             CREATE TABLE IF NOT EXISTS probe_patterns (
                 id TEXT PRIMARY KEY,
@@ -315,6 +349,39 @@ def init_db() -> None:
 
 
 def _ensure_sqlite_columns(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS utterances (
+            id TEXT PRIMARY KEY,
+            interview_id TEXT NOT NULL,
+            utterance_index INTEGER NOT NULL CHECK (utterance_index >= 0),
+            speaker TEXT NOT NULL CHECK (speaker IN ('interviewer', 'candidate', 'unknown')),
+            text TEXT NOT NULL CHECK (trim(text) <> ''),
+            start_ms INTEGER NOT NULL CHECK (start_ms >= 0),
+            end_ms INTEGER NOT NULL CHECK (end_ms >= start_ms),
+            sentence_count INTEGER NOT NULL CHECK (sentence_count >= 1),
+            payload TEXT NOT NULL CHECK (json_valid(payload) AND json_type(payload) = 'object'),
+            UNIQUE (interview_id, utterance_index)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS probe_chains (
+            id TEXT PRIMARY KEY,
+            interview_id TEXT NOT NULL,
+            chain_index INTEGER NOT NULL CHECK (chain_index >= 0),
+            topic TEXT NOT NULL CHECK (trim(topic) <> ''),
+            origin TEXT NOT NULL CHECK (
+                origin IN ('resume_claim', 'answer_claim', 'competency_gap')
+            ),
+            verdict TEXT NOT NULL CHECK (verdict IN ('held_up', 'cracked', 'unresolved')),
+            payload TEXT NOT NULL CHECK (json_valid(payload) AND json_type(payload) = 'object'),
+            UNIQUE (interview_id, chain_index)
+        )
+        """
+    )
+
     existing_interviews = {
         row["name"] for row in conn.execute("PRAGMA table_info(interviews)").fetchall()
     }
@@ -328,6 +395,8 @@ def _ensure_sqlite_columns(conn: sqlite3.Connection) -> None:
     existing_turns = {row["name"] for row in conn.execute("PRAGMA table_info(qa_turns)").fetchall()}
     turn_columns = {
         "payload": "TEXT",
+        "question_utterance_id": "TEXT",
+        "answer_utterance_id": "TEXT",
     }
     for column, column_type in turn_columns.items():
         if column not in existing_turns:

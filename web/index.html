@@ -530,6 +530,31 @@
         gap: var(--space-xs);
       }
 
+      .speaker-switch {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        min-height: 38px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 3px;
+        background: var(--surface);
+      }
+
+      .speaker-switch button {
+        min-height: 30px;
+        border-color: transparent;
+        padding: 5px 10px;
+        background: transparent;
+        color: var(--muted);
+      }
+
+      .speaker-switch button.active {
+        border-color: var(--teal);
+        background: var(--teal);
+        color: var(--surface);
+      }
+
       .toolbar .status-pill {
         margin-left: auto;
       }
@@ -768,6 +793,10 @@
             <span class="small text-counter" id="answerCharCount" role="status" aria-live="polite">回答 0 字</span>
           </label>
           <div class="toolbar">
+            <div class="speaker-switch" role="group" aria-label="当前麦克风说话人">
+              <button type="button" id="speakerCandidate" class="active">候选人发言</button>
+              <button type="button" id="speakerInterviewer">面试官发言</button>
+            </div>
             <button type="submit" id="sendAnswer" aria-describedby="controlHint" disabled>发送回答</button>
             <button class="secondary" type="button" id="startMic" aria-describedby="controlHint" disabled>开始麦克风</button>
             <button class="secondary" type="button" id="stopMic" aria-describedby="controlHint" disabled>停止麦克风</button>
@@ -811,6 +840,15 @@
           </div>
           <div class="stack">
             <div class="dimension-top">
+              <h3>追问链</h3>
+              <span class="tag blue" id="chainCount">0 条</span>
+            </div>
+            <div class="probe-list" id="chainList">
+              <div class="empty">追问链会随回答实时更新</div>
+            </div>
+          </div>
+          <div class="stack">
+            <div class="dimension-top">
               <h3>最终评分</h3>
               <div class="row" id="reportLinks"></div>
             </div>
@@ -846,6 +884,8 @@
       const competencyList = document.querySelector("#competencyList");
       const probeList = document.querySelector("#probeList");
       const probeCount = document.querySelector("#probeCount");
+      const chainList = document.querySelector("#chainList");
+      const chainCount = document.querySelector("#chainCount");
       const credibilityLevel = document.querySelector("#credibilityLevel");
       const credibilityBox = document.querySelector("#credibilityBox");
       const reportPanel = document.querySelector("#reportPanel");
@@ -862,6 +902,8 @@
       const manualProbe = document.querySelector("#manualProbe");
       const endInterview = document.querySelector("#endInterview");
       const controlHint = document.querySelector("#controlHint");
+      const speakerCandidate = document.querySelector("#speakerCandidate");
+      const speakerInterviewer = document.querySelector("#speakerInterviewer");
 
       const state = {
         job: null,
@@ -873,6 +915,7 @@
         prepareSessionToken: 0,
         seq: 1,
         turns: 0,
+        currentSpeaker: "candidate",
         selectedQuestionSource: "interviewer",
         selectedProbeTarget: null,
         selectedCompetency: null,
@@ -972,6 +1015,22 @@
         }
       }
 
+      function syncSpeakerControls() {
+        speakerCandidate.classList.toggle("active", state.currentSpeaker === "candidate");
+        speakerInterviewer.classList.toggle("active", state.currentSpeaker === "interviewer");
+        speakerCandidate.setAttribute("aria-pressed", state.currentSpeaker === "candidate");
+        speakerInterviewer.setAttribute("aria-pressed", state.currentSpeaker === "interviewer");
+      }
+
+      function setCurrentSpeaker(speaker) {
+        state.currentSpeaker = speaker === "interviewer" ? "interviewer" : "candidate";
+        syncSpeakerControls();
+        appendEvent(
+          "说话人",
+          state.currentSpeaker === "interviewer" ? "当前麦克风归属：面试官" : "当前麦克风归属：候选人"
+        );
+      }
+
       function setControls() {
         const socketState = state.socket ? state.socket.readyState : WebSocket.CLOSED;
         const connected = socketState === WebSocket.OPEN;
@@ -984,6 +1043,8 @@
         reconnectSocket.disabled = !state.interview || connected || connecting || state.interviewEnded;
         manualProbe.disabled = !textReady;
         endInterview.disabled = !active;
+        speakerCandidate.disabled = !state.interview || state.interviewEnded || state.endingInterview;
+        speakerInterviewer.disabled = !state.interview || state.interviewEnded || state.endingInterview;
         loadSampleButton.disabled =
           state.documentParsingCount > 0 || state.preparingInterview || Boolean(state.interview);
         prepareInterview.disabled =
@@ -995,6 +1056,7 @@
         setButtonBusy(prepareInterview, state.preparingInterview);
         setButtonBusy(startMic, state.micStarting);
         setButtonBusy(endInterview, state.endingInterview);
+        syncSpeakerControls();
         setControlHints(connected, connecting);
         controlHint.textContent = controlHintText(connected, connecting);
         controlHint.className = `control-hint ${controlHintTone(connected, connecting)}`.trim();
@@ -1953,6 +2015,31 @@
         });
       }
 
+      function renderProbeChains(chains = []) {
+        chainCount.textContent = `${chains.length} 条`;
+        if (!chains.length) {
+          chainList.innerHTML = '<div class="empty">追问链会随回答实时更新</div>';
+          return;
+        }
+        chainList.innerHTML = chains
+          .map((chain, index) => {
+            const links = Array.isArray(chain.links) ? chain.links : [];
+            const tone =
+              chain.verdict === "cracked" ? "red" : chain.verdict === "held_up" ? "blue" : "amber";
+            return `
+              <div class="probe-card">
+                <div class="probe-top">
+                  <span class="tag blue">链 #${index + 1}</span>
+                  <span class="tag ${tone}">${escapeHtml(chain.verdict)}</span>
+                </div>
+                <h3>${escapeHtml(chain.topic)}</h3>
+                <p>${escapeHtml(chain.origin)} · ${links.length} 层${chain.crack_depth ? ` · 第 ${escapeHtml(chain.crack_depth)} 层露馅` : ""}</p>
+              </div>
+            `;
+          })
+          .join("");
+      }
+
       function selectQuestion(question, meta = {}) {
         currentQuestion.value = question;
         answerText.value = "";
@@ -2046,6 +2133,7 @@
           metricJob.textContent = job.title;
           metricCandidate.textContent = candidate.name;
           renderCompetencies(job);
+          renderProbeChains((interview.context && interview.context.probe_chains) || []);
           await openSocketWithLatestGateway(interview.id, () =>
             prepareSessionStillCurrent(prepareToken)
           );
@@ -2277,23 +2365,22 @@
           return;
         }
         const timing = turnTiming();
-        const payload = manual
-          ? {
-              type: "manual_probe",
-              answer,
-              confidence: 1,
-              ...timing,
-              ...eventQuestionMeta(),
-            }
-          : {
-              type: "text_turn",
-              seq: state.seq,
-              answer,
-              speaker: "candidate",
-              confidence: 1,
-              ...timing,
-              ...eventQuestionMeta(),
-            };
+	        const payload = manual
+	          ? {
+	              type: "manual_probe",
+	              answer,
+	              confidence: 1,
+	              ...timing,
+	              ...eventQuestionMeta(),
+	            }
+	          : {
+	              type: "text_turn",
+	              seq: state.seq,
+	              answer,
+	              confidence: 1,
+	              ...timing,
+	              ...eventQuestionMeta(),
+	            };
         if (!sendLiveSocketPayload(payload, manual ? "追问触发失败" : "回答发送失败")) return;
         if (!manual) state.seq += 1;
         appendEvent(
@@ -2331,9 +2418,14 @@
             "转写",
             `${escapeHtml(message.payload.speaker)} · ${escapeHtml(message.payload.text)}`
           );
-        } else if (message.type === "probe") {
+	        } else if (message.type === "probe") {
+	          renderProbeCards(message.payload.suggestions || []);
+	          appendEvent("追问方向", "已生成新的专业问题候选。", "blue");
+        } else if (message.type === "probe_update") {
           renderProbeCards(message.payload.suggestions || []);
-          appendEvent("追问方向", "已生成新的专业问题候选。", "blue");
+          appendEvent("追问方向", "大模型追问已刷新。", "blue");
+        } else if (message.type === "probe_chains") {
+          renderProbeChains(message.payload || []);
         } else if (message.type === "credibility") {
           credibilityLevel.textContent = message.payload.level;
           credibilityBox.innerHTML = `
@@ -2454,6 +2546,9 @@
         const dimensions = Array.isArray(score.dimensions) ? score.dimensions : [];
         const riskNotes = Array.isArray(score.risk_notes) ? score.risk_notes : [];
         const transcriptTurns = Array.isArray(report.transcript) ? report.transcript : [];
+        const probeChains = Array.isArray(report.probe_chains) ? report.probe_chains : [];
+        const aigcResults = Array.isArray(report.aigc_results) ? report.aigc_results : [];
+        const analysisMode = report.analysis_mode || score.analysis_mode || "llm";
         reportLinks.innerHTML = `
           <button class="secondary" type="button" data-report-format="html" data-report-id="${escapeHtml(reportId)}" title="下载 HTML 报告" aria-label="下载 HTML 报告">HTML</button>
           <button class="secondary" type="button" data-report-format="pdf" data-report-id="${escapeHtml(reportId)}" title="下载 PDF 报告" aria-label="下载 PDF 报告">PDF</button>
@@ -2481,6 +2576,30 @@
         const risks = riskNotes.length
           ? riskNotes.map((note) => `<p class="risk">${escapeHtml(note)}</p>`).join("")
           : '<p class="success">暂无高置信风险点。</p>';
+        const chains = probeChains.length
+          ? probeChains
+          .map((chain) => {
+            const links = Array.isArray(chain.links) ? chain.links : [];
+            const linkText = links.length
+              ? links
+                .map(
+                  (link, index) =>
+                    `${index + 1}. ${escapeHtml(link.probe_question)} / ${escapeHtml(link.credibility_after)}`
+                )
+                .join("<br>")
+              : "未进入下钻";
+            return `
+              <tr>
+                <td>${escapeHtml(chain.topic)}</td>
+                <td>${escapeHtml(chain.origin)}</td>
+                <td>${links.length}</td>
+                <td>${escapeHtml(chain.verdict)}${chain.crack_depth ? ` · 第 ${escapeHtml(chain.crack_depth)} 层` : ""}</td>
+                <td>${linkText}</td>
+              </tr>
+            `;
+          })
+          .join("")
+          : '<tr><td colspan="5">暂无追问链。</td></tr>';
         const transcript = transcriptTurns.length
           ? transcriptTurns
           .map(
@@ -2494,8 +2613,28 @@
           )
           .join("")
           : '<tr><td colspan="3">暂无转写记录。</td></tr>';
+        const rehearsal = aigcResults.length
+          ? aigcResults
+            .map(
+              (item) => `
+                <tr>
+                  <td>${escapeHtml(item.turn_id)}</td>
+                  <td>${escapeHtml(item.mode || "voice")}</td>
+                  <td>${escapeHtml(item.rehearsal_score ?? 0)}</td>
+                  <td>${escapeHtml(item.template_similarity ?? 0)}</td>
+                  <td>${item.flagged ? '<span class="risk">疑似模板化</span>' : "未命中"}</td>
+                </tr>
+              `
+            )
+            .join("")
+          : '<tr><td colspan="5">暂无背稿检测结果。</td></tr>';
         reportPanel.innerHTML = `
           <div class="report-box">
+            ${
+              analysisMode === "fallback"
+                ? '<p class="risk">本报告由确定性规则生成（未启用大模型分析），分数仅供链路验证，不可用于招聘决策。</p>'
+                : ""
+            }
             <div class="score-line">
               <div class="score-main"><strong>${escapeHtml(reportTotalScoreText(report))}</strong><span>${escapeHtml(reportRecommendationText(report))}</span></div>
               <div class="stack">
@@ -2508,6 +2647,14 @@
             <table>
               <thead><tr><th>维度</th><th>分数</th><th>证据</th></tr></thead>
               <tbody>${rows}</tbody>
+            </table>
+            <table>
+              <thead><tr><th>主题</th><th>来源</th><th>层数</th><th>判定</th><th>关键链路</th></tr></thead>
+              <tbody>${chains}</tbody>
+            </table>
+            <table>
+              <thead><tr><th>Turn ID</th><th>模式</th><th>背稿分</th><th>模板相似度</th><th>状态</th></tr></thead>
+              <tbody>${rehearsal}</tbody>
             </table>
             <table>
               <thead><tr><th>#</th><th>问题</th><th>回答</th></tr></thead>
@@ -2763,10 +2910,10 @@
         if (!state.micSpeechStarted) {
           if (!hasVoiceEnergy(samples)) {
             if (!state.micWaitingForVoiceNotice) {
-              appendEvent(
-                "麦克风",
-                "已开启采集，等待检测到候选人声音；期间会每 250ms 发送低音量保活音频，避免 ASR 空闲断开。"
-              );
+	              appendEvent(
+	                "麦克风",
+	                "已开启采集，等待检测到当前角色声音；期间会每 250ms 发送低音量保活音频，避免 ASR 空闲断开。"
+	              );
               setPill(micStatus, "等待声音输入", "live");
               state.micWaitingForVoiceNotice = true;
             }
@@ -2780,11 +2927,11 @@
         const endMs = Math.round(((state.micSentSamples + samples.length) / micSampleRate) * 1000);
         const payload = {
           type: "audio_chunk",
-          session_id: state.interview.id,
-          seq: state.seq,
-          audio: samplesToBase64Pcm16(samples),
-          speaker: "candidate",
-          format: "pcm16",
+	          session_id: state.interview.id,
+	          seq: state.seq,
+	          audio: samplesToBase64Pcm16(samples),
+	          speaker: state.currentSpeaker,
+	          format: "pcm16",
           sample_rate_hz: micSampleRate,
           channels: 1,
           start_ms: startMs,
@@ -2997,6 +3144,7 @@
         state.selectedQuestionSource = "interviewer";
         state.selectedProbeTarget = null;
         state.selectedCompetency = null;
+        state.currentSpeaker = "candidate";
         state.micStarting = false;
         state.micError = "";
         state.documentParsingCount = 0;
@@ -3014,6 +3162,7 @@
         credibilityLevel.textContent = "待观察";
         credibilityBox.innerHTML = "<p>等待候选人首个回答。</p>";
         liveFeed.innerHTML = '<div class="empty">实时转写、回答和追问事件会出现在这里</div>';
+        renderProbeChains([]);
         reportLinks.innerHTML = "";
         reportPanel.innerHTML = '<div class="empty">结束面试后生成综合评分</div>';
         setPill(setupStatus, "未建面试", "");
@@ -3052,6 +3201,8 @@
       reconnectSocket.addEventListener("click", reconnectLiveChannel);
       manualProbe.addEventListener("click", () => sendTurn(true));
       endInterview.addEventListener("click", requestEndInterview);
+      speakerCandidate.addEventListener("click", () => setCurrentSpeaker("candidate"));
+      speakerInterviewer.addEventListener("click", () => setCurrentSpeaker("interviewer"));
       currentQuestion.addEventListener("input", () => {
         resetQuestionMetaForManualEdit();
         updateTextCounters();

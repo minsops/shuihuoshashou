@@ -29,10 +29,14 @@ REPORT_TEMPLATE = Template(
         .risk { color: #b42318; font-weight: 700; }
         .flagged { background: #fff1f0; color: #912018; font-weight: 700; }
         .highlight { background: #ecfdf3; color: #05603a; font-weight: 700; }
+        .fallback { border: 1px solid #f79009; background: #fffaeb; color: #93370d; padding: 10px 12px; font-weight: 700; }
       </style>
     </head>
     <body>
       <h1>水货杀手面试报告</h1>
+      {% if analysis_mode == "fallback" %}
+      <p class="fallback">本报告由确定性规则生成（未启用大模型分析），分数仅供链路验证，不可用于招聘决策。</p>
+      {% endif %}
       <p>总分：<strong>{{ score.total_score }}</strong> ｜ 建议：<strong>{{ score.recommendation }}</strong></p>
       <section>
         <h2>总评</h2>
@@ -79,13 +83,37 @@ REPORT_TEMPLATE = Template(
         {% for note in risk_highlights %}<p class="risk">{{ note }}</p>{% endfor %}
       </section>
       <section>
-        <h2>AIGC 察重</h2>
+        <h2>追问链</h2>
+        {% if probe_chains %}
         <table>
-          <tr><th>Turn ID</th><th>AI 概率</th><th>模板相似度</th><th>命中模板</th><th>状态</th></tr>
+          <tr><th>主题</th><th>来源</th><th>层数</th><th>判定</th><th>关键链路</th></tr>
+          {% for chain in probe_chains %}
+          <tr>
+            <td>{{ chain.topic }}</td>
+            <td>{{ chain.origin }}</td>
+            <td>{{ chain.links | length }}</td>
+            <td>{{ chain.verdict }}{% if chain.crack_depth %} · 第 {{ chain.crack_depth }} 层{% endif %}</td>
+            <td>
+              {% for link in chain.links %}
+              {{ loop.index }}. {{ link.probe_question }} / {{ link.credibility_after }}<br>
+              {% endfor %}
+            </td>
+          </tr>
+          {% endfor %}
+        </table>
+        {% else %}
+        <p>暂无追问链。</p>
+        {% endif %}
+      </section>
+      <section>
+        <h2>背稿与模板化检测</h2>
+        <table>
+          <tr><th>Turn ID</th><th>模式</th><th>背稿分</th><th>模板相似度</th><th>命中模板</th><th>状态</th></tr>
           {% for item in aigc_results %}
           <tr class="{{ 'flagged' if item.flagged else '' }}">
             <td>{{ item.turn_id }}</td>
-            <td>{{ item.ai_generated_prob }}</td>
+            <td>{{ item.mode }}</td>
+            <td>{{ item.rehearsal_score }}</td>
             <td>{{ item.template_similarity }}</td>
             <td>{{ item.matched_template or "" }}</td>
             <td>{{ "疑似注水/模板化" if item.flagged else "未命中" }}</td>
@@ -94,7 +122,26 @@ REPORT_TEMPLATE = Template(
         </table>
       </section>
       <section>
-        <h2>转写全文</h2>
+        <h2>完整转写</h2>
+        {% if utterances %}
+        <table>
+          <tr><th>序号</th><th>说话人</th><th>内容</th><th>时间</th><th>句子数</th></tr>
+          {% for utterance in utterances %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ utterance.speaker }}</td>
+            <td>{{ utterance.text }}</td>
+            <td>{{ utterance.start_ms }}ms - {{ utterance.end_ms }}ms</td>
+            <td>{{ utterance.sentence_count }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+        {% else %}
+        <p>暂无完整双向转写。</p>
+        {% endif %}
+      </section>
+      <section>
+        <h2>问答轮次</h2>
         <table>
           <tr><th>序号</th><th>来源</th><th>问题</th><th>回答</th><th>时间</th><th>追问目标</th></tr>
           {% for turn in transcript %}
@@ -281,11 +328,14 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
     )
     html = REPORT_TEMPLATE.render(
         score=score,
+        analysis_mode=score.analysis_mode,
         summary=summary,
         strengths=_strengths(score),
         aigc_results=aigc,
         risk_highlights=_risk_highlights(score, ctx.flags),
+        probe_chains=ctx.probe_chains,
         transcript=ctx.turns,
+        utterances=ctx.utterances,
         candidate_resume_text=ctx.candidate_resume_text,
         radar_chart_uri=_radar_chart_uri(score),
     )
@@ -298,7 +348,12 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
     html_path.write_text(html, encoding="utf-8")
     transcript_path.write_text(
         json.dumps(
-            [turn.model_dump() for turn in ctx.turns],
+            {
+                "qa_turns": [turn.model_dump() for turn in ctx.turns],
+                "full_transcript": [utterance.model_dump() for utterance in ctx.utterances],
+                "probe_chains": [chain.model_dump() for chain in ctx.probe_chains],
+                "analysis_mode": score.analysis_mode,
+            },
             ensure_ascii=False,
             default=str,
             indent=2,
@@ -326,9 +381,12 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
     report = Report(
         interview_id=ctx.session_id,
         score=score,
+        analysis_mode=score.analysis_mode,
         aigc_results=aigc,
         consistency_flags=ctx.flags,
         transcript=ctx.turns,
+        utterances=ctx.utterances,
+        probe_chains=ctx.probe_chains,
         candidate_resume_text=ctx.candidate_resume_text,
         summary=summary,
         json_path=str(json_path),
@@ -362,6 +420,7 @@ def _fallback_pdf_lines(
         f"Interview: {ctx.session_id}",
         f"Total score: {score.total_score}",
         f"Recommendation: {score.recommendation}",
+        f"Analysis mode: {score.analysis_mode}",
         f"Summary: {summary}",
         "Dimension scores:",
     ]
@@ -377,13 +436,24 @@ def _fallback_pdf_lines(
         lines.extend(f"- {note}" for note in risk_highlights)
     else:
         lines.append("- None")
-    lines.append("AIGC checks:")
+    lines.append("Rehearsal/template checks:")
     for result in aigc:
         lines.append(
-            f"- turn={result.turn_id}, ai_prob={result.ai_generated_prob}, "
+            f"- turn={result.turn_id}, rehearsal={result.rehearsal_score}, "
             f"template_similarity={result.template_similarity}, flagged={result.flagged}"
         )
+    lines.append("Probe chains:")
+    if ctx.probe_chains:
+        for chain in ctx.probe_chains:
+            lines.append(
+                f"- {chain.topic}: verdict={chain.verdict}, depth={len(chain.links)}, "
+                f"crack_depth={chain.crack_depth or ''}"
+            )
+    else:
+        lines.append("- None")
     lines.append("Transcript:")
+    for index, utterance in enumerate(ctx.utterances, start=1):
+        lines.append(f"- U{index} [{utterance.speaker}] {utterance.text}")
     for index, turn in enumerate(ctx.turns, start=1):
         lines.append(f"- T{index} [{turn.question_source}] Q={turn.question} A={turn.answer}")
     return lines
@@ -441,7 +511,8 @@ def _validate_report_inputs(
                 raise ValueError(
                     f"score evidence timestamp is outside turn range: {evidence.turn_id}"
                 )
-            if evidence.excerpt not in turn.answer:
+            comparable_excerpt = evidence.excerpt.removeprefix("[自动选取]")
+            if comparable_excerpt not in turn.answer:
                 raise ValueError(f"score evidence excerpt is not in turn answer: {evidence.turn_id}")
     aigc_turn_ids = [result.turn_id for result in aigc]
     duplicate_aigc_turn_ids = {

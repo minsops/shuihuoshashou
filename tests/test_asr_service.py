@@ -313,7 +313,7 @@ def test_asr_session_manager_smooths_unknown_speaker_by_continuity() -> None:
     assert decision.segment.speaker == "candidate"
 
 
-def test_asr_session_manager_resolves_unknown_speaker_from_audio_cluster() -> None:
+def test_asr_session_manager_does_not_fake_voiceprint_matching() -> None:
     manager = ASRSessionManager(speaker_continuity_gap_ms=0)
     audio = base64.b64encode(b"candidate-voiceprint").decode("ascii")
     known = TranscriptSegment(
@@ -340,7 +340,7 @@ def test_asr_session_manager_resolves_unknown_speaker_from_audio_cluster() -> No
 
     assert decision.accepted is True
     assert decision.segment is not None
-    assert decision.segment.speaker == "candidate"
+    assert decision.segment.speaker == "unknown"
 
 
 def test_http_speaker_diarizer_maps_unknown_speaker(monkeypatch) -> None:

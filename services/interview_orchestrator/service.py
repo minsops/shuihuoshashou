@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 
 from libs.common.config import get_settings
@@ -9,6 +10,7 @@ from libs.common.tasks import task_queue
 from libs.schemas import (
     CandidateCreate,
     CandidateRecord,
+    ChainLink,
     ConsentCreate,
     ConsentRecord,
     InterviewContext,
@@ -16,13 +18,16 @@ from libs.schemas import (
     InterviewRecord,
     InterviewStatus,
     OfflineTaskAccepted,
+    ProbeChain,
     QATurn,
     TranscriptSegment,
+    Utterance,
     new_id,
 )
 from services.aigc_detect_service.service import detect_interview
 from services.interview_orchestrator.consistency import detect_claim_conflicts, extract_fact_claim
 from services.jd_kb_service.service import get_job
+from services.probe_service.service import assess_credibility
 from services.report_service.service import build_report
 from services.scoring_service.service import score_interview
 
@@ -128,6 +133,7 @@ def create_interview(payload: InterviewCreate) -> InterviewRecord:
         candidate_id=payload.candidate_id,
         competency_model=job.competency_model,
         candidate_resume_text=candidate.resume_text,
+        probe_chains=_preopen_resume_chains(interview_id, candidate.resume_text),
     )
     record = InterviewRecord(
         id=interview_id,
@@ -155,6 +161,7 @@ def create_interview(payload: InterviewCreate) -> InterviewRecord:
                 None,
             ),
         )
+        _persist_probe_chains(conn, interview_id, record.context.probe_chains)
     return record
 
 
@@ -209,6 +216,57 @@ def start_interview(interview_id: str) -> InterviewRecord:
     return record
 
 
+def add_utterance(interview_id: str, utterance: Utterance) -> InterviewRecord:
+    record = get_interview(interview_id)
+    if record.status not in {InterviewStatus.created, InterviewStatus.in_progress}:
+        raise ValueError(f"cannot add utterance to interview in status {record.status.value}")
+    if any(item.utterance_id == utterance.utterance_id for item in record.context.utterances):
+        raise ValueError("interview context utterances must not contain duplicate utterance_id values")
+    with connect() as conn:
+        existing = conn.execute(
+            "SELECT interview_id FROM utterances WHERE id = ?",
+            (utterance.utterance_id,),
+        ).fetchone()
+    if existing is not None:
+        raise ValueError("utterance_id already exists")
+    if record.status == InterviewStatus.created:
+        record.status = InterviewStatus.in_progress
+        record.started_at = datetime.now(UTC)
+        record.context.started_at = record.started_at
+    record.context.utterances.append(utterance)
+    save_interview(record)
+    with connect() as conn:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO utterances
+            (id, interview_id, utterance_index, speaker, text, start_ms, end_ms,
+             sentence_count, payload)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                utterance.utterance_id,
+                interview_id,
+                len(record.context.utterances) - 1,
+                utterance.speaker,
+                utterance.text,
+                utterance.start_ms,
+                utterance.end_ms,
+                utterance.sentence_count,
+                dumps(utterance.model_dump()),
+            ),
+        )
+    event_bus.publish_nowait(
+        "utterance.created",
+        {
+            "interview_id": interview_id,
+            "utterance_id": utterance.utterance_id,
+            "utterance_index": len(record.context.utterances) - 1,
+            "speaker": utterance.speaker,
+        },
+    )
+    return record
+
+
 def add_turn(interview_id: str, turn: QATurn) -> InterviewRecord:
     record = get_interview(interview_id)
     if record.status not in {InterviewStatus.created, InterviewStatus.in_progress}:
@@ -233,14 +291,16 @@ def add_turn(interview_id: str, turn: QATurn) -> InterviewRecord:
         ]
     record.context.fact_claims.append(extract_fact_claim(turn))
     record.context.flags = detect_claim_conflicts(record.context.fact_claims)
+    _update_probe_chains_for_turn(record, turn)
     save_interview(record)
     with connect() as conn:
         conn.execute(
             """
             INSERT OR REPLACE INTO qa_turns
             (id, interview_id, turn_index, question, question_source, answer,
-             answer_start_ms, answer_end_ms, probe_target, payload)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             answer_start_ms, answer_end_ms, probe_target, question_utterance_id,
+             answer_utterance_id, payload)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 turn.turn_id,
@@ -252,9 +312,12 @@ def add_turn(interview_id: str, turn: QATurn) -> InterviewRecord:
                 turn.answer_start_ms,
                 turn.answer_end_ms,
                 turn.probe_target,
+                turn.question_utterance_id,
+                turn.answer_utterance_id,
                 dumps(turn.model_dump()),
             ),
         )
+        _persist_probe_chains(conn, interview_id, record.context.probe_chains)
     event_bus.publish_nowait(
         "qa_turn.created",
         {
@@ -266,13 +329,43 @@ def add_turn(interview_id: str, turn: QATurn) -> InterviewRecord:
     return record
 
 
+def list_utterances(interview_id: str) -> list[Utterance]:
+    init_db()
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, speaker, text, start_ms, end_ms, sentence_count, payload
+            FROM utterances
+            WHERE interview_id = ?
+            ORDER BY utterance_index
+            """,
+            (interview_id,),
+        ).fetchall()
+    utterances: list[Utterance] = []
+    for row in rows:
+        if row["payload"]:
+            utterances.append(Utterance.model_validate(loads(row["payload"])))
+            continue
+        utterances.append(
+            Utterance(
+                utterance_id=row["id"],
+                speaker=row["speaker"],
+                text=row["text"],
+                start_ms=row["start_ms"],
+                end_ms=row["end_ms"],
+                sentence_count=row["sentence_count"],
+            )
+        )
+    return utterances
+
+
 def list_turns(interview_id: str) -> list[QATurn]:
     init_db()
     with connect() as conn:
         rows = conn.execute(
             """
             SELECT id, question, question_source, answer, answer_start_ms, answer_end_ms,
-                   probe_target, payload
+                   probe_target, question_utterance_id, answer_utterance_id, payload
             FROM qa_turns
             WHERE interview_id = ?
             ORDER BY turn_index
@@ -293,9 +386,30 @@ def list_turns(interview_id: str) -> list[QATurn]:
                 answer_start_ms=row["answer_start_ms"],
                 answer_end_ms=row["answer_end_ms"],
                 probe_target=row["probe_target"],
+                question_utterance_id=row["question_utterance_id"],
+                answer_utterance_id=row["answer_utterance_id"],
             )
         )
     return turns
+
+
+def should_probe_v2(turn: QATurn, record: InterviewRecord) -> bool:
+    settings = get_settings()
+    if len(turn.answer.strip()) < settings.probe_min_answer_chars:
+        return False
+    previous_turns = [item for item in record.context.turns if item.turn_id != turn.turn_id]
+    if previous_turns:
+        last_turn = previous_turns[-1]
+        if turn.answer_start_ms - last_turn.answer_end_ms < settings.probe_min_interval_ms:
+            return False
+    credibility = assess_credibility(turn.answer)
+    if credibility.level in {"suspicious", "vague"}:
+        return True
+    return _has_competency_coverage_gap(record)
+
+
+def should_probe_turn(turn: QATurn, record: InterviewRecord) -> bool:
+    return should_probe_v2(turn, record)
 
 
 def should_probe(segment: TranscriptSegment, record: InterviewRecord) -> bool:
@@ -320,6 +434,121 @@ def _is_drill_down_topic(text: str) -> bool:
         if item.strip()
     ]
     return any(keyword in normalized for keyword in keywords)
+
+
+def _has_competency_coverage_gap(record: InterviewRecord) -> bool:
+    target_turns = max(1, len(record.context.competency_model.items))
+    return len(record.context.turns) < target_turns
+
+
+def _preopen_resume_chains(interview_id: str, resume_text: str) -> list[ProbeChain]:
+    chains: list[ProbeChain] = []
+    for claim in _high_risk_resume_claims(resume_text):
+        chains.append(
+            ProbeChain(
+                interview_id=interview_id,
+                topic=claim,
+                origin="resume_claim",
+                resume_claim_ref=claim,
+            )
+        )
+        if len(chains) >= 3:
+            break
+    return chains
+
+
+def _high_risk_resume_claims(resume_text: str) -> list[str]:
+    markers = ("独立", "主导", "负责", "提升", "优化", "上线", "%", "qps", "ms", "指标")
+    claims: list[str] = []
+    for raw in re.split(r"[。\n；;]", resume_text):
+        claim = raw.strip()
+        if len(claim) >= 8 and any(marker in claim for marker in markers):
+            claims.append(claim[:160])
+    return claims
+
+
+def _update_probe_chains_for_turn(record: InterviewRecord, turn: QATurn) -> None:
+    credibility = assess_credibility(turn.answer)
+    target = _chain_target_for_turn(turn)
+    if turn.question_source != "ai_probe" and not turn.probe_target and credibility.level != "suspicious":
+        return
+    chain = _find_or_create_probe_chain(record, target, origin="answer_claim")
+    if any(link.answer_turn_id == turn.turn_id for link in chain.links):
+        return
+    chain.links.append(
+        ChainLink(
+            probe_question=turn.question,
+            probe_target=target,
+            answer_turn_id=turn.turn_id,
+            credibility_after=credibility.level,
+        )
+    )
+    _refresh_probe_chain_verdict(chain)
+
+
+def _chain_target_for_turn(turn: QATurn) -> str:
+    if turn.probe_target:
+        return turn.probe_target
+    text = turn.answer.strip() or turn.question.strip()
+    return text[:80]
+
+
+def _find_or_create_probe_chain(
+    record: InterviewRecord,
+    target: str,
+    *,
+    origin: str,
+) -> ProbeChain:
+    normalized_target = target.strip().lower()
+    for chain in record.context.probe_chains:
+        normalized_topic = chain.topic.strip().lower()
+        if normalized_target in normalized_topic or normalized_topic in normalized_target:
+            return chain
+    chain = ProbeChain(
+        interview_id=record.id,
+        topic=target,
+        origin=origin,  # type: ignore[arg-type]
+    )
+    record.context.probe_chains.append(chain)
+    return chain
+
+
+def _refresh_probe_chain_verdict(chain: ProbeChain) -> None:
+    chain.verdict = "unresolved"
+    chain.crack_depth = None
+    if len(chain.links) >= 2 and all(link.credibility_after == "solid" for link in chain.links[-2:]):
+        chain.verdict = "held_up"
+        return
+    for index in range(len(chain.links) - 1):
+        current = chain.links[index]
+        next_link = chain.links[index + 1]
+        if (
+            current.credibility_after == "suspicious"
+            and next_link.credibility_after in {"suspicious", "vague"}
+        ):
+            chain.verdict = "cracked"
+            chain.crack_depth = index + 2
+            return
+
+
+def _persist_probe_chains(conn, interview_id: str, chains: list[ProbeChain]) -> None:
+    for index, chain in enumerate(chains):
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO probe_chains
+            (id, interview_id, chain_index, topic, origin, verdict, payload)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                chain.chain_id,
+                interview_id,
+                index,
+                chain.topic,
+                chain.origin,
+                chain.verdict,
+                dumps(chain.model_dump()),
+            ),
+        )
 
 
 def finish_interview(interview_id: str) -> InterviewRecord:
@@ -353,7 +582,7 @@ def run_offline_scoring_task(interview_id: str):
         "interview.scoring_started",
         {"interview_id": interview_id, "turn_count": len(record.context.turns)},
     )
-    aigc = detect_interview(record.context.turns)
+    aigc = detect_interview(record.context.turns, probe_chains=record.context.probe_chains)
     score = score_interview(record.context, aigc)
     report, html = build_report(record.context, score, aigc)
     record.status = InterviewStatus.reported

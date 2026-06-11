@@ -10,7 +10,7 @@ from typing import Any
 import httpx
 
 from libs.common.config import get_settings
-from libs.schemas import AIGCResult, QATurn
+from libs.schemas import AIGCResult, ProbeChain, QATurn
 
 
 TEMPLATE_PATH = Path(__file__).with_name("templates") / "common_answer_templates.txt"
@@ -49,8 +49,13 @@ def _cosine_similarity(a: str, b: str) -> float:
     return overlap / (left_norm * right_norm)
 
 
-def detect_turn(turn: QATurn, transport: httpx.BaseTransport | None = None) -> AIGCResult:
-    local = _local_detect_turn(turn)
+def detect_turn(
+    turn: QATurn,
+    transport: httpx.BaseTransport | None = None,
+    *,
+    cracked_turn_ids: set[str] | None = None,
+) -> AIGCResult:
+    local = _local_detect_turn(turn, cracked_turn_ids=cracked_turn_ids or set())
     settings = get_settings()
     if settings.aigc_detector_provider != "http":
         return local
@@ -60,7 +65,7 @@ def detect_turn(turn: QATurn, transport: httpx.BaseTransport | None = None) -> A
         return local
 
 
-def _local_detect_turn(turn: QATurn) -> AIGCResult:
+def _local_detect_turn(turn: QATurn, *, cracked_turn_ids: set[str]) -> AIGCResult:
     answer = turn.answer.strip()
     templates = load_templates()
     max_template = max(templates, key=lambda template: _cosine_similarity(answer, template))
@@ -74,17 +79,37 @@ def _local_detect_turn(turn: QATurn) -> AIGCResult:
         + template_similarity * 0.4,
     )
     settings = get_settings()
+    # Voice rehearsal detection uses transcript text features only. It does not infer biometric
+    # traits or facial/behavioral signals.
+    fluency_anomaly = _fluency_anomaly(answer, polished_markers)
+    chain_crack_bonus = 1.0 if turn.turn_id in cracked_turn_ids else 0.0
+    rehearsal_score = min(
+        1.0,
+        0.5 * template_similarity + 0.3 * fluency_anomaly + 0.2 * chain_crack_bonus,
+    )
     flagged = (
-        ai_generated_prob >= settings.aigc_ai_prob_threshold
+        rehearsal_score >= settings.rehearsal_threshold
         or template_similarity >= settings.aigc_template_similarity_threshold
     )
     return AIGCResult(
         turn_id=turn.turn_id,
         ai_generated_prob=round(ai_generated_prob, 3),
         template_similarity=round(template_similarity, 3),
+        rehearsal_score=round(rehearsal_score, 3),
+        mode="voice",
         matched_template=max_template if template_similarity > 0.2 else None,
         flagged=flagged,
     )
+
+
+def _fluency_anomaly(answer: str, polished_markers: list[str]) -> float:
+    if not answer:
+        return 0.0
+    filler_count = sum(answer.count(marker) for marker in ("嗯", "呃", "这个", "然后"))
+    marker_score = min(1.0, sum(marker in answer for marker in polished_markers) / 3)
+    long_polished = 1.0 if len(answer) >= 80 and filler_count == 0 else 0.0
+    punctuation_density = min(1.0, sum(answer.count(item) for item in ("，", "。", "；")) / 8)
+    return round(min(1.0, 0.45 * marker_score + 0.4 * long_polished + 0.15 * punctuation_density), 3)
 
 
 def _http_detect_turn(
@@ -121,12 +146,15 @@ def _http_detect_turn(
     flagged = (
         flagged
         or probability >= settings.aigc_ai_prob_threshold
+        or local.rehearsal_score >= settings.rehearsal_threshold
         or local.template_similarity >= settings.aigc_template_similarity_threshold
     )
     return AIGCResult(
         turn_id=turn.turn_id,
         ai_generated_prob=round(probability, 3),
         template_similarity=local.template_similarity,
+        rehearsal_score=local.rehearsal_score,
+        mode=local.mode,
         matched_template=local.matched_template,
         flagged=flagged,
     )
@@ -174,5 +202,16 @@ def _coerce_bool(value: Any) -> bool:
 def detect_interview(
     turns: list[QATurn],
     transport: httpx.BaseTransport | None = None,
+    *,
+    probe_chains: list[ProbeChain] | None = None,
 ) -> list[AIGCResult]:
-    return [detect_turn(turn, transport=transport) for turn in turns]
+    cracked_turn_ids = {
+        link.answer_turn_id
+        for chain in probe_chains or []
+        if chain.verdict == "cracked"
+        for link in chain.links
+    }
+    return [
+        detect_turn(turn, transport=transport, cracked_turn_ids=cracked_turn_ids)
+        for turn in turns
+    ]

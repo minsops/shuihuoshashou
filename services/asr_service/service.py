@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import base64
-import hashlib
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from threading import Lock
@@ -44,11 +43,6 @@ class ASRSessionDecision:
     reason: str = ""
 
 
-@dataclass
-class SpeakerDiarizationState:
-    cluster_roles: dict[str, Speaker] = field(default_factory=dict)
-
-
 class SpeakerDiarizer(ABC):
     @abstractmethod
     def resolve_speaker(
@@ -67,30 +61,14 @@ class SpeakerDiarizer(ABC):
 
 
 class LocalSpeakerDiarizer(SpeakerDiarizer):
-    def __init__(self) -> None:
-        self._sessions: dict[str, SpeakerDiarizationState] = {}
-
     def resolve_speaker(
         self,
         session_id: str,
         audio_b64: str | None,
         speaker: Speaker,
     ) -> Speaker:
-        fingerprint = _audio_fingerprint(audio_b64)
-        if fingerprint is None:
-            return speaker
-
-        state = self._sessions.setdefault(session_id, SpeakerDiarizationState())
-        if speaker in {"interviewer", "candidate"}:
-            state.cluster_roles[fingerprint] = speaker
-            return speaker
-        return state.cluster_roles.get(fingerprint, speaker)
-
-    def close(self, session_id: str) -> None:
-        self._sessions.pop(session_id, None)
-
-    def reset(self) -> None:
-        self._sessions.clear()
+        # Local mode is explicit speaker attribution, not biometric voiceprint matching.
+        return speaker
 
 
 class HTTPSpeakerDiarizer(SpeakerDiarizer):
@@ -419,18 +397,6 @@ def _coerce_int(value: Any, fallback: int) -> int:
         return fallback
 
 
-def _audio_fingerprint(audio_b64: str | None) -> str | None:
-    if not audio_b64:
-        return None
-    try:
-        raw = base64.b64decode(audio_b64)
-    except Exception:
-        return None
-    if not raw:
-        return None
-    return hashlib.sha256(raw).hexdigest()
-
-
 def get_asr_engine() -> ASREngine:
     settings = get_settings()
     if settings.asr_provider == "aliyun_ws":
@@ -448,7 +414,10 @@ def get_asr_engine() -> ASREngine:
 
 def get_speaker_diarizer() -> SpeakerDiarizer:
     settings = get_settings()
-    if settings.speaker_diarization_provider == "http":
+    if (
+        settings.speaker_mode == "http_diarization"
+        or settings.speaker_diarization_provider == "http"
+    ):
         return HTTPSpeakerDiarizer()
     return LocalSpeakerDiarizer()
 

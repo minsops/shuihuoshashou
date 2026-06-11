@@ -37,6 +37,30 @@ CREATE TABLE IF NOT EXISTS interviews (
     )
 );
 
+CREATE TABLE IF NOT EXISTS utterances (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    interview_id UUID NOT NULL REFERENCES interviews(id) ON DELETE CASCADE,
+    utterance_index INT NOT NULL CHECK (utterance_index >= 0),
+    speaker TEXT NOT NULL CHECK (speaker IN ('interviewer', 'candidate', 'unknown')),
+    text TEXT NOT NULL CHECK (btrim(text) <> ''),
+    start_ms INT NOT NULL CHECK (start_ms >= 0),
+    end_ms INT NOT NULL CHECK (end_ms >= start_ms),
+    sentence_count INT NOT NULL CHECK (sentence_count >= 1),
+    payload JSONB NOT NULL,
+    UNIQUE (interview_id, utterance_index)
+);
+
+CREATE TABLE IF NOT EXISTS probe_chains (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    interview_id UUID NOT NULL REFERENCES interviews(id) ON DELETE CASCADE,
+    chain_index INT NOT NULL CHECK (chain_index >= 0),
+    topic TEXT NOT NULL CHECK (btrim(topic) <> ''),
+    origin TEXT NOT NULL CHECK (origin IN ('resume_claim', 'answer_claim', 'competency_gap')),
+    verdict TEXT NOT NULL CHECK (verdict IN ('held_up', 'cracked', 'unresolved')),
+    payload JSONB NOT NULL,
+    UNIQUE (interview_id, chain_index)
+);
+
 CREATE TABLE IF NOT EXISTS qa_turns (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     interview_id UUID NOT NULL REFERENCES interviews(id) ON DELETE CASCADE,
@@ -47,9 +71,16 @@ CREATE TABLE IF NOT EXISTS qa_turns (
     answer_start_ms INT NOT NULL CHECK (answer_start_ms >= 0),
     answer_end_ms INT NOT NULL CHECK (answer_end_ms >= answer_start_ms),
     probe_target TEXT CHECK (probe_target IS NULL OR btrim(probe_target) <> ''),
+    question_utterance_id UUID REFERENCES utterances(id) ON DELETE SET NULL,
+    answer_utterance_id UUID REFERENCES utterances(id) ON DELETE SET NULL,
     payload JSONB NOT NULL,
     UNIQUE (interview_id, turn_index)
 );
+
+ALTER TABLE IF EXISTS qa_turns
+    ADD COLUMN IF NOT EXISTS question_utterance_id UUID REFERENCES utterances(id) ON DELETE SET NULL;
+ALTER TABLE IF EXISTS qa_turns
+    ADD COLUMN IF NOT EXISTS answer_utterance_id UUID REFERENCES utterances(id) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS probe_patterns (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -101,6 +132,8 @@ CREATE TABLE IF NOT EXISTS consents (
 
 CREATE INDEX IF NOT EXISTS idx_interviews_job_id ON interviews(job_id);
 CREATE INDEX IF NOT EXISTS idx_interviews_candidate_id ON interviews(candidate_id);
+CREATE INDEX IF NOT EXISTS idx_utterances_interview_id ON utterances(interview_id);
+CREATE INDEX IF NOT EXISTS idx_probe_chains_interview_id ON probe_chains(interview_id);
 CREATE INDEX IF NOT EXISTS idx_qa_turns_interview_id ON qa_turns(interview_id);
 CREATE INDEX IF NOT EXISTS idx_probe_patterns_job_id ON probe_patterns(job_id);
 CREATE INDEX IF NOT EXISTS idx_aigc_results_interview_id ON aigc_results(interview_id);

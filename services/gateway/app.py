@@ -4,6 +4,7 @@ import asyncio
 import base64
 import binascii
 import json
+import re
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -41,6 +42,7 @@ from libs.schemas import (
     ProbeRequest,
     ProbeSuggestion,
     QATurn,
+    ResumeClaim,
     ReportBuildRequest,
     ScoringRequest,
     TranscriptSegment,
@@ -55,8 +57,10 @@ from services.asr_service.service import (
     get_asr_engine,
 )
 from services.document_service import parse_document
+from services.interview_orchestrator.dialogue import DialogueAssembler
 from services.interview_orchestrator.service import (
     add_turn,
+    add_utterance,
     create_candidate,
     create_consent,
     create_interview,
@@ -64,11 +68,11 @@ from services.interview_orchestrator.service import (
     get_interview,
     get_report,
     has_active_consent,
-    should_probe,
+    should_probe_turn,
     start_interview,
 )
 from services.jd_kb_service.service import create_job, get_job, retrieve_job_probe_patterns
-from services.probe_service.service import generate_probe
+from services.probe_service.service import fallback_probe, generate_probe
 from services.report_service.service import build_report
 from services.scoring_service.service import score_interview
 from services.signal_service.service import extract_behavior_signal
@@ -516,48 +520,61 @@ def index() -> str:
     return WEB_INDEX.read_text(encoding="utf-8")
 
 
-async def _send_probe_for_segment(
+def _probe_request_for_turn(record, turn: QATurn) -> ProbeRequest:
+    return ProbeRequest(
+        job_id=record.job_id,
+        competency_model=record.context.competency_model,
+        recent_turns=record.context.turns[-5:],
+        latest_answer=turn.answer,
+        resume_claims=_resume_claims_for_probe(record),
+    )
+
+
+def _resume_claims_for_probe(record) -> list[ResumeClaim]:
+    markers = ("独立", "主导", "负责", "提升", "优化", "上线", "%", "qps", "ms", "指标")
+    claims: list[ResumeClaim] = []
+    for raw in re.split(r"[。\n；;]", record.context.candidate_resume_text):
+        text = raw.strip()
+        if len(text) < 8 or not any(marker in text for marker in markers):
+            continue
+        tags = [marker for marker in markers if marker in text][:4]
+        claims.append(ResumeClaim(text=text, tags=tags or ["resume"]))
+        if len(claims) >= 5:
+            break
+    return claims
+
+
+def _schedule_probe_task(
     websocket: WebSocket,
-    interview_id: str,
     record,
-    segment,
-    *,
-    question: str = "实时输入片段",
-    question_source: str = "interviewer",
-    probe_target: str | None = None,
-):
-    clean_question = question.strip() or "实时输入片段"
-    clean_source = "ai_probe" if question_source == "ai_probe" else "interviewer"
-    clean_probe_target = probe_target.strip() if probe_target else None
-    if clean_source == "ai_probe" and not clean_probe_target:
-        clean_probe_target = "AI 追问建议"
-    turn = QATurn(
-        question=clean_question,
-        question_source=clean_source,
-        answer=segment.text,
-        answer_start_ms=segment.start_ms,
-        answer_end_ms=segment.end_ms,
-        probe_target=clean_probe_target,
-    )
-    record = add_turn(interview_id, turn)
-    probe = await generate_probe(
-        ProbeRequest(
-            job_id=record.job_id,
-            competency_model=record.context.competency_model,
-            recent_turns=record.context.turns[-5:],
-            latest_answer=segment.text,
+    turn: QATurn,
+) -> None:
+    request = _probe_request_for_turn(record, turn)
+
+    async def _run() -> None:
+        try:
+            fallback = fallback_probe(request)
+        except Exception:
+            return
+        await websocket.send_json({"type": "probe", "payload": fallback.model_dump()})
+        await websocket.send_json(
+            {"type": "credibility", "payload": fallback.credibility.model_dump()}
         )
-    )
-    await websocket.send_json({"type": "probe", "payload": probe.model_dump()})
-    await websocket.send_json({"type": "credibility", "payload": probe.credibility.model_dump()})
-    signal = (
-        extract_behavior_signal(turn)
-        if record.signal_enabled and has_active_consent(record.candidate_id, "behavior_signal")
-        else None
-    )
-    if signal is not None:
-        await websocket.send_json({"type": "signal", "payload": signal.model_dump()})
-    return record
+        signal = (
+            extract_behavior_signal(turn)
+            if record.signal_enabled and has_active_consent(record.candidate_id, "behavior_signal")
+            else None
+        )
+        if signal is not None:
+            await websocket.send_json({"type": "signal", "payload": signal.model_dump()})
+        try:
+            probe = await generate_probe(request)
+        except Exception:
+            return
+        if probe.model_dump() != fallback.model_dump():
+            await websocket.send_json({"type": "probe_update", "payload": probe.model_dump()})
+
+    asyncio.create_task(_run())
 
 
 def _manual_probe_segment(interview_id: str, event: dict) -> TranscriptSegment:
@@ -1016,7 +1033,12 @@ def api_report_transcript(interview_id: str):
         if transcript is None:
             raise KeyError(f"report transcript not found: {interview_id}")
         return JSONResponse(
-            transcript,
+            {
+                "qa_turns": transcript,
+                "full_transcript": report.get("utterances", []),
+                "probe_chains": report.get("probe_chains", []),
+                "analysis_mode": report.get("analysis_mode", "llm"),
+            },
             headers={
                 "content-disposition": f'attachment; filename="{interview_id}.transcript.json"'
             },
@@ -1042,6 +1064,40 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
     aliyun_reader_task: asyncio.Task[None] | None = None
     aliyun_result_seq = 1
     aliyun_audio_contexts: list[_AliyunAudioContext] = []
+    assembler = DialogueAssembler(silence_close_ms=settings.dialogue_silence_close_ms)
+
+    async def handle_dialogue_segment(
+        segment: TranscriptSegment,
+        *,
+        fallback_question: str | None = None,
+        question_source: str = "interviewer",
+        probe_target: str | None = None,
+        force_close: bool = False,
+        emit_probe: bool = True,
+    ) -> None:
+        result = assembler.feed(
+            segment,
+            fallback_question=fallback_question,
+            question_source=question_source,
+            probe_target=probe_target,
+            force_close=force_close,
+        )
+        await persist_dialogue_result(result, emit_probe=emit_probe)
+
+    async def persist_dialogue_result(result, *, emit_probe: bool = True) -> None:
+        nonlocal record
+        for utterance in result.utterances:
+            record = add_utterance(interview_id, utterance)
+        for turn in result.turns:
+            record = add_turn(interview_id, turn)
+            await sender.send_json(
+                {
+                    "type": "probe_chains",
+                    "payload": [chain.model_dump() for chain in record.context.probe_chains],
+                }
+            )
+            if emit_probe and should_probe_turn(turn, record):
+                _schedule_probe_task(sender, record, turn)
 
     async def ensure_aliyun_session():
         nonlocal aliyun_session, aliyun_reader_task
@@ -1080,16 +1136,12 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                 continue
             segment = decision.segment
             await sender.send_json({"type": "transcript", "payload": segment.model_dump()})
-            if should_probe(segment, record):
-                record = await _send_probe_for_segment(
-                    sender,
-                    interview_id,
-                    record,
-                    segment,
-                    question=context.question if context is not None else "实时语音片段",
-                    question_source=context.question_source if context is not None else "interviewer",
-                    probe_target=context.probe_target if context is not None else None,
-                )
+            await handle_dialogue_segment(
+                segment,
+                fallback_question=context.question if context is not None else "实时语音片段",
+                question_source=context.question_source if context is not None else "interviewer",
+                probe_target=context.probe_target if context is not None else None,
+            )
 
     try:
         record = start_interview(interview_id)
@@ -1187,16 +1239,12 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                     continue
                 segment = decision.segment
                 await sender.send_json({"type": "transcript", "payload": segment.model_dump()})
-                if should_probe(segment, record):
-                    record = await _send_probe_for_segment(
-                        sender,
-                        interview_id,
-                        record,
-                        segment,
-                        question=_event_question(event),
-                        question_source=_event_question_source(event),
-                        probe_target=_event_probe_target(event),
-                    )
+                await handle_dialogue_segment(
+                    segment,
+                    fallback_question=_event_question(event),
+                    question_source=_event_question_source(event),
+                    probe_target=_event_probe_target(event),
+                )
             elif event.get("type") == "text_turn":
                 seq = _event_seq(event, 1)
                 if seq is None:
@@ -1241,16 +1289,13 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                     continue
                 segment = decision.segment
                 await sender.send_json({"type": "transcript", "payload": segment.model_dump()})
-                if should_probe(segment, record):
-                    record = await _send_probe_for_segment(
-                        sender,
-                        interview_id,
-                        record,
-                        segment,
-                        question=_event_question(event),
-                        question_source=_event_question_source(event),
-                        probe_target=_event_probe_target(event),
-                    )
+                await handle_dialogue_segment(
+                    segment,
+                    fallback_question=_event_question(event),
+                    question_source=_event_question_source(event),
+                    probe_target=_event_probe_target(event),
+                    force_close=True,
+                )
             elif event.get("type") == "manual_probe":
                 if not str(event.get("answer") or event.get("latest_answer") or "").strip():
                     await sender.send_json(
@@ -1262,14 +1307,13 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                 except ValueError as exc:
                     await sender.send_json({"type": "error", "detail": str(exc)})
                     continue
-                record = await _send_probe_for_segment(
-                    sender,
-                    interview_id,
-                    record,
+                await sender.send_json({"type": "transcript", "payload": segment.model_dump()})
+                await handle_dialogue_segment(
                     segment,
-                    question=_event_question(event),
+                    fallback_question=_event_question(event),
                     question_source=_event_question_source(event),
                     probe_target=_event_probe_target(event),
+                    force_close=True,
                 )
             elif event.get("type") == "end":
                 try:
@@ -1277,6 +1321,7 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                         await aliyun_session.close()
                     if aliyun_reader_task is not None:
                         await aliyun_reader_task
+                    await persist_dialogue_result(assembler.flush(), emit_probe=False)
                     result = await asyncio.to_thread(end_interview, interview_id)
                 except (KeyError, ValueError) as exc:
                     await sender.send_json({"type": "error", "detail": str(exc)})

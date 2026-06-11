@@ -76,15 +76,30 @@ class LLMClient:
         fallback: T,
         raise_on_error: bool = False,
     ) -> T:
+        result, _ = self.complete_json_sync_with_meta(
+            messages,
+            schema,
+            fallback,
+            raise_on_error=raise_on_error,
+        )
+        return result
+
+    def complete_json_sync_with_meta(
+        self,
+        messages: list[LLMMessage],
+        schema: type[T],
+        fallback: T,
+        raise_on_error: bool = False,
+    ) -> tuple[T, bool]:
         settings = get_settings()
         if settings.llm_provider == "mock" or not settings.llm_api_key or not settings.llm_base_url:
-            return fallback
+            return fallback, True
         if settings.llm_rate_limit_enabled:
             limited = _llm_rate_limited(settings.llm_provider, settings.llm_model)
             if limited:
                 if raise_on_error:
                     raise RuntimeError(limited)
-                return fallback
+                return fallback, True
         payload = _request_payload(messages)
         headers = _auth_headers()
         url = settings.llm_base_url.rstrip("/") + "/" + settings.llm_api_path.lstrip("/")
@@ -98,14 +113,14 @@ class LLMClient:
                 ) as client:
                     response = client.post(url, headers=headers, json=payload)
                     response.raise_for_status()
-                return _parse_json_response(response.json(), schema)
+                return _parse_json_response(response.json(), schema), False
             except Exception as exc:
                 last_error = exc
                 if attempt == max_attempts - 1:
                     if raise_on_error:
                         raise RuntimeError(_safe_error_message(last_error)) from exc
-                    return fallback
-        return fallback
+                    return fallback, True
+        return fallback, True
 
 
 def get_llm_client() -> LLMClient:
