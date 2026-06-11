@@ -2079,6 +2079,65 @@ def test_gateway_websocket_question_flow_events_with_question_bank(
     )
 
 
+def test_gateway_websocket_emits_next_options_update_when_llm_refines(
+    tmp_path: Path, monkeypatch
+) -> None:
+    class FakeNextOptionsClient:
+        async def complete_json(self, messages, schema, fallback, raise_on_error=False):
+            assert "NextOptions" in messages[0].content
+            refined_alternative = fallback.alternatives[0].model_copy(
+                update={
+                    "option_id": "llm-alt-1",
+                    "question": "请具体说明这次网关优化中你如何设计限流阈值和回滚方案？",
+                    "reason": "LLM 精排后优先验证关键技术决策。",
+                }
+            )
+            return fallback.model_copy(
+                update={"alternatives": [refined_alternative, *fallback.alternatives[1:]]}
+            )
+
+    monkeypatch.setattr(
+        "services.interview_orchestrator.question_flow.get_llm_client",
+        lambda: FakeNextOptionsClient(),
+    )
+    client = _client(tmp_path, monkeypatch)
+    setup = client.post(
+        "/api/interviews/quick-setup",
+        json={
+            "jd_text": "负责 Python FastAPI 网关、限流、降级和 LLM 编排。",
+            "resume_text": "姓名：候选人\n独立主导网关优化，响应时间提升 50%。",
+        },
+    ).json()
+
+    with client.websocket_connect(f"/ws/interview/{setup['interview_id']}") as websocket:
+        current = websocket.receive_json()
+        websocket.send_json(
+            {
+                "type": "text_turn",
+                "seq": 1,
+                "speaker": "interviewer",
+                "answer": current["payload"]["question"],
+            }
+        )
+        websocket.receive_json()
+        _receive_until(websocket, "question_matched")
+
+        websocket.send_json(
+            {
+                "type": "text_turn",
+                "seq": 2,
+                "speaker": "candidate",
+                "answer": "我亲自写了限流中间件、降级开关和监控指标。",
+            }
+        )
+        websocket.receive_json()
+        _receive_until(websocket, "next_options")
+        update, _ = _receive_until(websocket, "next_options_update", limit=12)
+
+    assert update["payload"]["alternatives"][0]["option_id"] == "llm-alt-1"
+    assert "限流阈值" in update["payload"]["alternatives"][0]["question"]
+
+
 def test_gateway_text_turn_works_with_aliyun_ws_provider(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("ASR_PROVIDER", "aliyun_ws")
     monkeypatch.setenv("ALIYUN_ASR_API_KEY", "dashscope-secret")

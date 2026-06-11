@@ -24,6 +24,16 @@ def test_load_question_bank_prompt_reads_prompt_file() -> None:
     assert prompt == prompt.strip()
 
 
+def test_load_next_options_prompt_reads_prompt_file() -> None:
+    prompt = load_prompt("next_options.md")
+
+    assert "实时面试问题编排助手" in prompt
+    assert "NextOptions" in prompt
+    assert "follow_up" in prompt
+    assert "alternatives" in prompt
+    assert prompt == prompt.strip()
+
+
 def test_load_prompt_rejects_path_separators() -> None:
     with pytest.raises(ValueError):
         load_prompt("../probe_system.md")

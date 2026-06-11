@@ -68,6 +68,7 @@ from services.interview_orchestrator.question_flow import (
     QuestionFlowState,
     fallback_next_options,
     find_option,
+    generate_next_options,
     initial_question,
 )
 from services.interview_orchestrator.question_match import match_asked_question
@@ -680,6 +681,35 @@ def _schedule_probe_task(
             return
         if probe.model_dump() != fallback.model_dump():
             await websocket.send_json({"type": "probe_update", "payload": probe.model_dump()})
+
+    asyncio.create_task(_run())
+
+
+def _schedule_next_options_update(
+    runtime: _DialogueSessionRuntime,
+    record,
+    turn: QATurn,
+    fallback_options,
+) -> None:
+    async def _run() -> None:
+        if runtime.question_flow is None:
+            return
+        try:
+            refined = await generate_next_options(
+                record,
+                runtime.question_flow.bank,
+                turn,
+                fallback_options,
+            )
+        except Exception:
+            return
+        if refined.model_dump() == fallback_options.model_dump():
+            return
+        async with runtime.lock:
+            if runtime.question_flow is None:
+                return
+            runtime.question_flow.last_options = refined
+        await runtime.send_json({"type": "next_options_update", "payload": refined.model_dump()})
 
     asyncio.create_task(_run())
 
@@ -1322,6 +1352,7 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                 options = fallback_next_options(record, runtime.question_flow.bank, turn)
                 runtime.question_flow.last_options = options
                 await runtime.send_json({"type": "next_options", "payload": options.model_dump()})
+                _schedule_next_options_update(runtime, record, turn, options)
             if emit_probe and (force_probe or should_probe_turn(turn, record)):
                 _schedule_probe_task(runtime, record, turn)
 

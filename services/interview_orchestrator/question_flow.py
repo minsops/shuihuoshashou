@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 
+from libs.common.prompts import load_prompt
+from libs.llm_client import LLMMessage, get_llm_client
 from libs.schemas import NextOption, NextOptions, QATurn, QuestionBank, QuestionBankItem
 from services.probe_service.service import assess_credibility
 
@@ -32,6 +35,39 @@ def fallback_next_options(record, bank: QuestionBank, after_turn: QATurn) -> Nex
         follow_up=[follow_up],
         alternatives=alternatives,
     )
+
+
+async def generate_next_options(
+    record,
+    bank: QuestionBank,
+    after_turn: QATurn,
+    fallback: NextOptions,
+) -> NextOptions:
+    messages = [
+        LLMMessage(role="system", content=load_prompt("next_options.md")),
+        LLMMessage(
+            role="user",
+            content=json.dumps(
+                {
+                    "interview_id": bank.interview_id,
+                    "job_id": record.job_id,
+                    "candidate_id": record.candidate_id,
+                    "latest_turn": after_turn.model_dump(),
+                    "recent_turns": [turn.model_dump() for turn in record.context.turns[-5:]],
+                    "probe_chains": [chain.model_dump() for chain in record.context.probe_chains],
+                    "question_bank_unasked": [
+                        item.model_dump() for item in bank.items if not item.asked
+                    ],
+                    "fallback_options": fallback.model_dump(),
+                },
+                ensure_ascii=False,
+            ),
+        ),
+    ]
+    draft = await get_llm_client().complete_json(messages, NextOptions, fallback)
+    if draft.interview_id != bank.interview_id or draft.after_turn_id != after_turn.turn_id:
+        return fallback
+    return draft
 
 
 def find_option(flow: QuestionFlowState, option_id: str) -> NextOption | None:
