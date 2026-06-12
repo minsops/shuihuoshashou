@@ -150,11 +150,16 @@ def create_interview(payload: InterviewCreate) -> InterviewRecord:
         if not has_active_consent(payload.candidate_id, "behavior_signal"):
             raise PermissionError("behavior signal requires explicit candidate consent")
     interview_id = new_id()
+    with connect() as conn:
+        row = conn.execute("SELECT COUNT(*) AS total FROM interviews").fetchone()
+    interview_seq = int(row["total"]) + 1
     ctx = InterviewContext(
         session_id=interview_id,
         job_id=payload.job_id,
         candidate_id=payload.candidate_id,
         competency_model=job.competency_model,
+        candidate_name=candidate.name,
+        interview_seq=interview_seq,
         candidate_resume_text=candidate.resume_text,
         probe_chains=_preopen_resume_chains(interview_id, candidate.resume_text),
     )

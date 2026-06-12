@@ -7,6 +7,31 @@ from libs.common.config import get_settings
 from libs.common.prompts import load_prompt
 from libs.llm_client import LLMMessage, get_llm_client
 from libs.schemas import AIGCResult, DimensionScore, EvidenceRef, InterviewContext, InterviewScore, QATurn
+from services.probe_service.service import assess_credibility
+
+SUBSTANCE_FULL_ANSWER_CHARS = 120
+SUBSTANCE_SCORE_FLOOR = 15.0
+SUBSTANCE_RISK_THRESHOLD = 0.35
+CREDIBILITY_SUBSTANCE_FACTORS = {"solid": 1.0, "vague": 0.55, "suspicious": 0.25}
+
+
+def _answer_substance_factor(ctx: InterviewContext) -> float:
+    """回答实质程度 0..1：由可信度信号与回答长度确定，纯寒暄/灌水回答趋近 0。"""
+    if not ctx.turns:
+        return 0.0
+    factors: list[float] = []
+    for turn in ctx.turns:
+        answer = turn.answer.strip()
+        level_factor = CREDIBILITY_SUBSTANCE_FACTORS[assess_credibility(answer).level]
+        length_factor = min(1.0, len(answer) / SUBSTANCE_FULL_ANSWER_CHARS)
+        factors.append(level_factor * length_factor)
+    return round(sum(factors) / len(factors), 4)
+
+
+def _substance_cap(ctx: InterviewContext) -> float:
+    """所有正权重维度分数的确定性上限，保证垃圾回答拿不到高分。"""
+    factor = _answer_substance_factor(ctx)
+    return round(SUBSTANCE_SCORE_FLOOR + (100.0 - SUBSTANCE_SCORE_FLOOR) * factor, 2)
 
 
 def _evidence_for_dimension(ctx: InterviewContext, dimension: str) -> list[EvidenceRef]:
@@ -79,6 +104,10 @@ def fallback_score_interview(
             depth = chain.crack_depth or len(chain.links)
             risk_notes.append(f"声明「{chain.topic}」在第 {depth} 层追问露馅。")
     held_up_bonus = min(9.0, settings.chain_held_up_bonus * len(held_up_chains))
+    substance_factor = _answer_substance_factor(ctx)
+    substance_cap = _substance_cap(ctx)
+    if substance_factor < SUBSTANCE_RISK_THRESHOLD:
+        risk_notes.append("回答缺乏实质内容（过短或空泛），分数已按内容质量封顶，建议人工复核。")
 
     dimensions: list[DimensionScore] = []
     for item in ctx.competency_model.items:
@@ -92,6 +121,8 @@ def fallback_score_interview(
         elif item.name == "沟通与逻辑":
             avg_len = sum(len(turn.answer) for turn in ctx.turns) / max(1, len(ctx.turns))
             base += 5.0 if avg_len > 80 else -8.0
+        if item.weight > 0:
+            base = min(base, substance_cap)
         dimensions.append(
             DimensionScore(
                 dimension=item.name,
@@ -102,20 +133,12 @@ def fallback_score_interview(
         )
 
     total = _compute_total_score(dimensions)
-    if total >= 88:
-        recommendation = "strong_yes"
-    elif total >= 75:
-        recommendation = "yes"
-    elif total >= 60:
-        recommendation = "hold"
-    else:
-        recommendation = "no"
     return InterviewScore(
         session_id=ctx.session_id,
         dimensions=dimensions,
         total_score=total,
         risk_notes=risk_notes,
-        recommendation=recommendation,
+        recommendation=_recommendation(total),
         analysis_mode="fallback",
     )
 
@@ -142,6 +165,7 @@ def score_interview(ctx: InterviewContext, aigc_results: list[AIGCResult]) -> In
 
 def _scoring_payload(ctx: InterviewContext, aigc_results: list[AIGCResult]) -> str:
     payload = {
+        "session_id": ctx.session_id,
         "job_id": ctx.job_id,
         "candidate_id": ctx.candidate_id,
         "candidate_resume_text": ctx.candidate_resume_text,
@@ -191,6 +215,7 @@ def _normalize_score(
     deterministic_risk_present = bool(fallback.risk_notes)
     has_cracked_chain = any(chain.verdict == "cracked" for chain in ctx.probe_chains)
     has_held_up_chain = any(chain.verdict == "held_up" for chain in ctx.probe_chains)
+    substance_cap = _substance_cap(ctx)
     normalized_dimensions: list[DimensionScore] = []
     for item in ctx.competency_model.items:
         draft_dimension = next(
@@ -204,17 +229,20 @@ def _normalize_score(
         if not evidence:
             evidence = fallback_by_dimension[item.name].evidence
         fallback_dimension = fallback_by_dimension[item.name]
+        score = _normalize_dimension_score(
+            item.name,
+            draft_dimension,
+            fallback_dimension,
+            deterministic_risk_present=deterministic_risk_present,
+            has_cracked_chain=has_cracked_chain,
+            has_held_up_chain=has_held_up_chain,
+        )
+        if item.weight > 0:
+            score = min(score, substance_cap)
         normalized_dimensions.append(
             DimensionScore(
                 dimension=item.name,
-                score=_normalize_dimension_score(
-                    item.name,
-                    draft_dimension,
-                    fallback_dimension,
-                    deterministic_risk_present=deterministic_risk_present,
-                    has_cracked_chain=has_cracked_chain,
-                    has_held_up_chain=has_held_up_chain,
-                ),
+                score=score,
                 weight=item.weight,
                 evidence=evidence,
             )

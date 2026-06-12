@@ -21,165 +21,62 @@ from libs.schemas import (
 )
 
 
-REPORT_TEMPLATE = Template(
-    """
-    <!doctype html>
-    <html lang="zh-CN">
-    <head>
-      <meta charset="utf-8">
-      <title>水货杀手面试报告</title>
-      <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 32px; color: #172033; }
-        h1, h2 { margin: 0 0 12px; }
-        section { margin: 24px 0; }
-        table { border-collapse: collapse; width: 100%; }
-        td, th { border: 1px solid #d9dee8; padding: 8px; text-align: left; }
-        .risk { color: #b42318; font-weight: 700; }
-        .flagged { background: #fff1f0; color: #912018; font-weight: 700; }
-        .highlight { background: #ecfdf3; color: #05603a; font-weight: 700; }
-        .fallback { border: 1px solid #f79009; background: #fffaeb; color: #93370d; padding: 10px 12px; font-weight: 700; }
-      </style>
-    </head>
-    <body>
-      <h1>水货杀手面试报告</h1>
-      {% if analysis_mode == "fallback" %}
-      <p class="fallback">本报告由确定性规则生成（未启用大模型分析），分数仅供链路验证，不可用于招聘决策。</p>
-      {% endif %}
-      <p>总分：<strong>{{ score.total_score }}</strong> ｜ 建议：<strong>{{ score.recommendation }}</strong></p>
-      <section>
-        <h2>总评</h2>
-        <p>{{ summary }}</p>
-      </section>
-      <section>
-        <h2>问题采纳统计</h2>
-        <p>
-          系统建议 {{ question_adoption.suggested_unique_count }} 题｜
-          采纳 {{ question_adoption.adopted_suggested_count }} 题｜
-          自定义 {{ question_adoption.custom_question_count }} 题｜
-          采纳率 {{ "%.1f"|format(question_adoption.adoption_rate * 100) }}%
-        </p>
-        <p>当前策略：{{ question_adoption.steering_focus }}</p>
-      </section>
-      {% if candidate_resume_text %}
-      <section>
-        <h2>简历摘要</h2>
-        <p>{{ candidate_resume_text }}</p>
-      </section>
-      {% endif %}
-      <section>
-        <h2>亮点</h2>
-        {% if strengths %}
-        <ul>
-          {% for item in strengths %}
-          <li class="highlight">{{ item }}</li>
-          {% endfor %}
-        </ul>
-        {% else %}
-        <p>暂无明确高可信亮点，建议结合追问继续观察。</p>
-        {% endif %}
-      </section>
-      <section>
-        <h2>维度得分</h2>
-        {% if radar_chart_uri %}
-        <img src="{{ radar_chart_uri }}" alt="维度雷达图" style="max-width: 520px; width: 100%; margin: 8px 0 18px;">
-        {% endif %}
-        <table>
-          <tr><th>编号</th><th>维度</th><th>分数</th><th>权重</th><th>证据</th></tr>
-          {% for d in score.dimensions %}
-          <tr>
-            <td>D{{ loop.index }}</td>
-            <td>{{ d.dimension }}</td>
-            <td>{{ d.score }}</td>
-            <td>{{ d.weight }}</td>
-            <td>{% for e in d.evidence %}{{ e.excerpt }}<br>{% endfor %}</td>
-          </tr>
-          {% endfor %}
-        </table>
-      </section>
-      <section>
-        <h2>风险点</h2>
-        {% for note in risk_highlights %}<p class="risk">{{ note }}</p>{% endfor %}
-      </section>
-      <section>
-        <h2>追问链</h2>
-      {% if probe_chains %}
-        <table>
-          <tr><th>主题</th><th>来源</th><th>层数</th><th>判定</th><th>关键链路</th></tr>
-          {% for chain in probe_chains %}
-          <tr>
-            <td>{{ chain.topic }}</td>
-            <td>{{ chain.origin }}</td>
-            <td>{{ chain.links | length }}</td>
-            <td>{{ chain.verdict }}{% if chain.crack_depth %} · 第 {{ chain.crack_depth }} 层{% endif %}</td>
-            <td>
-              {% for link in chain.links %}
-              {{ loop.index }}. Q：{{ link.probe_question }}<br>
-              A：{{ link.answer_excerpt }}<br>
-              判定：{{ link.credibility_after }}<br>
-              {% endfor %}
-            </td>
-          </tr>
-          {% endfor %}
-        </table>
-        {% else %}
-        <p>暂无追问链。</p>
-        {% endif %}
-      </section>
-      <section>
-        <h2>背稿与模板化检测</h2>
-        <table>
-          <tr><th>Turn ID</th><th>模式</th><th>背稿分</th><th>模板相似度</th><th>命中模板</th><th>状态</th></tr>
-          {% for item in aigc_results %}
-          <tr class="{{ 'flagged' if item.flagged else '' }}">
-            <td>{{ item.turn_id }}</td>
-            <td>{{ item.mode }}</td>
-            <td>{{ item.rehearsal_score }}</td>
-            <td>{{ item.template_similarity }}</td>
-            <td>{{ item.matched_template or "" }}</td>
-            <td>{{ "疑似注水/模板化" if item.flagged else "未命中" }}</td>
-          </tr>
-          {% endfor %}
-        </table>
-      </section>
-      <section>
-        <h2>完整转写</h2>
-        {% if utterances %}
-        <table>
-          <tr><th>序号</th><th>说话人</th><th>内容</th><th>时间</th><th>句子数</th></tr>
-          {% for utterance in utterances %}
-          <tr>
-            <td>{{ loop.index }}</td>
-            <td>{{ utterance.speaker }}</td>
-            <td>{{ utterance.text }}</td>
-            <td>{{ utterance.start_ms }}ms - {{ utterance.end_ms }}ms</td>
-            <td>{{ utterance.sentence_count }}</td>
-          </tr>
-          {% endfor %}
-        </table>
-        {% else %}
-        <p>暂无完整双向转写。</p>
-        {% endif %}
-      </section>
-      <section>
-        <h2>问答轮次</h2>
-        <table>
-          <tr><th>序号</th><th>来源</th><th>问题</th><th>回答</th><th>时间</th><th>追问目标</th></tr>
-          {% for turn in transcript %}
-          <tr>
-            <td>{{ loop.index }}</td>
-            <td>{{ turn.question_source }}</td>
-            <td>{{ turn.question }}</td>
-            <td>{{ turn.answer }}</td>
-            <td>{{ turn.answer_start_ms }}ms - {{ turn.answer_end_ms }}ms</td>
-            <td>{{ turn.probe_target or "" }}</td>
-          </tr>
-          {% endfor %}
-        </table>
-      </section>
-    </body>
-    </html>
-    """
-)
+TEMPLATE_PATH = Path(__file__).resolve().parent / "templates" / "report.html.j2"
+REPORT_TEMPLATE = Template(TEMPLATE_PATH.read_text(encoding="utf-8"))
+
+RECOMMENDATION_LABELS = {
+    "strong_yes": "强烈推荐",
+    "yes": "推荐",
+    "hold": "待定",
+    "no": "不推荐",
+}
+RECOMMENDATION_TONES = {
+    "strong_yes": "green",
+    "yes": "green",
+    "hold": "amber",
+    "no": "red",
+}
+ANALYSIS_MODE_LABELS = {"llm": "大模型 + 规则校验", "fallback": "确定性规则兜底"}
+SPEAKER_LABELS = {"interviewer": "面试官", "candidate": "候选人", "unknown": "未知"}
+QUESTION_SOURCE_LABELS = {"interviewer": "面试官提问", "ai_probe": "AI 追问"}
+CHAIN_ORIGIN_LABELS = {
+    "resume_claim": "简历声明",
+    "answer_claim": "回答声明",
+    "competency_gap": "覆盖缺口",
+}
+CHAIN_VERDICT_LABELS = {
+    "cracked": "追问露馅",
+    "held_up": "经受住追问",
+    "unresolved": "未定",
+}
+CHAIN_VERDICT_TONES = {"cracked": "red", "held_up": "green", "unresolved": "gray"}
+CREDIBILITY_LABELS = {"solid": "可信", "vague": "含糊", "suspicious": "可疑"}
+AIGC_MODE_LABELS = {"voice": "语音", "text": "文字"}
+STEERING_LABELS = {
+    "balanced": "均衡",
+    "resume_drill": "深挖简历",
+    "jd_professional": "JD 专业题",
+}
+
+
+def _candidate_display_name(ctx: InterviewContext) -> str:
+    return ctx.candidate_name.strip() or "候选人"
+
+
+def _report_number(ctx: InterviewContext) -> str:
+    return f"{ctx.interview_seq:03d}" if ctx.interview_seq > 0 else ctx.session_id[:8]
+
+
+def _report_basename(ctx: InterviewContext) -> str:
+    """报告产物命名原则：面试序号 + 面试者姓名（旧数据无序号/姓名时退回 session_id）。"""
+    name = ctx.candidate_name.strip()
+    if ctx.interview_seq > 0 and name:
+        safe_name = "".join(
+            char if char.isalnum() or "一" <= char <= "鿿" else "-" for char in name
+        ).strip("-")
+        if safe_name:
+            return f"{ctx.interview_seq:03d}-{safe_name}"
+    return ctx.session_id
 
 
 def _strengths(score: InterviewScore) -> list[str]:
@@ -249,17 +146,33 @@ def _probe_chain_rows(ctx: InterviewContext) -> list[dict]:
     rows: list[dict] = []
     for chain in ctx.probe_chains:
         payload = chain.model_dump()
+        payload["origin_label"] = CHAIN_ORIGIN_LABELS.get(chain.origin, chain.origin)
+        payload["verdict_label"] = CHAIN_VERDICT_LABELS.get(chain.verdict, chain.verdict)
+        payload["verdict_tone"] = CHAIN_VERDICT_TONES.get(chain.verdict, "gray")
         payload["links"] = [
             {
                 **link.model_dump(),
+                "credibility_label": CREDIBILITY_LABELS.get(
+                    link.credibility_after, link.credibility_after
+                ),
                 "answer_excerpt": turns_by_id.get(link.answer_turn_id).answer[:160]
                 if link.answer_turn_id in turns_by_id
-                else "(未找到关联回答)",
+                else "（未找到关联回答）",
             }
             for link in chain.links
         ]
         rows.append(payload)
     return rows
+
+
+def _aigc_rows(aigc: list[AIGCResult]) -> list[dict]:
+    return [
+        {
+            **item.model_dump(),
+            "mode_label": AIGC_MODE_LABELS.get(item.mode, item.mode),
+        }
+        for item in aigc
+    ]
 
 
 def _question_adoption_stats(ctx: InterviewContext) -> QuestionAdoptionStats:
@@ -391,30 +304,47 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
     _validate_report_inputs(ctx, score, aigc)
     ordered_utterances = _ordered_utterances(ctx)
     question_adoption = _question_adoption_stats(ctx)
+    recommendation_label = RECOMMENDATION_LABELS.get(score.recommendation, score.recommendation)
+    candidate_name = _candidate_display_name(ctx)
     summary = (
-        f"候选人在本场面试中获得 {score.total_score} 分，系统建议为 {score.recommendation}。"
+        f"候选人{candidate_name}在本场面试中获得 {score.total_score} 分，"
+        f"系统建议为「{recommendation_label}」。"
         "报告中的每项评分均绑定原始回答证据，注水风险需由面试官结合上下文复核。"
     )
     html = REPORT_TEMPLATE.render(
+        interview_id=ctx.session_id,
+        candidate_name=candidate_name,
+        report_number=_report_number(ctx),
+        job_title=ctx.competency_model.job_title,
+        interview_date=(ctx.ended_at or ctx.started_at).strftime("%Y-%m-%d"),
         score=score,
         analysis_mode=score.analysis_mode,
+        analysis_mode_label=ANALYSIS_MODE_LABELS.get(score.analysis_mode, score.analysis_mode),
+        recommendation_label=recommendation_label,
+        recommendation_tone=RECOMMENDATION_TONES.get(score.recommendation, "gray"),
         summary=summary,
         strengths=_strengths(score),
-        aigc_results=aigc,
+        aigc_rows=_aigc_rows(aigc),
         risk_highlights=_risk_highlights(score, ctx.flags),
         probe_chains=_probe_chain_rows(ctx),
         transcript=ctx.turns,
         utterances=ordered_utterances,
         candidate_resume_text=ctx.candidate_resume_text,
         question_adoption=question_adoption,
+        steering_label=STEERING_LABELS.get(
+            question_adoption.steering_focus, question_adoption.steering_focus
+        ),
+        speaker_labels=SPEAKER_LABELS,
+        question_source_labels=QUESTION_SOURCE_LABELS,
         radar_chart_uri=_radar_chart_uri(score),
     )
     settings = get_settings()
     settings.report_dir.mkdir(parents=True, exist_ok=True)
-    json_path = Path(settings.report_dir / f"{ctx.session_id}.report.json")
-    html_path = Path(settings.report_dir / f"{ctx.session_id}.html")
-    pdf_path = Path(settings.report_dir / f"{ctx.session_id}.pdf")
-    transcript_path = Path(settings.report_dir / f"{ctx.session_id}.transcript.json")
+    basename = _report_basename(ctx)
+    json_path = Path(settings.report_dir / f"{basename}.report.json")
+    html_path = Path(settings.report_dir / f"{basename}.html")
+    pdf_path = Path(settings.report_dir / f"{basename}.pdf")
+    transcript_path = Path(settings.report_dir / f"{basename}.transcript.json")
     html_path.write_text(html, encoding="utf-8")
     transcript_path.write_text(
         json.dumps(
@@ -434,21 +364,21 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
     _write_pdf(html, pdf_path, _fallback_pdf_lines(ctx, score, aigc, summary))
     artifact_store = get_artifact_store()
     html_artifact = artifact_store.put_file(
-        f"reports/{ctx.session_id}.html",
+        f"reports/{basename}.html",
         html_path,
         "text/html; charset=utf-8",
     )
     pdf_artifact = artifact_store.put_file(
-        f"reports/{ctx.session_id}.pdf",
+        f"reports/{basename}.pdf",
         pdf_path,
         "application/pdf",
     )
     transcript_artifact = artifact_store.put_file(
-        f"reports/{ctx.session_id}.transcript.json",
+        f"reports/{basename}.transcript.json",
         transcript_path,
         "application/json; charset=utf-8",
     )
-    json_artifact_name = f"reports/{ctx.session_id}.report.json"
+    json_artifact_name = f"reports/{basename}.report.json"
     report = Report(
         interview_id=ctx.session_id,
         score=score,
@@ -488,57 +418,61 @@ def _fallback_pdf_lines(
     summary: str,
 ) -> list[str]:
     lines = [
-        "Shuihuo Killer Interview Report",
-        f"Interview: {ctx.session_id}",
-        f"Total score: {score.total_score}",
-        f"Recommendation: {score.recommendation}",
-        f"Analysis mode: {score.analysis_mode}",
+        "水货杀手 · 面试评估报告",
+        f"候选人：{_candidate_display_name(ctx)}（面试序号 {_report_number(ctx)}）",
+        f"应聘岗位：{ctx.competency_model.job_title}",
+        f"综合得分：{score.total_score}（满分 100）",
+        f"录用建议：{RECOMMENDATION_LABELS.get(score.recommendation, score.recommendation)}",
+        f"分析方式：{ANALYSIS_MODE_LABELS.get(score.analysis_mode, score.analysis_mode)}",
     ]
     question_adoption = _question_adoption_stats(ctx)
     lines.append(
-        "Question adoption: "
-        f"suggested={question_adoption.suggested_unique_count}, "
-        f"adopted={question_adoption.adopted_suggested_count}, "
-        f"custom={question_adoption.custom_question_count}, "
-        f"rate={question_adoption.adoption_rate:.1%}"
+        "问题采纳统计："
+        f"系统建议 {question_adoption.suggested_unique_count} 题，"
+        f"采纳 {question_adoption.adopted_suggested_count} 题，"
+        f"自定义 {question_adoption.custom_question_count} 题，"
+        f"采纳率 {question_adoption.adoption_rate:.1%}"
     )
     if score.analysis_mode == "fallback":
         lines.append(
             "本报告由确定性规则生成（未启用大模型分析），分数仅供链路验证，不可用于招聘决策。"
         )
-    lines.extend([f"Summary: {summary}", "Dimension scores:"])
+    lines.extend([f"总评：{summary}", "维度得分："])
     for dimension in score.dimensions:
         evidence = dimension.evidence[0].excerpt if dimension.evidence else ""
         lines.append(
-            f"- {dimension.dimension}: score={dimension.score}, weight={dimension.weight}, "
-            f"evidence={evidence}"
+            f"- {dimension.dimension}：{dimension.score} 分（权重 {dimension.weight}），"
+            f"证据：「{evidence}」"
         )
-    lines.append("Risk notes:")
+    lines.append("风险点：")
     risk_highlights = _risk_highlights(score, ctx.flags)
     if risk_highlights:
         lines.extend(f"- {note}" for note in risk_highlights)
     else:
-        lines.append("- None")
-    lines.append("Rehearsal/template checks:")
-    for result in aigc:
+        lines.append("- 未发现高置信风险点")
+    lines.append("背稿与模板化检测：")
+    for index, result in enumerate(aigc, start=1):
         lines.append(
-            f"- turn={result.turn_id}, rehearsal={result.rehearsal_score}, "
-            f"template_similarity={result.template_similarity}, flagged={result.flagged}"
+            f"- 第 {index} 轮（{AIGC_MODE_LABELS.get(result.mode, result.mode)}）："
+            f"背稿分 {result.rehearsal_score}，模板相似度 {result.template_similarity}，"
+            f"{'疑似注水/模板化' if result.flagged else '未命中'}"
         )
-    lines.append("Probe chains:")
+    lines.append("追问链：")
     if ctx.probe_chains:
         for chain in ctx.probe_chains:
-            lines.append(
-                f"- {chain.topic}: verdict={chain.verdict}, depth={len(chain.links)}, "
-                f"crack_depth={chain.crack_depth or ''}"
-            )
+            verdict = CHAIN_VERDICT_LABELS.get(chain.verdict, chain.verdict)
+            crack = f"，第 {chain.crack_depth} 层露馅" if chain.crack_depth else ""
+            lines.append(f"- {chain.topic}：{verdict}，共 {len(chain.links)} 层{crack}")
     else:
-        lines.append("- None")
-    lines.append("Transcript:")
+        lines.append("- 暂无追问链")
+    lines.append("完整转写：")
     for index, utterance in enumerate(_ordered_utterances(ctx), start=1):
-        lines.append(f"- U{index} [{utterance.speaker}] {utterance.text}")
+        speaker = SPEAKER_LABELS.get(utterance.speaker, utterance.speaker)
+        lines.append(f"- {index}. [{speaker}] {utterance.text}")
+    lines.append("问答轮次：")
     for index, turn in enumerate(ctx.turns, start=1):
-        lines.append(f"- T{index} [{turn.question_source}] Q={turn.question} A={turn.answer}")
+        source = QUESTION_SOURCE_LABELS.get(turn.question_source, turn.question_source)
+        lines.append(f"- 第 {index} 轮（{source}）问：{turn.question} 答：{turn.answer}")
     return lines
 
 
