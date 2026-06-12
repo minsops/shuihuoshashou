@@ -346,428 +346,46 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     response = client.get("/")
     assert response.status_code == 200
     assert "水货杀手" in response.text
-    assert "/api/jobs" in response.text
-    assert "创建实时面试" in response.text
-    assert "专业追问" in response.text
-    assert "/api/interviews/quick-setup" in response.text
-    assert "/ws/interview/" in response.text
+    # 极简三步流程：开始面试 -> 进行中 -> 报告
+    assert "开始面试" in response.text
+    assert "结束面试，生成评分报告" in response.text
+    assert "开始新的面试" in response.text
     assert 'id="currentQuestionText"' in response.text
     assert 'id="nextOptionList"' in response.text
-    assert 'id="debugTextPanel"' in response.text
-    assert 'data-steering-focus="resume_drill"' in response.text
-    assert "current_question" in response.text
-    assert "next_options_update" in response.text
-    assert "set_steering" in response.text
-    assert "debug_text_input_enabled" in response.text
-    assert "问题采纳统计" in response.text
-    assert 'id="roleLinks"' in response.text
-    assert "joinExistingInterviewFromUrl" in response.text
-    assert "joinInterviewIdFromUrl" in response.text
-    assert "roleFromUrl" in response.text
-    assert 'url.searchParams.set("join", state.interview.id)' in response.text
-    assert 'url.searchParams.set("role", role)' in response.text
-    assert 'fetchGatewayJson(`/api/interviews/${encodeURIComponent(interviewId)}`' in response.text
-    assert "selectedProbeChainId" in response.text
-    assert "chain_id: state.selectedProbeChainId" in response.text
-    assert "asr_warning" in response.text
-    assert "开始麦克风" in response.text
-    assert "停止麦克风" in response.text
-    assert "重连通道" in response.text
-    assert "刷新状态" in response.text
-    assert 'id="runtimeStatus" role="status" aria-live="polite"' in response.text
-    assert 'id="modelStatus" role="status" aria-live="polite"' in response.text
-    assert 'id="asrStatus" role="status" aria-live="polite"' in response.text
-    assert 'aria-label="Gateway Key"' in response.text
-    assert 'autocapitalize="off"' in response.text
-    assert 'title="刷新本地服务、模型和 ASR 配置状态"' in response.text
-    assert 'title="调用真实模型检查连接"' in response.text
-    assert 'title="检查 ASR 配置、依赖和 Token"' in response.text
-    assert 'title="保存当前浏览器会话使用的 Gateway Key"' in response.text
-    assert 'title="填入一组可直接试用的 JD、简历和回答"' in response.text
-    assert 'title="打开本地 API 文档"' in response.text
-    assert 'title="创建实时面试通道"' in response.text
-    assert 'title="清空当前面试状态并重新开始"' in response.text
-    assert "maxLiveFeedEvents = 120" in response.text
-    assert "trimLiveFeedEvents" in response.text
-    assert "setStatusTitleFromMessage" in response.text
-    assert "result.message" in response.text
-    assert "配置状态读取失败" in response.text
-    assert "modelStatusFromConfig" in response.text
-    assert "模型模拟模式" in response.text
-    assert "模型未配置完整" in response.text
-    assert "模型 ${modelName} 已配置" in response.text
-    assert "已配置，未测试" in response.text
-    assert "本地服务已连接；模型配置已填写但尚未调用真实模型测试" in response.text
-    assert "点击“检查模型”后才会确认模型连接" in response.text
+    assert 'id="answerBox"' in response.text
+    assert "renderBankOptions" in response.text
+    assert "appendTranscript" in response.text
+    assert 'id="liveFeed"' in response.text
+    assert 'id="reportPanel"' in response.text
+    # 后端协议契约
+    assert "/api/interviews/quick-setup" in response.text
+    assert "/api/documents/parse" in response.text
+    assert "/ws/interview/" in response.text
     assert "audio_chunk" in response.text
     assert "pcm16" in response.text
-    assert "micChunkSamples = Math.floor(micSampleRate / 4)" in response.text
-    assert "audioContextConstructor" in response.text
-    assert "window.webkitAudioContext" in response.text
-    assert "当前浏览器不支持 Web Audio" in response.text
-    assert "micStarting" in response.text
-    assert "麦克风启动中" in response.text
-    assert "正在请求麦克风权限并初始化音频采集" in response.text
-    assert "micStartToken" in response.text
-    assert "micStartStillCurrent" in response.text
-    assert "if (!micStartStillCurrent(micStartToken)) return" in response.text
-    assert "麦克风启动已取消" in response.text
-    assert "micError" in response.text
-    assert "修复后再次点击开始麦克风" in response.text
+    assert "pick_option" in response.text
+    assert "text_turn" in response.text
+    assert "task_queued" in response.text
+    assert "asr_warning" in response.text
+    assert "next_options_update" in response.text
+    assert "current_question" in response.text
+    # 自动化行为：自动连麦、自动重连、报告轮询
+    assert "startMicCapture" in response.text
+    assert "scheduleReconnect" in response.text
+    assert "scheduleReportPolling" in response.text
     assert "discoverGateway" in response.text
-    assert "fallbackGatewayOrigins" in response.text
-    assert "fetchGatewayJson" in response.text
-    assert "wsUrl(`/ws/interview/${interviewId}`)" in response.text
-    assert "python scripts/run_gateway.py" in response.text
     assert "http://127.0.0.1:8001" in response.text
-    assert "无法连接到本地 gateway" in response.text
-    assert "页面正在尝试连接" in response.text
-    assert "失败详情" in response.text
-    assert "gatewayFailureTitle" in response.text
-    assert "setRuntimeStatusFromGateway(status)" in response.text
-    assert "function setRuntimeStatusFromGateway(status)" in response.text
-    assert "setRuntimeStatusGatewayUnavailable(error)" in response.text
-    assert "function setRuntimeStatusGatewayUnavailable(error)" in response.text
-    assert response.text.count("state.lastRuntimeCheckAt = Date.now()") == 2
-    assert "runtimeStatus.title = gatewayFailureTitle(error)" in response.text
-    assert "服务不可达：${errorText(error)}。${gatewayHelpText()}" in response.text
-    assert "setDependentStatusWaitingForGateway(error)" in response.text
-    assert "function setDependentStatusWaitingForGateway(error)" in response.text
-    assert "applyModelStatusFromConfig(config)" in response.text
-    assert "applyAsrStatusFromConfig(config)" in response.text
-    assert "function dependencyStatusAlreadyVerified(peer)" in response.text
-    assert "if (dependencyStatusAlreadyVerified(peer)) return" in response.text
-    assert "function refreshPeerDependencyStatusFromConfig(peer)" in response.text
-    assert 'await refreshPeerDependencyStatusFromConfig("asr")' in response.text
-    assert 'await refreshPeerDependencyStatusFromConfig("model")' in response.text
-    assert 'showGatewayKeyRequired("配置刷新", { [peer]: true })' in response.text
-    assert "setModelStatusWaitingForGateway(error)" in response.text
-    assert "setAsrStatusWaitingForGateway(error)" in response.text
-    assert "function gatewayUnavailableEventBody(error)" in response.text
-    assert "if (gatewayError) return" in response.text
-    assert "模型等待本地服务" in response.text
-    assert "ASR 等待本地服务" in response.text
-    assert "当前 gateway" in response.text
-    assert "runtimeCheckToken" in response.text
-    assert "runtimeCheckStillCurrent" in response.text
-    assert "modelCheckToken" in response.text
-    assert "modelCheckStillCurrent" in response.text
-    assert "asrCheckToken" in response.text
-    assert "asrCheckStillCurrent" in response.text
-    assert "refreshRuntimeIfVisible" in response.text
-    assert "window.addEventListener(\"online\", refreshRuntimeIfVisible)" in response.text
-    assert "gatewayOriginFromResponse" in response.text
-    assert "new URL(response.url).origin" in response.text
-    assert "resolvedOrigin" in response.text
-    assert "ASR 检查中" in response.text
-    assert "ASR 阿里云 NLS 已配置，未测试" in response.text
-    assert "ASR 阿里云 NLS 已配置（自动 Token），未测试" in response.text
-    assert "ASR 配置已填写但尚未验证依赖、Token 和音频链路" in response.text
-    assert "点击“检查 ASR”后才会确认" in response.text
-    assert "asrCheckStatusText" in response.text
-    assert "ASR 固定 Token 已配置，自动刷新可用" in response.text
-    assert "ASR Token 可生成，未跑音频" in response.text
-    assert "ASR 固定 Token 已配置" in response.text
-    assert "ASR 配置存在，未跑音频" in response.text
-    assert "ASR 长时间没有收到有效语音" in response.text
-    assert "ASR Token 已失效或被拒绝" in response.text
-    assert "ALIYUN_NLS_TOKEN 或阿里云 AccessKey 权限" in response.text
-    assert "ALIYUN_ASR_API_KEY 是否是百炼/DashScope API Key" in response.text
-    assert "NLS Token 创建失败" in response.text
-    assert "ASR WebSocket 依赖缺失" in response.text
-    assert "ASR 没有返回识别文本" in response.text
-    assert "每 250ms 发送低音量保活音频" in response.text
-    assert "避免 ASR 空闲断开" in response.text
-    assert "原始原因" in response.text
-    assert "先创建实时面试" in response.text
-    assert "实时通道连接中" in response.text
-    assert "通道未连接" in response.text
-    assert "等待重连通道" in response.text
-    assert "liveChannelUnavailableReason" in response.text
-    assert "实时通道未连接，请点击重连通道" in response.text
-    assert "WebSocket 已关闭。可点击重连通道继续当前面试。" in response.text
-    assert "恢复后点击重连通道继续当前面试" in response.text
-    assert "openSocketWithLatestGateway" in response.text
-    assert "socketToken" in response.text
-    assert "socketStillCurrent" in response.text
-    assert "if (!socketStillCurrent(socketToken)) return" in response.text
-    assert "连接前无法确认本地 gateway" in response.text
-    assert "WebSocket 初始化失败" in response.text
-    assert "handleSocketMessage" in response.text
-    assert "parseLiveSocketMessage" in response.text
-    assert "实时消息不是有效 JSON" in response.text
-    assert "validateLiveMessage" in response.text
-    assert "实时消息格式异常" in response.text
-    assert "实时消息结构异常" in response.text
-    assert "未知实时消息类型" in response.text
-    assert "formatLiveError" in response.text
-    assert "还没有候选人回答，不能生成评分报告" in response.text
-    assert "候选人回答不能为空" in response.text
-    assert "实时消息序号无效，请重连通道后重试" in response.text
-    assert "原始错误" in response.text
-    assert 'id="liveStatus" role="status" aria-live="polite"' in response.text
-    assert 'id="micStatus" role="status" aria-live="polite"' in response.text
-    assert 'class="control-hint" id="controlHint" role="status" aria-live="polite"' in (
-        response.text
-    )
-    assert 'id="liveFeed" role="log" aria-live="polite" aria-relevant="additions text"' in (
-        response.text
-    )
-    assert 'id="sendAnswer" aria-describedby="controlHint"' in response.text
-    assert 'id="startMic" aria-describedby="controlHint"' in response.text
-    assert 'id="reconnectSocket" aria-describedby="controlHint"' in response.text
-    assert 'id="endInterview" aria-describedby="controlHint"' in response.text
-    assert "controlHintText" in response.text
-    assert "controlHintTone" in response.text
-    assert "controlHint.className" in response.text
-    assert 'id="questionCharCount" role="status" aria-live="polite"' in response.text
-    assert 'id="answerCharCount" role="status" aria-live="polite"' in response.text
-    assert "answerMinChars = 20" in response.text
-    assert "updateTextCounters" in response.text
-    assert "textTurnReady" in response.text
-    assert "sendAnswer.disabled = !textReady" in response.text
-    assert "manualProbe.disabled = !textReady" in response.text
-    assert "当前问题和候选人回答都需要填写" in response.text
-    assert "请填写当前问题和候选人回答后发送文字回答" in response.text
-    assert "建议至少 ${answerMinChars} 字" in response.text
-    assert 'answerText.addEventListener("input", updateTextCounters)' in response.text
-    assert ".control-hint.warn" in response.text
-    assert "实时通道已连接。可以发送文字回答" in response.text
-    assert "实时通道未连接。请点击重连通道" in response.text
-    assert "liveChannelReadyForInput" in response.text
-    assert "实时通道未连接，请点击重连通道。" in response.text
-    assert "sendLiveSocketPayload" in response.text
-    assert "发送失败" in response.text
-    assert "请点击重连通道后重试" in response.text
-    assert "(question ? answerText : currentQuestion).focus();" in response.text
-    assert 'answerText.value = ""' in response.text
-    assert "answerText.focus();" in response.text
-    assert "if (!manual) {" in response.text
-    assert "endingInterview" in response.text
-    assert "正在结束面试并生成评分报告，请等待结果" in response.text
-    assert "requestEndInterview" in response.text
-    assert "setPill(liveStatus, \"评分中\", \"live\");" in response.text
-    assert "setControls();" in response.text
-    assert 'sendLiveSocketPayload({ type: "end" }, "结束面试失败")' in response.text
-    assert "state.seq += 1" in response.text
-    assert "stopMicCapture({ flush: false })" in response.text
-    assert "readErrorMessage" in response.text
-    assert "readJsonResponse" in response.text
-    assert "接口响应不是有效 JSON" in response.text
-    assert "服务健康检查响应不是有效 JSON" in response.text
-    assert "资料解析响应不是有效 JSON" in response.text
-    assert "formatApiDetailItem" in response.text
-    assert "item.loc" in response.text
-    assert "payload.detail" in response.text
-    assert 'part !== "body" && part !== "query"' in response.text
-    assert 'error.name === "AbortError"' in response.text
-    assert "请求超时，请确认本地服务仍在运行" in response.text
-    assert "signal is aborted|aborted without reason" in response.text
-    assert "请求被浏览器中止，通常是前端超时或重复触发检查导致" in response.text
-    assert "failed to fetch|networkerror|load failed" in response.text
-    assert "无法连接到本地服务，请确认 gateway 正在运行后重试" in response.text
-    assert "cursor: not-allowed" in response.text
-    assert 'button[data-busy="true"]' in response.text
-    assert "setButtonBusy" in response.text
-    assert 'button.setAttribute("aria-busy", "true")' in response.text
-    assert "const { timeoutMs, ...fetchOptions } = options" in response.text
-    assert "timeoutMs: documentParseTimeoutMs" in response.text
-    assert "documentParseTimeoutMs = 45_000" in response.text
-    assert "prepareSessionTimeoutMs = 90_000" in response.text
-    assert "externalCheckTimeoutMs = 65_000" in response.text
-    assert 'else if (connected) {\n          setPill(micStatus, "麦克风未开启", "");' in response.text
-    assert "input.disabled = true" in response.text
-    assert "input.value = \"\"" in response.text
-    assert ".log,.pdf" in response.text
-    assert "supportedDocumentSuffixes" in response.text
-    assert "supportedDocumentMimeTypes" in response.text
-    assert "supportedDocumentFile(file)" in response.text
-    assert "normalizedContentType(file.type)" in response.text
-    assert 'type.startsWith("text/")' in response.text
-    assert 'type.startsWith("image/")' in response.text
-    assert "文件格式暂不支持" in response.text
-    assert "txt、md、json、csv、log、pdf、docx、doc 或图片" in response.text
-    assert "setUploadInputStatus" in response.text
-    assert 'input[type="file"]:disabled' in response.text
-    assert 'aria-describedby="jdFileStatus"' in response.text
-    assert 'class="small upload-status" id="jdFileStatus" role="status" aria-live="polite"' in (
-        response.text
-    )
-    assert 'aria-describedby="resumeFileStatus"' in response.text
-    assert 'class="small upload-status" id="resumeFileStatus" role="status" aria-live="polite"' in (
-        response.text
-    )
-    assert ".upload-status.live" in response.text
-    assert ".upload-status.ready" in response.text
-    assert ".upload-status.warn" in response.text
-    assert 'status.className = `small upload-status ${tone}`.trim()' in response.text
-    assert "支持 PDF、Word、图片和文本文件" in response.text
-    assert 'document.querySelector(`#${input.id}Status`)' in response.text
-    assert "正在解析" in response.text
-    assert "解析失败" in response.text
-    assert "documentParsingCount" in response.text
-    assert "documentParseToken" in response.text
-    assert "documentParseEpoch" in response.text
-    assert "documentParseStillCurrent" in response.text
-    assert "const parseStillCurrent = documentParseStillCurrent(input, documentParseToken)" in response.text
-    assert "if (!documentParseStillCurrent(input, documentParseToken)) return" in response.text
-    assert "cancelDocumentParses" in response.text
-    assert "resetDocumentUploadInputs" in response.text
-    assert "解析已取消" in response.text
-    assert "资料正在解析，完成后再创建实时面试" in response.text
-    assert "maxDocumentUploadBytes = 25 * 1024 * 1024" in response.text
-    assert "文件超过 25MB" in response.text
-    assert "请压缩、拆分或直接粘贴关键内容" in response.text
-    assert "资料上传提示" in response.text
-    assert "result.warning" in response.text
-    assert "未提取到可用文本" in response.text
-    assert "文字版 PDF、DOCX" in response.text
-    assert "DeepSeek 清洗未完成" in response.text
-    assert "resetQuestionMetaForManualEdit" in response.text
-    assert "hadProbeMeta" in response.text
-    assert "已改为手动编辑问题，将按面试官自定义问题记录" in response.text
-    assert 'title="把该能力维度生成当前面试问题"' in response.text
-    assert 'aria-label="生成${escapeHtml(item.name)}维度的面试问题"' in response.text
-    assert 'title="将此追问填入当前面试问题"' in response.text
-    assert 'aria-label="将此追问设为下一问"' in response.text
-    assert "function selectQuestion(question, meta = {})" in response.text
-    assert 'answerText.value = "";\n        updateTextCounters();\n        state.selectedQuestionSource' in (
-        response.text
-    )
-    assert 'currentQuestion.addEventListener("input", () =>' in response.text
-    assert "resetQuestionMetaForManualEdit();" in response.text
-    assert 'parseDocumentFile(event.target.files[0], event.target, resumeText, "简历", "resume")' in response.text
-    assert "reconnectLiveChannel" in response.text
-    assert "reconnectInterviewId" in response.text
-    assert "reconnectStillCurrent" in response.text
-    assert "重新连接当前面试实时通道" in response.text
-    assert "当前已有面试，请重置后再创建新的面试" in response.text
-    assert "资料正在解析，完成后再创建实时面试。" in response.text
-    assert "loadSampleButton" in response.text
-    assert "当前已有面试，请重置后再加载样例资料" in response.text
-    assert "当前已有面试或资料正在处理，请重置后再加载样例资料" in response.text
-    assert "prepareSessionToken" in response.text
-    assert "prepareSessionStillCurrent" in response.text
-    assert "async function postJson(url, payload, options = {})" in response.text
-    assert "timeoutMs: prepareSessionTimeoutMs" in response.text
-    assert "if (!prepareSessionStillCurrent(prepareToken)) return" in response.text
-    assert "openSocketWithLatestGateway(interview.id, () =>" in response.text
-    assert "validateSetupForm" in response.text
-    assert "面试创建失败" in response.text
-    assert "不能为空" in response.text
-    assert "重新检查服务、模型和 ASR 状态" in response.text
-    assert 'refreshStatus.addEventListener("click", checkRuntime)' in response.text
-    assert 'id="checkModel"' in response.text
-    assert "checkLlmConnection" in response.text
-    assert "/api/config/llm/check" in response.text
-    assert "timeoutMs: externalCheckTimeoutMs" in response.text
-    assert 'appendEvent("模型检查", gatewayUnavailableEventBody(error), "red")' in response.text
-    assert "if (!modelCheckStillCurrent(checkToken)) return" in response.text
-    assert "if (modelCheckStillCurrent(checkToken))" in response.text
-    assert "手动调用真实模型检查连接" in response.text
-    assert 'id="checkAsr"' in response.text
-    assert "checkAsrReadiness" in response.text
-    assert "/api/config/asr/check" in response.text
-    assert 'appendEvent("ASR 检查", gatewayUnavailableEventBody(error), "red")' in response.text
-    assert "if (!asrCheckStillCurrent(checkToken)) return" in response.text
-    assert "if (asrCheckStillCurrent(checkToken))" in response.text
-    assert "手动检查 ASR 配置、依赖和 Token" in response.text
-    assert 'id="gatewayKey"' in response.text
-    assert 'id="saveGatewayKey"' in response.text
-    assert "sessionStorage.getItem(\"gatewayApiKey\")" in response.text
-    assert '"X-API-Key": state.gatewayApiKey' in response.text
-    assert "fetchWithTimeout(" in response.text
-    assert "apiUrl(path)" in response.text
-    assert "url.searchParams.set(key, value)" in response.text
-    assert "websocketProtocols" in response.text
-    assert "base64UrlEncode" in response.text
-    assert 'gateway-key.${base64UrlEncode(state.gatewayApiKey)}' in response.text
-    assert "const socketUrl = wsUrl(`/ws/interview/${interviewId}`)" in response.text
-    assert "new WebSocket(socketUrl, websocketProtocols())" in response.text
-    assert 'data-report-format="html"' in response.text
-    assert 'data-report-format="transcript.json"' in response.text
-    assert 'title="下载 HTML 报告"' in response.text
-    assert 'aria-label="下载 HTML 报告"' in response.text
-    assert 'title="下载 PDF 报告"' in response.text
-    assert 'aria-label="下载 PDF 报告"' in response.text
-    assert 'title="下载 JSON 报告"' in response.text
-    assert 'aria-label="下载 JSON 报告"' in response.text
-    assert 'title="下载转写记录"' in response.text
-    assert 'aria-label="下载转写记录"' in response.text
-    assert ">转写</button>" in response.text
-    assert "downloadReportArtifact" in response.text
-    assert "reportDownloadStillCurrent" in response.text
-    assert 'id="credibilityBox" role="status" aria-live="polite"' in response.text
-    assert 'id="reportPanel" role="status" aria-live="polite"' in response.text
-    assert "if (!reportDownloadStillCurrent(interviewId)) return" in response.text
-    assert "reportDownloadInFlight" in response.text
-    assert "state.reportDownloadInFlight.has(downloadKey)" in response.text
-    assert "state.reportDownloadInFlight.delete(downloadKey)" in response.text
-    assert "正在下载中，请稍候" in response.text
-    assert "`/api/interviews/${interviewId}/report.${format}`" in response.text
-    assert "timeoutMs: reportDownloadTimeoutMs" in response.text
-    assert "reportDownloadTimeoutMs = 30_000" in response.text
-    assert 'button.textContent = "下载中"' in response.text
-    assert "正在下载 ${reportFormatLabel(format)} 报告" in response.text
-    assert "button.textContent = originalLabel || reportFormatLabel(format)" in response.text
-    assert "reportFormatLabel(format)" in response.text
-    assert '"transcript.json": "转写"' in response.text
-    assert "reportFilename" in response.text
-    assert "reportEvidenceRows" in response.text
-    assert "reportTotalScoreText" in response.text
-    assert "待确认" in response.text
-    assert "reportRecommendationText" in response.text
-    assert "建议待确认" in response.text
-    assert "reportSummaryText" in response.text
-    assert "暂无总评" in response.text
-    assert "reportInterviewId" in response.text
-    assert "报告 ID 或格式缺失" in response.text
-    assert "暂无维度评分" in response.text
-    assert "暂无转写记录" in response.text
-    assert "暂无证据" in response.text
-    assert 'format === "transcript.json"' in response.text
-    assert '.transcript.json`' in response.text
-    assert "gatewayAuthError" in response.text
-    assert "showGatewayKeyRequired" in response.text
-    assert 'showGatewayKeyRequired("模型检查", { model: true })' in response.text
-    assert 'showGatewayKeyRequired("ASR 检查", { asr: true })' in response.text
-    assert "需要 Gateway Key" in response.text
-    assert "Gateway 已启用鉴权" in response.text
-    assert "interviewEnded" in response.text
-    assert "reportReady" in response.text
-    assert "面试已结束，请重置后创建新的面试" in response.text
-    assert "正在结束面试并生成评分报告" in response.text
-    assert "请等待后台评分完成" in response.text
-    assert "后台评分任务已排队，系统会自动刷新报告" in response.text
-    assert 'id="refreshReport"' in response.text
-    assert "refreshQueuedReport" in response.text
-    assert "scheduleQueuedReportPolling" in response.text
-    assert "clearQueuedReportPolling" in response.text
-    assert "queuedReportMaxPollAttempts = 30" in response.text
-    assert "queuedReportPollIntervalMs = 3000" in response.text
-    assert "reportRefreshEpoch" in response.text
-    assert "reportRefreshStillCurrent" in response.text
-    assert "reportRefreshInFlight" in response.text
-    assert "reportRefreshStillCurrent(refreshEpoch, interviewId) &&" in response.text
-    assert 'button.textContent = "刷新中"' in response.text
-    assert 'button.textContent = originalLabel || "刷新报告"' in response.text
-    assert 'title="手动刷新评分报告"' in response.text
-    assert 'aria-label="手动刷新评分报告"' in response.text
-    assert "报告刷新正在进行中，请稍候" in response.text
-    assert "fetchGatewayJson(`/api/interviews/${interviewId}/report`)" in response.text
-    assert "reportPendingError" in response.text
-    assert "报告仍在生成中，请稍后再刷新" in response.text
-    assert "markReportReady" in response.text
-    assert "报告已生成" in response.text
-    assert "可以下载 HTML、PDF、JSON 或转写" in response.text
-    assert "resetSessionState" in response.text
-    assert 'currentQuestion.value = ""' in response.text
-    assert 'answerText.value = ""' in response.text
-    assert 'document.querySelector("#resetSession").addEventListener("click", resetSessionState)' in response.text
-    assert "实时转写、回答和追问事件会出现在这里" in response.text
-    assert "preparingInterview" in response.text
-    assert "正在创建实时面试，请稍候" in response.text
-    assert "当前已有面试，请重置后再创建新的面试" in response.text
+    # 麦克风兜底文本输入
+    assert 'id="fallbackText"' in response.text
+    # 做减法：手动开关麦克风、说话人切换、检查按钮都不应再出现
+    assert "开始麦克风" not in response.text
+    assert "停止麦克风" not in response.text
+    assert "speaker-switch" not in response.text
+    assert "重连通道" not in response.text
+    assert "检查模型" not in response.text
+    assert "检查 ASR" not in response.text
+    assert "Gateway Key" not in response.text
+    assert "data-steering-focus" not in response.text
 
 
 def test_gateway_health_identifies_service(tmp_path: Path, monkeypatch) -> None:
@@ -1394,7 +1012,8 @@ def test_gateway_report_build_rejects_mismatched_inputs(
     assert rejected_total.status_code == 409
     assert "score total_score must match dimension scores and weights" in rejected_total.text
 
-    mismatched_recommendation = {**score, "recommendation": "no"}
+    flipped_recommendation = "no" if score["recommendation"] != "no" else "strong_yes"
+    mismatched_recommendation = {**score, "recommendation": flipped_recommendation}
     rejected_recommendation = client.post(
         "/api/report/build",
         json={

@@ -91,7 +91,13 @@ from services.interview_orchestrator.service import (
     should_probe_turn,
     start_interview,
 )
-from services.jd_kb_service.service import create_job, get_job, retrieve_job_probe_patterns
+from services.jd_kb_service.service import (
+    create_job,
+    fallback_competency_model,
+    get_job,
+    retrieve_job_probe_patterns,
+    update_job_title,
+)
 from services.probe_service.service import fallback_probe, generate_probe, generate_question_bank
 from services.report_service.service import build_report
 from services.scoring_service.service import score_interview
@@ -190,7 +196,7 @@ async def _send_initial_question_if_available(
             try:
                 bank = get_question_bank(interview_id)
             except KeyError:
-                return
+                return record
             runtime.question_flow = QuestionFlowState(
                 bank=bank,
                 current_question=initial_question(bank),
@@ -644,6 +650,14 @@ def _resume_claims_for_probe(record) -> list[ResumeClaim]:
     return claims
 
 
+QUICK_SETUP_PENDING_INTERVIEW_ID = "pending-quick-setup"
+
+
+def _provisional_job_title(jd_text: str) -> str:
+    first_line = next((line.strip() for line in jd_text.splitlines() if line.strip()), "")
+    return first_line[:40] or "未命名岗位"
+
+
 def _extract_quick_setup_fields(payload: QuickSetupRequest) -> tuple[SetupExtraction, bool]:
     fallback = SetupExtraction(job_title="未命名岗位", candidate_name="候选人")
     messages = [
@@ -675,7 +689,7 @@ def _extract_quick_setup_fields(payload: QuickSetupRequest) -> tuple[SetupExtrac
 
 
 def _schedule_probe_task(
-    websocket: WebSocket,
+    runtime: _DialogueSessionRuntime,
     record,
     turn: QATurn,
 ) -> None:
@@ -686,8 +700,8 @@ def _schedule_probe_task(
             fallback = fallback_probe(request)
         except Exception:
             return
-        await websocket.send_json({"type": "probe", "payload": fallback.model_dump()})
-        await websocket.send_json(
+        await runtime.send_json({"type": "probe", "payload": fallback.model_dump()})
+        await runtime.send_json(
             {"type": "credibility", "payload": fallback.credibility.model_dump()}
         )
         signal = (
@@ -696,13 +710,13 @@ def _schedule_probe_task(
             else None
         )
         if signal is not None:
-            await websocket.send_json({"type": "signal", "payload": signal.model_dump()})
+            await runtime.send_json({"type": "signal", "payload": signal.model_dump()})
         try:
             probe = await generate_probe(request)
         except Exception:
             return
         if probe.model_dump() != fallback.model_dump():
-            await websocket.send_json({"type": "probe_update", "payload": probe.model_dump()})
+            await runtime.send_json({"type": "probe_update", "payload": probe.model_dump()})
 
     asyncio.create_task(_run())
 
@@ -1052,18 +1066,35 @@ def api_create_interview(payload: InterviewCreate):
 
 @app.post("/api/interviews/quick-setup", response_model=QuickSetupResponse)
 async def api_quick_setup(payload: QuickSetupRequest) -> QuickSetupResponse:
-    extraction, extraction_confident = _extract_quick_setup_fields(payload)
-    job = create_job(JobCreate(title=extraction.job_title, jd_text=payload.jd_text))
+    # 三个 LLM 步骤互不等待：字段提取、胜任力模型（create_job 内部）、题库生成。
+    # 题库以确定性兜底胜任力模型为输入，避免串行等待真实模型的胜任力结果。
+    provisional_title = _provisional_job_title(payload.jd_text)
+    extraction_task = asyncio.create_task(
+        asyncio.to_thread(_extract_quick_setup_fields, payload)
+    )
+    job_task = asyncio.create_task(
+        asyncio.to_thread(
+            create_job, JobCreate(title=provisional_title, jd_text=payload.jd_text)
+        )
+    )
+    bank_task = asyncio.create_task(
+        generate_question_bank(
+            QUICK_SETUP_PENDING_INTERVIEW_ID,
+            payload.jd_text,
+            payload.resume_text,
+            fallback_competency_model("pending", provisional_title, payload.jd_text),
+        )
+    )
+    (extraction, extraction_confident), job, question_bank = await asyncio.gather(
+        extraction_task, job_task, bank_task
+    )
+    if extraction.job_title != job.title:
+        job = update_job_title(job.id, extraction.job_title)
     candidate = get_or_create_candidate(
         CandidateCreate(name=extraction.candidate_name, resume_text=payload.resume_text)
     )
     interview = create_interview(InterviewCreate(job_id=job.id, candidate_id=candidate.id))
-    question_bank = await generate_question_bank(
-        interview.id,
-        payload.jd_text,
-        payload.resume_text,
-        job.competency_model,
-    )
+    question_bank = question_bank.model_copy(update={"interview_id": interview.id})
     save_question_bank(question_bank)
     return QuickSetupResponse(
         interview_id=interview.id,
