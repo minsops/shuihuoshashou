@@ -30,6 +30,7 @@ from libs.common.observability import (
 from libs.common.prompts import load_prompt
 from libs.common.runtime import RuntimeStatus, get_runtime_status
 from libs.common.storage import get_artifact_store
+from libs.common.textsim import cosine_similarity, normalize_text
 from libs.schemas import (
     AIGCDetectRequest,
     CandidateCreate,
@@ -151,6 +152,13 @@ class _LockedWebSocketSender:
             await self._websocket.send_json(payload)
 
 
+# 内容级回声消除：扬声器外放的候选人声音被麦克风拾取后，会以「面试官」身份转写出与
+# 候选人近期内容高度相似的文本。用时间窗口 + 文本相似度比对，识别并抑制这种串音回声。
+ECHO_SIMILARITY_THRESHOLD = 0.6
+ECHO_TIME_WINDOW_MS = 6000
+ECHO_REF_BUFFER = 16
+
+
 @dataclass
 class _DialogueSessionRuntime:
     assembler: DialogueAssembler
@@ -159,6 +167,8 @@ class _DialogueSessionRuntime:
     epoch: int = 0
     flush_task: asyncio.Task[None] | None = None
     question_flow: QuestionFlowState | None = None
+    # 候选人近期转写的 (归一化文本, end_ms)，供麦克风路做回声比对。
+    recent_candidate: list[tuple[str, int]] = field(default_factory=list)
 
     async def send_json(self, payload: dict) -> None:
         stale: list[_LockedWebSocketSender] = []
@@ -187,6 +197,33 @@ def _dialogue_runtime(interview_id: str, silence_close_ms: int) -> _DialogueSess
 def _discard_dialogue_runtime(interview_id: str, runtime: _DialogueSessionRuntime) -> None:
     if _dialogue_runtimes.get(interview_id) is runtime:
         _dialogue_runtimes.pop(interview_id, None)
+
+
+def _suppress_candidate_echo(runtime: _DialogueSessionRuntime, segment: TranscriptSegment) -> bool:
+    """跨双声道的内容级回声消除。
+
+    候选人语音从扬声器外放、被麦克风拾取后，会以 speaker=interviewer 转写出与候选人
+    近期内容几乎一致的文本。这里把候选人(扬声器)转写存入参考缓冲，麦克风(面试官)转写
+    到达时与时间窗口内的候选人文本比对相似度，超过阈值即判定为串音回声并抑制。
+
+    仅在接入了会议声音(存在候选人参考路)时才会真正生效；纯麦克风场景缓冲为空，永不抑制。
+    返回 True 表示该 segment 是回声、应丢弃。这是同步函数，在单线程事件循环中原子执行。
+    """
+    text = normalize_text(segment.text)
+    if not text:
+        return False
+    if segment.speaker == "candidate":
+        runtime.recent_candidate.append((text, segment.end_ms))
+        if len(runtime.recent_candidate) > ECHO_REF_BUFFER:
+            del runtime.recent_candidate[:-ECHO_REF_BUFFER]
+        return False
+    if segment.speaker == "interviewer":
+        for cand_text, cand_end in runtime.recent_candidate:
+            if abs(segment.end_ms - cand_end) > ECHO_TIME_WINDOW_MS:
+                continue
+            if cosine_similarity(text, cand_text) >= ECHO_SIMILARITY_THRESHOLD:
+                return True
+    return False
 
 
 async def _send_initial_question_if_available(
@@ -1526,6 +1563,8 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                 await _send_asr_warning(sender, decision.reason, seq)
                 continue
             segment = decision.segment
+            if _suppress_candidate_echo(runtime, segment):
+                continue
             await runtime.send_json({"type": "transcript", "payload": segment.model_dump()})
             await handle_dialogue_segment(
                 segment,
@@ -1638,6 +1677,8 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                     await _send_asr_warning(sender, decision.reason, seq)
                     continue
                 segment = decision.segment
+                if _suppress_candidate_echo(runtime, segment):
+                    continue
                 await runtime.send_json({"type": "transcript", "payload": segment.model_dump()})
                 await handle_dialogue_segment(
                     segment,
@@ -1694,6 +1735,8 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
                     await _send_asr_warning(sender, decision.reason, seq)
                     continue
                 segment = decision.segment
+                if _suppress_candidate_echo(runtime, segment):
+                    continue
                 await runtime.send_json({"type": "transcript", "payload": segment.model_dump()})
                 await handle_dialogue_segment(
                     segment,

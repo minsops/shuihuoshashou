@@ -1378,24 +1378,34 @@
         drill: {
           items: [],
           page: 0,
+          rendered: false,
           list: () => followUpList,
-          empty: "候选人回答后，这里会实时给出追问",
+          empty: "候选人回答后，这里会实时给出追问，点「刷新」查看",
         },
         switch: {
           items: [],
           page: 0,
+          rendered: false,
           list: () => switchList,
-          empty: "题库生成后，这里会列出可切换的问题",
+          empty: "题库生成后，这里会列出可切换的问题，点「刷新」查看",
         },
       };
 
       function resetZones() {
         pools.drill.items = [];
         pools.drill.page = 0;
+        pools.drill.rendered = false;
         pools.switch.items = [];
         pools.switch.page = 0;
+        pools.switch.rendered = false;
         renderPool("drill");
         renderPool("switch");
+      }
+
+      // 新选项进池后只在「池子尚未显示过内容」时初始渲染一次；之后累积但不打断当前显示，
+      // 用户点「刷新」按钮才轮换查看新题——避免追问/换题随每次回答自动跳变。
+      function renderPoolIfFirst(name) {
+        if (!pools[name].rendered && pools[name].items.length) renderPool(name);
       }
 
       function poolAdd(name, entry, { front = false } = {}) {
@@ -1416,6 +1426,7 @@
         clearZone(list);
         if (!pool.items.length) {
           list.innerHTML = `<p class="zone-empty">${pool.empty}</p>`;
+          pool.rendered = false;
           return;
         }
         const pages = Math.max(1, Math.ceil(pool.items.length / POOL_PAGE_SIZE));
@@ -1430,6 +1441,7 @@
             })
           );
         });
+        pool.rendered = true;
       }
 
       function refreshPool(name) {
@@ -1481,10 +1493,8 @@
             { front: true }
           );
         });
-        pools.drill.page = 0;
-        pools.switch.page = 0;
-        renderPool("drill");
-        renderPool("switch");
+        renderPoolIfFirst("drill");
+        renderPoolIfFirst("switch");
       }
 
       function renderBankOptions(items) {
@@ -1497,7 +1507,7 @@
             onPick: pickEntry({ question: item.question }, "题库"),
           });
         });
-        renderPool("switch");
+        renderPoolIfFirst("switch");
       }
 
       function renderProbeSuggestions(suggestions) {
@@ -1521,8 +1531,7 @@
             { front: true }
           );
         });
-        pools.drill.page = 0;
-        renderPool("drill");
+        renderPoolIfFirst("drill");
       }
 
       function renderLiveMessage(message) {
@@ -1532,15 +1541,11 @@
         } else if (message.type === "current_question") {
           setCurrentQuestion(payload.question, { label: "系统首题" });
         } else if (message.type === "question_matched") {
-          // 以面试官口头提出的问题为准；AI 建议只作辅助
-          const asked = String(payload.asked_text || "").trim();
-          if (asked) {
-            setCurrentQuestion(asked, {
-              label: payload.matched_option_id
-                ? "面试官口头提问 · 已匹配系统建议"
-                : "面试官口头提问",
-            });
-          }
+          // 当前问题窗口保持稳定，显示用户/系统选定的问题，不被面试官口头转写碎片反复覆盖切换。
+          // 面试官实际说的话见左侧麦克风转写框；后端仍按口头内容装配问答。这里仅更新状态标签。
+          currentQuestionMeta.textContent = payload.matched_option_id
+            ? "面试官口头提问中 · 已匹配系统建议"
+            : "面试官口头提问中";
         } else if (message.type === "question_bank_update") {
           renderBankOptions(payload.items);
           appendEvent("题库", "AI 定制题库已生成，换题备选已更新。", "blue");
@@ -1622,7 +1627,10 @@
           const stream = await navigator.mediaDevices.getUserMedia({
             audio: {
               channelCount: 1,
-              echoCancellation: false,
+              // 开启回声消除：消除扬声器外放的候选人声音被麦克风拾取后串进面试官通道。
+              // 注意浏览器 AEC 主要对“浏览器内播放的音频”有效；候选人声音若来自独立会议
+              // App（微信/腾讯会议）外放，仍建议面试官戴耳机做物理隔离以根治串音。
+              echoCancellation: true,
               noiseSuppression: true,
               autoGainControl: true,
             },

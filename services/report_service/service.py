@@ -3,7 +3,10 @@ from __future__ import annotations
 import base64
 import json
 import os
+import shutil
+import subprocess
 import sys
+import tempfile
 from contextlib import redirect_stderr, redirect_stdout
 from io import BytesIO, StringIO
 from pathlib import Path
@@ -245,6 +248,67 @@ def _resolve_cjk_font_uri() -> str:
     return ""
 
 
+# 浏览器引擎候选路径：优先用 Chrome/Chromium 无头模式渲染 PDF，效果与网页所见完全一致。
+_CHROME_CANDIDATES = (
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+)
+
+
+def _find_chrome_binary() -> str | None:
+    override = os.environ.get("CHROME_BIN", "").strip()
+    if override and Path(override).exists():
+        return override
+    for path in _CHROME_CANDIDATES:
+        if Path(path).exists():
+            return path
+    for name in ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "chrome"):
+        found = shutil.which(name)
+        if found:
+            return found
+    return None
+
+
+def _render_pdf_with_chrome(html_path: Path, pdf_path: Path) -> bool:
+    """用 Chrome/Chromium 无头模式把 HTML 原样渲染成 PDF（与浏览器所见一致，最美观）。
+
+    成功返回 True；找不到浏览器或渲染失败返回 False，由调用方回退到 WeasyPrint。
+    用独立临时 profile 避免与用户正在运行的 Chrome 冲突。
+    """
+    chrome = _find_chrome_binary()
+    if chrome is None:
+        return False
+    try:
+        with tempfile.TemporaryDirectory(prefix="chrome_pdf_") as workdir:
+            # Chrome 的 --print-to-pdf 写含中文（如「水货杀手」）的目标路径会失败，
+            # 故先渲染到纯 ASCII 的临时目录，再用 Python 移动到目标路径。
+            # 不用 check=True：headless Chrome 即便渲染成功也常因 GPU/沙箱警告返回非 0 退出码，
+            # 以「是否产出有效 PDF 文件」判定成功。
+            tmp_pdf = Path(workdir) / "report.pdf"
+            subprocess.run(
+                [
+                    chrome,
+                    "--headless=new",
+                    "--disable-gpu",
+                    "--no-sandbox",
+                    f"--user-data-dir={workdir}/profile",
+                    "--no-pdf-header-footer",
+                    f"--print-to-pdf={tmp_pdf}",
+                    html_path.resolve().as_uri(),
+                ],
+                timeout=60,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            if tmp_pdf.exists() and tmp_pdf.stat().st_size > 1024:
+                shutil.move(str(tmp_pdf), str(pdf_path))
+                return True
+    except (subprocess.SubprocessError, OSError):
+        return False
+    return False
+
+
 def _ensure_weasyprint_lib_path() -> None:
     """macOS 下让 WeasyPrint 找到 Homebrew 安装的 Pango/GObject/Cairo 等原生库。
 
@@ -265,24 +329,31 @@ def _ensure_weasyprint_lib_path() -> None:
         os.environ["DYLD_FALLBACK_LIBRARY_PATH"] = ":".join(parts)
 
 
-def _write_pdf(html: str, pdf_path: Path, fallback_lines: list[str], base_url: str) -> None:
+def _write_pdf(
+    html: str, pdf_path: Path, fallback_lines: list[str], base_url: str, html_path: Path
+) -> None:
+    # 可选浏览器引擎渲染（与网页所见完全一致，最美观）：设 REPORT_PDF_ENGINE=chrome 启用。
+    # 默认关闭——macOS 上 headless Chrome 经 Python 子进程调用会 hang（无 GUI session 时
+    # 等待 mach port 不退出），仅在确认可用的环境（如装了 Chrome 的 Linux 容器）显式开启。
+    if os.environ.get("REPORT_PDF_ENGINE", "").strip() == "chrome" and _render_pdf_with_chrome(
+        html_path, pdf_path
+    ):
+        return
+    # 次选 WeasyPrint：用内存 html + 显式 base_url（正确编码含中文路径），才能 fetch @font-face
+    # 的 file:// 中文字体；否则会回退到系统默认 CJK 字体（macOS 的 PingFang 子集化会损坏字形）。
     _ensure_weasyprint_lib_path()
     try:
         with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
             from weasyprint import HTML
 
-            # 用内存中的 html + 显式 base_url 渲染：base_url 必须是正确编码的 file:// 目录 URI
-            # （兼容含中文的项目路径），WeasyPrint 才能 fetch @font-face 里的 file:// 中文字体。
-            # 否则会静默回退到系统默认 CJK 字体（macOS 的 PingFang 是可变字体，子集化会损坏字形）。
             HTML(string=html, base_url=base_url).write_pdf(pdf_path)
         return
     except Exception as exc:
-        # Local fallback for machines without WeasyPrint's native Pango/GObject stack.
-        # 记录可见告警，避免「PDF 不美观」却查不到原因。
+        # 最终兜底：缺浏览器又缺 WeasyPrint 原生栈时，输出可审计的文本 PDF，并记录可见告警。
         log_event(
-            "report.pdf.weasyprint_unavailable",
+            "report.pdf.rich_render_unavailable",
             error=f"{type(exc).__name__}: {exc}"[:200],
-            hint="macOS 可执行 `brew install pango gdk-pixbuf libffi` 启用完整版式 PDF",
+            hint="安装 Chrome/Chromium，或 macOS 执行 `brew install pango gdk-pixbuf libffi`",
         )
         _write_text_fallback_pdf(fallback_lines, pdf_path)
 
@@ -452,6 +523,7 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
         pdf_path,
         _fallback_pdf_lines(ctx, score, aigc, summary),
         base_url=html_path.parent.resolve().as_uri() + "/",
+        html_path=html_path,
     )
     artifact_store = get_artifact_store()
     html_artifact = artifact_store.put_file(
