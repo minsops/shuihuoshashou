@@ -5,24 +5,27 @@
   <title>面试评估报告 · {{ candidate_name }}</title>
   <style>
     :root {
-      --ink: #1c2433;
-      --muted: #667082;
-      --faint: #98a1b3;
-      --line: #e3e7ef;
-      --teal: #0f766e;
-      --teal-deep: #0b5a54;
-      --teal-soft: #effaf8;
-      --red: #b42318;
-      --red-soft: #fef3f2;
-      --green: #067647;
-      --green-soft: #ecfdf3;
-      --amber: #b54708;
-      --amber-soft: #fffaeb;
+      --ink: #111827;
+      --muted: #6b7280;
+      --faint: #9ca3af;
+      --line: #e5e7eb;
+      --primary: #1e3a8a;
+      --primary-dark: #0f172a;
+      --teal: #1e3a8a;
+      --teal-deep: #1e3a8a;
+      --teal-soft: #eef2ff;
+      --red: #dc2626;
+      --red-soft: #fef2f2;
+      --green: #16a34a;
+      --green-soft: #f0fdf4;
+      --amber: #d97706;
+      --amber-soft: #fffbeb;
       --paper: #ffffff;
+      --page-bg: #f5f7fb;
     }
     @page { size: A4; margin: 16mm 13mm; }
     * { box-sizing: border-box; }
-    html { background: #f1f3f7; }
+    html { background: var(--page-bg); }
     body {
       margin: 0 auto;
       max-width: 820px;
@@ -40,32 +43,69 @@
       justify-content: space-between;
       align-items: flex-start;
       gap: 24px;
-      padding-bottom: 18px;
-      border-bottom: 2px solid var(--ink);
-      margin-bottom: 6px;
+      margin: -40px -44px 6px;
+      padding: 30px 44px 24px;
+      background: linear-gradient(115deg, var(--primary-dark) 0%, var(--primary) 70%, #312e81 100%);
+      color: #fff;
+      border-radius: 0 0 18px 18px;
     }
     .candidate-name { font-size: 30px; font-weight: 800; line-height: 1.2; letter-spacing: 2px; }
-    .head-meta { margin-top: 6px; color: var(--muted); font-size: 12px; }
-    .head-meta span { margin-right: 14px; white-space: nowrap; }
-    .head-meta b { color: var(--ink); font-weight: 650; }
+    .head-meta { margin-top: 8px; color: rgba(255, 255, 255, 0.75); font-size: 12px; }
+    .head-meta span {
+      display: inline-block;
+      margin: 4px 10px 0 0;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.12);
+      white-space: nowrap;
+    }
+    .head-meta b { color: #fff; font-weight: 650; }
     .score-stamp {
       flex: 0 0 auto;
       text-align: center;
-      border: 2.5px solid var(--teal);
-      border-radius: 12px;
-      padding: 10px 22px;
-      color: var(--teal-deep);
+      border-radius: 14px;
+      padding: 12px 24px;
+      background: #fff;
+      color: var(--primary);
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.35);
     }
     .score-stamp .num { font-size: 34px; font-weight: 800; line-height: 1.1; }
     .of { font-size: 12px; font-weight: 600; color: var(--muted); margin-left: 2px; }
     .score-stamp .label { font-size: 11px; color: var(--muted); }
     .score-stamp .verdict { margin-top: 2px; font-size: 14px; font-weight: 800; }
-    .score-stamp.tone-green { border-color: var(--green); }
     .score-stamp.tone-green .verdict { color: var(--green); }
-    .score-stamp.tone-amber { border-color: var(--amber); }
     .score-stamp.tone-amber .verdict { color: var(--amber); }
-    .score-stamp.tone-red { border-color: var(--red); }
     .score-stamp.tone-red .verdict { color: var(--red); }
+    .pass-tag {
+      display: inline-block;
+      margin-top: 6px;
+      border-radius: 999px;
+      padding: 2px 12px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .pass-tag.ok { background: var(--green-soft); color: var(--green); }
+    .pass-tag.fail { background: var(--red-soft); color: var(--red); }
+    .aigc-banner {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-weight: 700;
+      margin: 14px 0 0;
+    }
+    .aigc-banner.ok {
+      background: var(--green-soft);
+      color: var(--green);
+      border-left: 4px solid var(--green);
+    }
+    .aigc-banner.bad {
+      background: var(--red-soft);
+      color: var(--red);
+      border-left: 4px solid var(--red);
+    }
+    .aigc-banner .sub { font-weight: 500; font-size: 12px; opacity: 0.85; }
 
     .doc-subtitle {
       display: flex;
@@ -92,7 +132,7 @@
       font-size: 14px;
       font-weight: 800;
       letter-spacing: 3px;
-      color: var(--ink);
+      color: var(--primary);
       border-bottom: 1px solid var(--line);
       padding-bottom: 6px;
     }
@@ -110,7 +150,7 @@
     .dim-row .meta { color: var(--muted); font-size: 11px; }
     .dim-row .value { font-weight: 800; color: var(--teal-deep); font-size: 14px; }
     .bar { height: 8px; border-radius: 99px; background: #edf0f5; margin-top: 4px; overflow: hidden; }
-    .bar i { display: block; height: 100%; border-radius: 99px; background: var(--teal); }
+    .bar i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--primary) 0%, #3b82f6 100%); }
     .bar i.low { background: var(--red); }
     .bar i.mid { background: var(--amber); }
     .dim-row .evidence { margin-top: 4px; color: var(--muted); font-size: 11.5px; line-height: 1.6; }
@@ -216,6 +256,7 @@
       <div class="num">{{ score.total_score }}<span class="of">/100</span></div>
       <div class="label">综合得分</div>
       <div class="verdict">{{ recommendation_label }}</div>
+      <span class="pass-tag {{ 'ok' if pass_verdict == '合格' else 'fail' }}">{{ pass_verdict }}</span>
     </div>
   </header>
   <div class="doc-subtitle">
@@ -226,6 +267,15 @@
   {% if analysis_mode == "fallback" %}
   <p class="fallback">本报告由确定性规则生成（未启用大模型分析），分数仅供链路验证，不可用于招聘决策。</p>
   {% endif %}
+
+  <div class="aigc-banner {{ 'bad' if aigc_flagged_count else 'ok' }}">
+    {% if aigc_flagged_count %}
+    AIGC 检测：{{ aigc_total }} 轮回答中有 {{ aigc_flagged_count }} 轮疑似 AI 生成或背稿，请重点复核。
+    {% else %}
+    AIGC 检测：{{ aigc_total }} 轮回答未发现明显 AI 生成或背稿痕迹。
+    {% endif %}
+    <span class="sub">{{ "大模型评判 + 规则检测" if aigc_llm_reviewed else "规则检测" }}</span>
+  </div>
 
   <section>
     <h2>总评<span class="en">SUMMARY</span></h2>
@@ -324,15 +374,16 @@
   <section>
     <h2>背稿与模板化检测<span class="en">AIGC CHECK</span></h2>
     <table>
-      <tr><th>轮次</th><th>模式</th><th>背稿分</th><th>模板相似度</th><th>命中模板</th><th>状态</th></tr>
+      <tr><th>轮次</th><th>模式</th><th>AI 概率</th><th>背稿分</th><th>模板相似度</th><th>状态</th><th>大模型判断依据</th></tr>
       {% for item in aigc_rows %}
       <tr class="{{ 'flagged' if item.flagged else '' }}">
         <td>第 {{ loop.index }} 轮</td>
         <td>{{ item.mode_label }}</td>
+        <td class="num-cell">{{ item.ai_generated_prob }}</td>
         <td class="num-cell">{{ item.rehearsal_score }}</td>
         <td class="num-cell">{{ item.template_similarity }}</td>
-        <td>{{ item.matched_template or "—" }}</td>
         <td>{{ "疑似注水/模板化" if item.flagged else "未命中" }}</td>
+        <td>{{ item.llm_reason or "—" }}</td>
       </tr>
       {% endfor %}
     </table>

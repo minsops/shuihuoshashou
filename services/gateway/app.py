@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from time import perf_counter
+from urllib.parse import quote
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
@@ -1299,14 +1300,20 @@ def api_report_pdf(interview_id: str):
         report, _ = get_report(interview_id)
         pdf_path = report.get("pdf_path")
         if pdf_path and Path(pdf_path).exists():
-            return FileResponse(pdf_path, media_type="application/pdf", filename=f"{interview_id}.pdf")
+            # 下载名遵循命名规则：合格/不合格-姓名-分数.pdf
+            return FileResponse(
+                pdf_path, media_type="application/pdf", filename=Path(pdf_path).name
+            )
         pdf_uri = report.get("artifact_uris", {}).get("pdf")
         if pdf_uri:
             artifact = get_artifact_store().get_file(pdf_uri)
+            download_name = Path(pdf_uri).name or f"{interview_id}.pdf"
             return Response(
                 content=artifact.content,
                 media_type=artifact.content_type or "application/pdf",
-                headers={"content-disposition": f'attachment; filename="{interview_id}.pdf"'},
+                headers={
+                    "content-disposition": f"attachment; filename*=UTF-8''{quote(download_name)}"
+                },
             )
         raise KeyError(f"report pdf not found: {interview_id}")
     except KeyError as exc:

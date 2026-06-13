@@ -7,16 +7,22 @@
     <style>
       :root {
         color-scheme: light;
-        --bg: oklch(0.97 0.01 178);
-        --surface: oklch(0.995 0.004 178);
-        --ink: oklch(0.22 0.03 238);
-        --muted: oklch(0.49 0.028 236);
-        --line: oklch(0.88 0.015 220);
-        --teal: oklch(0.46 0.105 183);
-        --teal-deep: oklch(0.34 0.09 184);
+        --bg: oklch(0.982 0.006 240);
+        --surface: oklch(1 0 0);
+        --surface-2: oklch(0.975 0.008 230);
+        --ink: oklch(0.24 0.03 250);
+        --ink-2: oklch(0.34 0.05 252);
+        --muted: oklch(0.52 0.03 250);
+        --faint: oklch(0.68 0.02 245);
+        --line: oklch(0.915 0.012 240);
+        --teal: oklch(0.52 0.16 255);
+        --teal-deep: oklch(0.42 0.15 260);
         --amber: oklch(0.72 0.145 74);
         --red: oklch(0.52 0.17 29);
         --green: oklch(0.5 0.13 148);
+        --serif: "Noto Serif SC", "Songti SC", "STSong", "SimSun", serif;
+        --shadow-soft: 0 1px 2px color-mix(in oklch, var(--ink), transparent 95%),
+          0 16px 44px color-mix(in oklch, var(--ink), transparent 93%);
       }
 
       * {
@@ -26,60 +32,163 @@
       body {
         margin: 0;
         min-height: 100vh;
-        background: var(--bg);
+        background:
+          radial-gradient(900px 360px at 18% -80px, color-mix(in oklch, var(--teal), transparent 84%), transparent 70%),
+          radial-gradient(700px 300px at 88% -120px, color-mix(in oklch, var(--amber), transparent 92%), transparent 70%),
+          var(--bg);
         color: var(--ink);
         font-family: "Avenir Next", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+        -webkit-font-smoothing: antialiased;
       }
 
-      main {
-        max-width: 760px;
-        margin: 0 auto;
-        padding: 24px 16px 64px;
-        display: grid;
-        gap: 16px;
+      ::selection {
+        background: color-mix(in oklch, var(--teal), transparent 75%);
       }
 
-      header {
+      *::-webkit-scrollbar { width: 8px; height: 8px; }
+      *::-webkit-scrollbar-thumb {
+        border-radius: 99px;
+        background: color-mix(in oklch, var(--ink), transparent 85%);
+      }
+      *::-webkit-scrollbar-track { background: transparent; }
+
+      /* ===== 顶栏：品牌 + 流程步骤 + 状态 ===== */
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
         display: flex;
-        align-items: baseline;
+        align-items: center;
         justify-content: space-between;
-        gap: 12px;
-        padding: 8px 4px 0;
+        gap: 16px;
+        min-height: 60px;
+        padding: 8px clamp(16px, 3vw, 32px);
+        border-bottom: 1px solid color-mix(in oklch, var(--teal), transparent 70%);
+        background: linear-gradient(110deg, oklch(0.32 0.09 262) 0%, oklch(0.45 0.14 255) 100%);
+        color: oklch(0.97 0.005 120);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      .brand .mark {
+        display: grid;
+        place-items: center;
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        background: linear-gradient(160deg, var(--teal) 0%, var(--teal-deep) 100%);
+        color: #fff;
+        font-weight: 800;
+        font-family: var(--serif);
+        flex: 0 0 auto;
+        box-shadow: 0 4px 14px color-mix(in oklch, var(--teal), transparent 55%);
       }
 
       h1 {
         margin: 0;
-        font-size: 22px;
+        font-size: 17px;
+        line-height: 1.1;
+        letter-spacing: 2px;
       }
 
-      h1 small {
-        margin-left: 8px;
-        color: var(--muted);
+      .brand p {
+        margin: 3px 0 0;
+        color: oklch(0.72 0.02 210);
+        font-size: 11px;
+        letter-spacing: 1px;
+      }
+
+      .steps {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .steps .step {
+        display: inline-flex;
+        align-items: center;
+        min-height: 30px;
+        border-radius: 999px;
+        padding: 4px 14px;
+        color: oklch(0.68 0.02 210);
         font-size: 13px;
-        font-weight: 500;
+        font-weight: 600;
+        white-space: nowrap;
+        transition: background 0.2s ease, color 0.2s ease;
       }
 
-      h2,
-      h3,
-      p {
-        margin: 0;
+      .steps .step.active {
+        background: linear-gradient(160deg, var(--teal) 0%, var(--teal-deep) 100%);
+        color: #fff;
+        box-shadow: 0 4px 14px color-mix(in oklch, var(--teal), transparent 60%);
+      }
+
+      .steps .step.done {
+        color: oklch(0.85 0.05 183);
+      }
+
+      .steps .sep {
+        color: oklch(0.45 0.02 220);
+      }
+
+      .status-line {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        max-width: 320px;
+        color: oklch(0.78 0.015 210);
+        font-size: 12.5px;
+        text-align: right;
+      }
+
+      .status-line::before {
+        content: "";
+        width: 9px;
+        height: 9px;
+        border-radius: 999px;
+        background: var(--muted);
+        flex: 0 0 auto;
+      }
+
+      .status-line.live::before { background: var(--amber); }
+      .status-line.ready::before { background: var(--green); }
+      .status-line.warn::before { background: var(--red); }
+
+      /* ===== 主区：阶段宽度 ===== */
+      main {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 20px 16px 64px;
+        display: grid;
+        gap: 16px;
+      }
+
+      body[data-phase="live"] main,
+      body[data-phase="scoring"] main {
+        max-width: 1360px;
       }
 
       h2 {
+        margin: 0;
         font-size: 16px;
       }
 
-      h3 {
-        font-size: 14px;
-      }
+      h3 { margin: 0; font-size: 14px; }
+      p { margin: 0; }
 
       .card {
         display: grid;
         gap: 12px;
         border: 1px solid var(--line);
-        border-radius: 12px;
-        padding: 16px;
+        border-radius: 16px;
+        padding: 18px;
         background: var(--surface);
+        box-shadow: var(--shadow-soft);
       }
 
       .muted,
@@ -112,13 +221,14 @@
       }
 
       textarea {
-        min-height: 96px;
+        min-height: 150px;
         resize: vertical;
       }
 
       textarea:focus,
       input:focus {
         border-color: var(--teal);
+        box-shadow: 0 0 0 3px color-mix(in oklch, var(--teal), transparent 85%);
       }
 
       .file-row {
@@ -138,20 +248,34 @@
         align-items: center;
         justify-content: center;
         min-height: 44px;
-        border: 1px solid var(--teal);
-        border-radius: 8px;
+        border: 1px solid var(--teal-deep);
+        border-radius: 10px;
         padding: 10px 18px;
-        background: var(--teal);
+        background: linear-gradient(180deg, var(--teal) 0%, var(--teal-deep) 100%);
         color: #fff;
         font: inherit;
         font-size: 15px;
         font-weight: 650;
         cursor: pointer;
+        box-shadow: 0 6px 18px color-mix(in oklch, var(--teal), transparent 70%);
+        transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
       }
 
+      button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 24px color-mix(in oklch, var(--teal), transparent 62%);
+      }
+
+      button:active { transform: translateY(0); }
+
       button.danger {
-        border-color: var(--red);
-        background: var(--red);
+        border-color: color-mix(in oklch, var(--red), black 12%);
+        background: linear-gradient(180deg, var(--red) 0%, color-mix(in oklch, var(--red), black 14%) 100%);
+        box-shadow: 0 6px 18px color-mix(in oklch, var(--red), transparent 72%);
+      }
+
+      button.danger:hover {
+        box-shadow: 0 10px 24px color-mix(in oklch, var(--red), transparent 64%);
       }
 
       button.subtle {
@@ -160,60 +284,193 @@
         background: var(--surface);
         color: var(--teal-deep);
         font-size: 13px;
+        box-shadow: none;
+      }
+
+      button.subtle:hover {
+        border-color: var(--teal);
+        box-shadow: 0 4px 12px color-mix(in oklch, var(--teal), transparent 82%);
       }
 
       button:disabled {
         cursor: not-allowed;
         opacity: 0.5;
+        filter: none;
       }
 
-      .status-line {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        color: var(--muted);
-        font-size: 13px;
+      /* ===== 准备页：JD / 简历并排 ===== */
+      .setup-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
       }
 
-      .status-line::before {
-        content: "";
-        width: 9px;
-        height: 9px;
-        border-radius: 999px;
-        background: var(--muted);
-        flex: 0 0 auto;
+      .setup-actions {
+        display: grid;
+        gap: 10px;
+        justify-items: center;
       }
 
-      .status-line.live::before {
-        background: var(--amber);
+      .setup-actions button#startInterview {
+        min-width: 260px;
+        min-height: 50px;
+        font-size: 17px;
       }
 
-      .status-line.ready::before {
-        background: var(--green);
+      /* ===== 面试驾驶舱：三栏 ===== */
+      .live-layout {
+        display: grid;
+        grid-template-columns: 264px minmax(0, 1fr) 330px;
+        gap: 14px;
+        align-items: start;
       }
 
-      .status-line.warn::before {
-        background: var(--red);
+      .rail {
+        display: grid;
+        gap: 12px;
+        position: sticky;
+        top: 72px;
+      }
+
+      .center {
+        display: grid;
+        gap: 12px;
+        min-width: 0;
+      }
+
+      .question-hero {
+        position: relative;
+        overflow: hidden;
+        border: 1px solid color-mix(in oklch, var(--teal), transparent 60%);
+        background:
+          linear-gradient(135deg, color-mix(in oklch, var(--teal), transparent 94%), transparent 55%),
+          var(--surface);
+      }
+
+      .question-hero::before {
+        content: "「";
+        position: absolute;
+        top: -26px;
+        right: 6px;
+        color: color-mix(in oklch, var(--teal), transparent 86%);
+        font-family: var(--serif);
+        font-size: 110px;
+        font-weight: 800;
+        line-height: 1;
+        pointer-events: none;
+      }
+
+      .question-hero .small {
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        font-size: 11.5px;
+        font-weight: 700;
+        color: var(--teal-deep);
       }
 
       .question-text {
-        font-size: 19px;
+        font-family: var(--serif);
+        font-size: 23px;
         font-weight: 700;
-        line-height: 1.5;
+        line-height: 1.55;
+        letter-spacing: 0.5px;
       }
 
-      .option-zones {
+      /* 参考面板（VS Code 式折叠） */
+      .ref-panel {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--surface);
+        overflow: hidden;
+      }
+
+      .ref-panel summary {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 9px 12px;
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--ink);
+        cursor: pointer;
+        list-style: none;
+        user-select: none;
+      }
+
+      .ref-panel summary::-webkit-details-marker { display: none; }
+
+      .ref-panel summary::before {
+        content: "";
+        width: 0;
+        height: 0;
+        border-left: 5px solid var(--muted);
+        border-top: 4px solid transparent;
+        border-bottom: 4px solid transparent;
+        transition: transform 0.15s ease;
+      }
+
+      .ref-panel[open] summary::before { transform: rotate(90deg); }
+
+      .ref-panel .ref-body {
+        max-height: 38vh;
+        overflow: auto;
+        border-top: 1px solid var(--line);
+        padding: 10px 12px;
+        background: var(--surface-2);
+        color: var(--muted);
+        font-size: 12.5px;
+        line-height: 1.7;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      /* 双通道转写 */
+      .transcript-zones {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 12px;
       }
 
-      @media (max-width: 640px) {
-        .option-zones {
-          grid-template-columns: 1fr;
-        }
+      .transcript-zones > div {
+        display: grid;
+        gap: 6px;
+        align-content: start;
+        min-width: 0;
       }
 
+      .answer-box {
+        display: grid;
+        gap: 6px;
+        min-height: 120px;
+        max-height: 280px;
+        overflow: auto;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px 12px;
+        background: var(--surface-2);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+
+      .answer-box .placeholder {
+        color: var(--muted);
+        font-size: 12.5px;
+      }
+
+      .answer-box .seg { margin: 0; }
+
+      .answer-box .seg.pending { color: var(--muted); }
+      .answer-box .seg.pending::after { content: "…"; }
+
+      .answer-box .seg .who {
+        color: var(--teal-deep);
+        font-size: 12px;
+        font-weight: 700;
+        margin-right: 6px;
+      }
+
+      /* 追问 / 换题 */
       .option-zone {
         display: grid;
         gap: 8px;
@@ -221,11 +478,12 @@
         border: 1px solid var(--line);
         border-radius: 12px;
         padding: 10px 12px;
-        background: oklch(0.985 0.008 178);
+        background: var(--surface);
       }
 
       .option-zone.drill {
-        border-color: color-mix(in oklch, var(--teal), transparent 50%);
+        border-color: color-mix(in oklch, var(--teal), transparent 45%);
+        background: color-mix(in oklch, var(--teal), var(--surface) 96%);
       }
 
       .zone-title {
@@ -237,9 +495,7 @@
         color: var(--teal-deep);
       }
 
-      .option-zone.switch .zone-title {
-        color: var(--ink);
-      }
+      .option-zone.switch .zone-title { color: var(--ink); }
 
       .zone-title span {
         color: var(--muted);
@@ -270,70 +526,97 @@
         gap: 8px;
       }
 
-      .ref-zones {
+      .option-card {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 12px;
-      }
-
-      @media (max-width: 640px) {
-        .ref-zones {
-          grid-template-columns: 1fr;
-        }
-      }
-
-      .ref-panel {
-        min-width: 0;
+        gap: 4px;
         border: 1px solid var(--line);
         border-radius: 10px;
-        background: oklch(0.985 0.008 178);
-        overflow: hidden;
+        padding: 10px 12px;
+        background: var(--surface);
+        text-align: left;
+        cursor: pointer;
+        font: inherit;
+        color: var(--ink);
+        min-height: 0;
+        font-weight: 500;
+        font-size: 13.5px;
+        line-height: 1.5;
       }
 
-      .ref-panel summary {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        padding: 8px 12px;
+      .option-card {
+        border-left: 3px solid transparent;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+      }
+
+      .option-card:hover {
+        border-color: color-mix(in oklch, var(--teal), transparent 55%);
+        border-left-color: var(--teal);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px color-mix(in oklch, var(--teal), transparent 80%);
+      }
+
+      .option-card .kind {
+        color: var(--teal-deep);
+        font-size: 11.5px;
+        font-weight: 700;
+      }
+
+      .option-card .reason {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .end-btn {
+        width: 100%;
+      }
+
+      /* 活动日志抽屉 */
+      .log-drawer summary {
+        cursor: pointer;
+        color: var(--muted);
         font-size: 13px;
         font-weight: 700;
-        color: var(--ink);
-        cursor: pointer;
-        list-style: none;
         user-select: none;
       }
 
-      .ref-panel summary::-webkit-details-marker {
-        display: none;
-      }
-
-      .ref-panel summary::before {
-        content: "";
-        width: 0;
-        height: 0;
-        border-left: 5px solid var(--muted);
-        border-top: 4px solid transparent;
-        border-bottom: 4px solid transparent;
-        transition: transform 0.15s ease;
-      }
-
-      .ref-panel[open] summary::before {
-        transform: rotate(90deg);
-      }
-
-      .ref-panel .ref-body {
-        max-height: 220px;
+      .feed {
+        display: grid;
+        gap: 8px;
+        max-height: 240px;
         overflow: auto;
-        border-top: 1px solid var(--line);
-        padding: 10px 12px;
-        background: var(--surface);
-        color: var(--muted);
-        font-size: 12.5px;
-        line-height: 1.7;
-        white-space: pre-wrap;
-        word-break: break-word;
       }
 
+      .event {
+        border-left: 3px solid var(--line);
+        padding: 2px 0 2px 10px;
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .event strong {
+        color: var(--muted);
+        font-size: 12px;
+        margin-right: 6px;
+      }
+
+      .event.red { border-left-color: var(--red); }
+      .event.green { border-left-color: var(--green); }
+      .event.blue { border-left-color: var(--teal); }
+
+      .fallback-input {
+        display: flex;
+        gap: 8px;
+      }
+
+      .fallback-input input { flex: 1; }
+
+      .row-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      /* thinking 动画 */
       .thinking {
         display: flex;
         align-items: center;
@@ -360,11 +643,7 @@
         animation: dots 1.2s steps(4, end) infinite;
       }
 
-      @keyframes spin {
-        to {
-          transform: rotate(360deg);
-        }
-      }
+      @keyframes spin { to { transform: rotate(360deg); } }
 
       @keyframes dots {
         0% { content: ""; }
@@ -373,133 +652,7 @@
         75% { content: "..."; }
       }
 
-      .transcript-zones {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 12px;
-      }
-
-      @media (max-width: 640px) {
-        .transcript-zones {
-          grid-template-columns: 1fr;
-        }
-      }
-
-      .transcript-zones > div {
-        display: grid;
-        gap: 6px;
-        align-content: start;
-      }
-
-      .answer-box .seg.pending {
-        color: var(--muted);
-      }
-
-      .answer-box .seg.pending::after {
-        content: "…";
-      }
-
-      .answer-box {
-        display: grid;
-        gap: 6px;
-        min-height: 72px;
-        max-height: 200px;
-        overflow: auto;
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        padding: 10px 12px;
-        background: oklch(0.985 0.008 178);
-        font-size: 14px;
-        line-height: 1.6;
-      }
-
-      .answer-box .placeholder {
-        color: var(--muted);
-        font-size: 13px;
-      }
-
-      .answer-box .seg {
-        margin: 0;
-      }
-
-      .answer-box .seg .who {
-        color: var(--teal-deep);
-        font-size: 12px;
-        font-weight: 700;
-        margin-right: 6px;
-      }
-
-      .option-card {
-        display: grid;
-        gap: 4px;
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        padding: 10px 12px;
-        background: var(--surface);
-        text-align: left;
-        cursor: pointer;
-        font: inherit;
-        color: var(--ink);
-        min-height: 0;
-        font-weight: 500;
-      }
-
-      .option-card:hover {
-        border-color: var(--teal);
-      }
-
-      .option-card .kind {
-        color: var(--teal-deep);
-        font-size: 12px;
-        font-weight: 700;
-      }
-
-      .option-card .reason {
-        color: var(--muted);
-        font-size: 12px;
-      }
-
-      .feed {
-        display: grid;
-        gap: 8px;
-        max-height: 320px;
-        overflow: auto;
-      }
-
-      .event {
-        border-left: 3px solid var(--line);
-        padding: 2px 0 2px 10px;
-        font-size: 13px;
-        line-height: 1.55;
-      }
-
-      .event strong {
-        color: var(--muted);
-        font-size: 12px;
-        margin-right: 6px;
-      }
-
-      .event.red {
-        border-left-color: var(--red);
-      }
-
-      .event.green {
-        border-left-color: var(--green);
-      }
-
-      .event.blue {
-        border-left-color: var(--teal);
-      }
-
-      .fallback-input {
-        display: flex;
-        gap: 8px;
-      }
-
-      .fallback-input input {
-        flex: 1;
-      }
-
+      /* ===== 报告 ===== */
       .score-line {
         display: flex;
         align-items: center;
@@ -509,11 +662,12 @@
       .score-main {
         display: grid;
         place-items: center;
-        min-width: 96px;
-        min-height: 96px;
-        border-radius: 12px;
-        background: var(--ink);
+        min-width: 110px;
+        min-height: 110px;
+        border-radius: 16px;
+        background: linear-gradient(160deg, var(--ink) 0%, var(--ink-2) 100%);
         color: var(--surface);
+        box-shadow: var(--shadow-soft);
       }
 
       .score-main strong {
@@ -521,9 +675,7 @@
         line-height: 1.1;
       }
 
-      .score-main span {
-        font-size: 12px;
-      }
+      .score-main span { font-size: 12px; }
 
       table {
         width: 100%;
@@ -539,17 +691,10 @@
         vertical-align: top;
       }
 
-      th {
-        color: var(--muted);
-      }
+      th { color: var(--muted); }
 
-      .risk {
-        color: var(--red);
-      }
-
-      .success {
-        color: var(--green);
-      }
+      .risk { color: var(--red); }
+      .success { color: var(--green); }
 
       .links {
         display: flex;
@@ -562,103 +707,155 @@
         font-size: 13px;
       }
 
-      [hidden] {
-        display: none !important;
+      [hidden] { display: none !important; }
+
+      /* ===== 响应式 ===== */
+      @media (max-width: 1080px) {
+        .live-layout {
+          grid-template-columns: minmax(0, 1fr) 320px;
+        }
+
+        .rail-left {
+          grid-column: 1 / -1;
+          position: static;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 760px) {
+        .topbar { flex-wrap: wrap; }
+        .steps { order: 3; width: 100%; justify-content: center; }
+        .live-layout { grid-template-columns: 1fr; }
+        .rail { position: static; }
+        .rail-left { grid-template-columns: 1fr; }
+        .setup-grid,
+        .transcript-zones { grid-template-columns: 1fr; }
       }
     </style>
   </head>
   <body>
-    <main>
-      <header>
-        <h1>水货杀手<small>AI 实时深挖面试官</small></h1>
-        <span class="status-line" id="statusLine" role="status" aria-live="polite">检查本地服务中</span>
-      </header>
-
-      <section class="card" id="setupCard">
-        <h2>1 · 粘贴 JD 和简历，开始面试</h2>
-        <label>
-          岗位 JD
-          <textarea id="jdText" placeholder="粘贴岗位描述，或上传文件"></textarea>
-          <span class="file-row">
-            <input type="file" id="jdFile" accept=".txt,.md,.markdown,.json,.csv,.log,.pdf,.doc,.docx,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff,.heic,application/pdf,image/*" />
-            <span class="small" id="jdFileStatus"></span>
-          </span>
-        </label>
-        <label>
-          候选人简历
-          <textarea id="resumeText" placeholder="粘贴简历内容，或上传文件"></textarea>
-          <span class="file-row">
-            <input type="file" id="resumeFile" accept=".txt,.md,.markdown,.json,.csv,.log,.pdf,.doc,.docx,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff,.heic,application/pdf,image/*" />
-            <span class="small" id="resumeFileStatus"></span>
-          </span>
-        </label>
-        <button type="button" id="startInterview">开始面试</button>
-        <div class="thinking" id="setupThinking" hidden>
-          <span class="orb"></span>
-          <span>AI 正在解析资料并准备面试<span class="dots"></span></span>
+    <header class="topbar">
+      <div class="brand">
+        <span class="mark">杀</span>
+        <div>
+          <h1>水货杀手</h1>
+          <p>AI 实时深挖面试官</p>
         </div>
-        <p class="small">点击后会自动生成题库、连接实时通道并打开麦克风。面试在微信或腾讯会议里进行也没问题：把声音外放，让麦克风同时听到双方即可。</p>
+      </div>
+      <nav class="steps" aria-label="流程">
+        <span class="step" data-step="idle">1 资料</span>
+        <span class="sep">›</span>
+        <span class="step" data-step="live">2 面试</span>
+        <span class="sep">›</span>
+        <span class="step" data-step="report">3 报告</span>
+      </nav>
+      <span class="status-line" id="statusLine" role="status" aria-live="polite">检查本地服务中</span>
+    </header>
+
+    <main>
+      <section class="card" id="setupCard">
+        <h2>粘贴 JD 和简历，开始面试</h2>
+        <div class="setup-grid">
+          <label>
+            岗位 JD
+            <textarea id="jdText" placeholder="粘贴岗位描述，或上传文件"></textarea>
+            <span class="file-row">
+              <input type="file" id="jdFile" accept=".txt,.md,.markdown,.json,.csv,.log,.pdf,.doc,.docx,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff,.heic,application/pdf,image/*" />
+              <span class="small" id="jdFileStatus"></span>
+            </span>
+          </label>
+          <label>
+            候选人简历
+            <textarea id="resumeText" placeholder="粘贴简历内容，或上传文件"></textarea>
+            <span class="file-row">
+              <input type="file" id="resumeFile" accept=".txt,.md,.markdown,.json,.csv,.log,.pdf,.doc,.docx,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff,.heic,application/pdf,image/*" />
+              <span class="small" id="resumeFileStatus"></span>
+            </span>
+          </label>
+        </div>
+        <div class="setup-actions">
+          <button type="button" id="startInterview">开始面试</button>
+          <div class="thinking" id="setupThinking" hidden>
+            <span class="orb"></span>
+            <span>AI 正在解析资料并准备面试<span class="dots"></span></span>
+          </div>
+          <p class="small">点击后会自动生成题库、连接实时通道并打开麦克风。面试在微信或腾讯会议里进行也没问题：把声音外放，或在下一步点「接入会议声音」单独收对方的声音。</p>
+        </div>
       </section>
 
-      <section class="card" id="liveCard" hidden>
-        <h2>2 · 面试进行中</h2>
-        <div class="ref-zones">
-          <details class="ref-panel">
-            <summary>候选人简历</summary>
-            <div class="ref-body" id="refResume"></div>
-          </details>
-          <details class="ref-panel">
-            <summary>岗位 JD</summary>
-            <div class="ref-body" id="refJd"></div>
-          </details>
-        </div>
-        <div>
-          <p class="small" id="currentQuestionMeta">当前问题</p>
-          <p class="question-text" id="currentQuestionText">正在生成首题…</p>
-        </div>
-        <div class="transcript-zones">
-          <div>
-            <p class="small">麦克风收音<span id="micRoleHint"> · 当前按候选人记录</span></p>
-            <div class="answer-box" id="micBox" role="log" aria-live="polite">
-              <p class="placeholder">等待麦克风声音，转写会实时出现在这里。</p>
+      <section id="liveCard" hidden>
+        <div class="live-layout">
+          <aside class="rail rail-left">
+            <details class="ref-panel" open>
+              <summary>候选人简历</summary>
+              <div class="ref-body" id="refResume"></div>
+            </details>
+            <details class="ref-panel">
+              <summary>岗位 JD</summary>
+              <div class="ref-body" id="refJd"></div>
+            </details>
+          </aside>
+
+          <div class="center">
+            <div class="card question-hero">
+              <p class="small" id="currentQuestionMeta">当前问题</p>
+              <p class="question-text" id="currentQuestionText">正在生成首题…</p>
             </div>
-          </div>
-          <div>
-            <p class="small">扬声器收音 · 会议对方（候选人）</p>
-            <div class="answer-box" id="speakerBox" role="log" aria-live="polite">
-              <p class="placeholder">微信/腾讯会议面试时，点击下方「接入会议声音」，对方语音会单独出现在这里。</p>
+
+            <div class="card">
+              <div class="transcript-zones">
+                <div>
+                  <p class="small">麦克风收音<span id="micRoleHint"> · 当前按候选人记录</span></p>
+                  <div class="answer-box" id="micBox" role="log" aria-live="polite">
+                    <p class="placeholder">等待麦克风声音，转写会实时出现在这里。</p>
+                  </div>
+                </div>
+                <div>
+                  <p class="small">扬声器收音 · 会议对方（候选人）</p>
+                  <div class="answer-box" id="speakerBox" role="log" aria-live="polite">
+                    <p class="placeholder">微信/腾讯会议面试时，点击「接入会议声音」，对方语音会单独出现在这里。</p>
+                  </div>
+                </div>
+              </div>
+              <div class="row-actions">
+                <button type="button" class="subtle" id="captureSystemAudio">接入会议声音（共享标签页或屏幕的音频）</button>
+              </div>
+              <div class="fallback-input" id="fallbackInput" hidden>
+                <input type="text" id="fallbackText" placeholder="麦克风不可用时，可在这里手动输入候选人回答" />
+                <button type="button" class="subtle" id="fallbackSend">发送</button>
+              </div>
             </div>
+
+            <details class="card log-drawer">
+              <summary>活动日志</summary>
+              <div class="feed" id="liveFeed" role="log" aria-live="polite"></div>
+            </details>
           </div>
-        </div>
-        <button type="button" class="subtle" id="captureSystemAudio">接入会议声音（共享标签页或屏幕的音频）</button>
-        <div class="option-zones">
-          <div class="option-zone drill">
-            <p class="zone-title">深挖追问<span>顺着回答往下钻</span><button type="button" class="zone-refresh" id="refreshDrill" title="换一批追问">↻ 刷新</button></p>
-            <div class="option-list" id="followUpList">
-              <p class="zone-empty">候选人回答后，这里会实时给出追问</p>
+
+          <aside class="rail rail-right">
+            <div class="option-zone drill">
+              <p class="zone-title">深挖追问<span>顺着回答往下钻</span><button type="button" class="zone-refresh" id="refreshDrill" title="换一批追问">↻ 刷新</button></p>
+              <div class="option-list" id="followUpList">
+                <p class="zone-empty">候选人回答后，这里会实时给出追问</p>
+              </div>
             </div>
-          </div>
-          <div class="option-zone switch">
-            <p class="zone-title">换题备选<span>切换话题或验证简历</span><button type="button" class="zone-refresh" id="refreshSwitch" title="换一批问题">↻ 刷新</button></p>
-            <div class="option-list" id="switchList">
-              <p class="zone-empty">题库生成后，这里会列出可切换的问题</p>
+            <div class="option-zone switch">
+              <p class="zone-title">换题备选<span>切换话题或验证简历</span><button type="button" class="zone-refresh" id="refreshSwitch" title="换一批问题">↻ 刷新</button></p>
+              <div class="option-list" id="switchList">
+                <p class="zone-empty">题库生成后，这里会列出可切换的问题</p>
+              </div>
             </div>
-          </div>
+            <div class="thinking" id="scoreThinking" hidden>
+              <span class="orb"></span>
+              <span>AI 正在分析全部问答并打分，通常需要半分钟左右<span class="dots"></span></span>
+            </div>
+            <button type="button" class="danger end-btn" id="endInterview">结束面试，生成评分报告</button>
+          </aside>
         </div>
-        <div class="feed" id="liveFeed" role="log" aria-live="polite"></div>
-        <div class="fallback-input" id="fallbackInput" hidden>
-          <input type="text" id="fallbackText" placeholder="麦克风不可用时，可在这里手动输入候选人回答" />
-          <button type="button" class="subtle" id="fallbackSend">发送</button>
-        </div>
-        <div class="thinking" id="scoreThinking" hidden>
-          <span class="orb"></span>
-          <span>AI 正在分析全部问答并打分，通常需要半分钟左右<span class="dots"></span></span>
-        </div>
-        <button type="button" class="danger" id="endInterview">结束面试，生成评分报告</button>
       </section>
 
       <section class="card" id="reportCard" hidden>
-        <h2>3 · 评分报告</h2>
+        <h2>评分报告</h2>
         <div id="reportPanel"></div>
         <div class="links" id="reportLinks"></div>
         <button type="button" class="subtle" id="newInterview">开始新的面试</button>
@@ -863,6 +1060,21 @@
         setupCard.hidden = phase !== "idle";
         liveCard.hidden = phase !== "live" && phase !== "scoring";
         reportCard.hidden = phase !== "report" && phase !== "queued";
+        document.body.dataset.phase = phase;
+        const stepKey =
+          phase === "live" || phase === "scoring"
+            ? "live"
+            : phase === "report" || phase === "queued"
+              ? "report"
+              : "idle";
+        const order = ["idle", "live", "report"];
+        document.querySelectorAll(".steps .step").forEach((node) => {
+          node.classList.toggle("active", node.dataset.step === stepKey);
+          node.classList.toggle(
+            "done",
+            order.indexOf(node.dataset.step) < order.indexOf(stepKey)
+          );
+        });
         syncControls();
       }
 
@@ -1745,6 +1957,13 @@
       function renderReport(report) {
         clearReportPolling();
         const score = report.score || {};
+        const aigcResults = Array.isArray(report.aigc_results) ? report.aigc_results : [];
+        const aigcFlagged = aigcResults.filter((item) => item.flagged).length;
+        const aigcBanner = aigcResults.length
+          ? aigcFlagged
+            ? `<p class="risk" style="border-left:4px solid var(--red); background:color-mix(in oklch, var(--red), transparent 92%); padding:10px 12px; border-radius:8px; font-weight:700;">AIGC 检测：${aigcResults.length} 轮回答中有 ${aigcFlagged} 轮疑似 AI 生成或背稿，请重点复核。</p>`
+            : `<p class="success" style="border-left:4px solid var(--green); background:color-mix(in oklch, var(--green), transparent 92%); padding:10px 12px; border-radius:8px; font-weight:700;">AIGC 检测：${aigcResults.length} 轮回答未发现明显 AI 生成或背稿痕迹。</p>`
+          : "";
         const interviewId = String(report.interview_id || (state.interview && state.interview.id) || "");
         const dimensions = Array.isArray(score.dimensions) ? score.dimensions : [];
         const riskNotes = Array.isArray(score.risk_notes) ? score.risk_notes : [];
@@ -1780,6 +1999,7 @@
                 ? '<p class="risk">本报告由规则兜底生成（未启用大模型），仅供链路验证。</p>'
                 : ""
             }
+            ${aigcBanner}
             <div class="score-line">
               <div class="score-main"><strong>${escapeHtml(score.total_score ?? "—")}<span style="font-size:13px;opacity:0.75;font-weight:600;"> /100</span></strong><span>${escapeHtml(recommendationLabel(score.recommendation || "待定"))}</span></div>
               <p class="small">${escapeHtml(report.summary || "暂无总评。")}</p>
@@ -1841,6 +2061,7 @@
         );
       });
 
+      showPhase("idle");
       discoverGateway()
         .then(() => setStatus("准备就绪", "ready"))
         .catch((error) => setStatus(errorText(error), "warn"));

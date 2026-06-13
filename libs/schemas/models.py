@@ -532,6 +532,7 @@ class AIGCResult(BaseModel):
     mode: Literal["voice", "written"] = "voice"
     matched_template: str | None = None
     flagged: bool = False
+    llm_reason: str | None = None
 
     @field_validator("turn_id")
     @classmethod

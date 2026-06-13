@@ -108,8 +108,11 @@ def test_offline_interview_chain(tmp_path: Path, monkeypatch) -> None:
     assert report.transcript[0].answer == "我主要负责整体架构设计并推动项目落地最终取得显著提升"
     assert (tmp_path / "reports" / "001-Ada.report.json").exists()
     assert (tmp_path / "reports" / "001-Ada.html").exists()
-    assert (tmp_path / "reports" / "001-Ada.pdf").exists()
     assert (tmp_path / "reports" / "001-Ada.transcript.json").exists()
+    pdf_name = Path(report.pdf_path or "").name
+    assert pdf_name.startswith(("合格-Ada-", "不合格-Ada-"))
+    assert pdf_name.endswith(f"{report.score.total_score}.pdf")
+    assert (tmp_path / "reports" / pdf_name).exists()
     report_json = loads(Path(report.json_path or "").read_text(encoding="utf-8"))
     html = Path(report.html_path or "").read_text(encoding="utf-8")
     pdf_bytes = Path(report.pdf_path or "").read_bytes()
@@ -402,10 +405,11 @@ def test_report_artifact_uris_use_object_storage_when_configured(
 
     assert report.artifact_uris == {
         "html": "s3://reports-bucket/reports/001-Lin.html",
-        "pdf": "s3://reports-bucket/reports/001-Lin.pdf",
+        "pdf": f"s3://reports-bucket/reports/{Path(report.pdf_path or '').name}",
         "transcript": "s3://reports-bucket/reports/001-Lin.transcript.json",
         "json": "s3://reports-bucket/reports/001-Lin.report.json",
     }
+    assert Path(report.pdf_path or "").name.startswith(("合格-Lin-", "不合格-Lin-"))
     assert Path(report.json_path or "").exists()
     assert Path(report.html_path or "").exists()
     assert Path(report.pdf_path or "").exists()

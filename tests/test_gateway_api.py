@@ -306,9 +306,7 @@ def test_gateway_report_pdf_falls_back_to_artifact_store_when_local_file_missing
 
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/pdf"
-    assert response.headers["content-disposition"] == (
-        f'attachment; filename="{interview["id"]}.pdf"'
-    )
+    assert response.headers["content-disposition"] == "attachment; filename*=UTF-8''demo.pdf"
     assert response.content == b"%PDF remote"
 
 

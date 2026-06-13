@@ -63,6 +63,22 @@ def _candidate_display_name(ctx: InterviewContext) -> str:
     return ctx.candidate_name.strip() or "候选人"
 
 
+def _pass_verdict(score: InterviewScore) -> str:
+    return "合格" if score.recommendation in {"strong_yes", "yes"} else "不合格"
+
+
+def _safe_filename_text(value: str) -> str:
+    return "".join(
+        char if char.isalnum() or "一" <= char <= "鿿" or char in ".-" else "-" for char in value
+    ).strip("-")
+
+
+def _pdf_filename(ctx: InterviewContext, score: InterviewScore) -> str:
+    """PDF 命名规则：合格/不合格 + 姓名 + 分数。"""
+    name = _safe_filename_text(_candidate_display_name(ctx)) or "候选人"
+    return f"{_pass_verdict(score)}-{name}-{score.total_score}.pdf"
+
+
 def _report_number(ctx: InterviewContext) -> str:
     return f"{ctx.interview_seq:03d}" if ctx.interview_seq > 0 else ctx.session_id[:8]
 
@@ -311,9 +327,15 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
         f"系统建议为「{recommendation_label}」。"
         "报告中的每项评分均绑定原始回答证据，注水风险需由面试官结合上下文复核。"
     )
+    aigc_flagged_count = sum(1 for item in aigc if item.flagged)
+    aigc_llm_reviewed = any(item.llm_reason for item in aigc)
     html = REPORT_TEMPLATE.render(
         interview_id=ctx.session_id,
         candidate_name=candidate_name,
+        pass_verdict=_pass_verdict(score),
+        aigc_flagged_count=aigc_flagged_count,
+        aigc_total=len(aigc),
+        aigc_llm_reviewed=aigc_llm_reviewed,
         report_number=_report_number(ctx),
         job_title=ctx.competency_model.job_title,
         interview_date=(ctx.ended_at or ctx.started_at).strftime("%Y-%m-%d"),
@@ -341,9 +363,10 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
     settings = get_settings()
     settings.report_dir.mkdir(parents=True, exist_ok=True)
     basename = _report_basename(ctx)
+    pdf_filename = _pdf_filename(ctx, score)
     json_path = Path(settings.report_dir / f"{basename}.report.json")
     html_path = Path(settings.report_dir / f"{basename}.html")
-    pdf_path = Path(settings.report_dir / f"{basename}.pdf")
+    pdf_path = Path(settings.report_dir / pdf_filename)
     transcript_path = Path(settings.report_dir / f"{basename}.transcript.json")
     html_path.write_text(html, encoding="utf-8")
     transcript_path.write_text(
@@ -369,7 +392,7 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
         "text/html; charset=utf-8",
     )
     pdf_artifact = artifact_store.put_file(
-        f"reports/{basename}.pdf",
+        f"reports/{pdf_filename}",
         pdf_path,
         "application/pdf",
     )

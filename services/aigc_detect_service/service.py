@@ -1,17 +1,78 @@
 from __future__ import annotations
 
+import json
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 import httpx
+from pydantic import BaseModel, Field
 
 from libs.common.config import get_settings
+from libs.common.prompts import load_prompt
 from libs.common.textsim import cosine_similarity
+from libs.llm_client import LLMMessage, get_llm_client
 from libs.schemas import AIGCResult, ProbeChain, QATurn
 
 
 TEMPLATE_PATH = Path(__file__).with_name("templates") / "common_answer_templates.txt"
+
+
+class AIGCReviewItem(BaseModel):
+    turn_id: str
+    ai_generated_prob: float = Field(ge=0.0, le=1.0)
+    reason: str
+
+
+class AIGCReview(BaseModel):
+    results: list[AIGCReviewItem] = Field(default_factory=list)
+
+
+def llm_review_aigc(turns: list[QATurn], results: list[AIGCResult]) -> list[AIGCResult]:
+    """用大模型逐条评判回答是否疑似 AI 生成/背稿，与确定性检测取较高风险合并。"""
+    if not turns or not results:
+        return results
+    messages = [
+        LLMMessage(role="system", content=load_prompt("aigc_review.md")),
+        LLMMessage(
+            role="user",
+            content=json.dumps(
+                {
+                    "turns": [
+                        {
+                            "turn_id": turn.turn_id,
+                            "question": turn.question,
+                            "answer": turn.answer,
+                        }
+                        for turn in turns
+                    ]
+                },
+                ensure_ascii=False,
+            ),
+        ),
+    ]
+    review = get_llm_client().complete_json_sync(messages, AIGCReview, AIGCReview())
+    if not review.results:
+        return results
+    by_turn = {item.turn_id: item for item in review.results}
+    settings = get_settings()
+    merged: list[AIGCResult] = []
+    for result in results:
+        item = by_turn.get(result.turn_id)
+        if item is None:
+            merged.append(result)
+            continue
+        prob = max(result.ai_generated_prob, round(item.ai_generated_prob, 3))
+        merged.append(
+            result.model_copy(
+                update={
+                    "ai_generated_prob": prob,
+                    "flagged": result.flagged or prob >= settings.aigc_ai_prob_threshold,
+                    "llm_reason": item.reason.strip() or None,
+                }
+            )
+        )
+    return merged
 
 
 @lru_cache
