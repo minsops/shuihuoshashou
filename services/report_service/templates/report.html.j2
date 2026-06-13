@@ -24,6 +24,16 @@
       --page-bg: #f5f7fb;
     }
     @page { size: A4; margin: 16mm 13mm; }
+    {% if cjk_font_uri %}
+    /* 把 PDF 用中文字体显式绑定到具体字体文件（url，由后端按平台探测注入），绕过 Pango 对 CJK
+       默认 fallback 到 PingFang（macOS 可变字体，WeasyPrint 子集化会损坏字形）的行为。
+       src 只放 url：一旦混入 local()，WeasyPrint 会优先选系统 PingFang 而非该文件，导致字形损坏。
+       浏览器看 HTML 时若无法加载 file:// 字体，会退回 body 末尾的 sans-serif（系统中文字体），不影响。 */
+    @font-face {
+      font-family: 'ReportCJK';
+      src: url('{{ cjk_font_uri }}');
+    }
+    {% endif %}
     * { box-sizing: border-box; }
     html { background: var(--page-bg); }
     body {
@@ -32,7 +42,9 @@
       background: var(--paper);
       padding: 40px 44px 36px;
       color: var(--ink);
-      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+      /* 只用 'ReportCJK'（其 @font-face 已含 url + local 兜底）；不要再列裸中文字体名，
+         否则 WeasyPrint 会对 CJK 字符优先选系统 PingFang，导致 PDF 字形损坏。 */
+      font-family: 'ReportCJK', sans-serif;
       font-size: 13px;
       line-height: 1.7;
     }

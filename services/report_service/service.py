@@ -2,13 +2,17 @@ from __future__ import annotations
 
 import base64
 import json
+import os
+import sys
 from contextlib import redirect_stderr, redirect_stdout
 from io import BytesIO, StringIO
 from pathlib import Path
+from urllib.parse import quote
 
 from jinja2 import Template
 
 from libs.common.config import get_settings
+from libs.common.observability import log_event
 from libs.common.storage import get_artifact_store
 from libs.common.textsim import normalize_text
 from libs.schemas import (
@@ -213,15 +217,73 @@ def _question_adoption_stats(ctx: InterviewContext) -> QuestionAdoptionStats:
     )
 
 
-def _write_pdf(html: str, pdf_path: Path, fallback_lines: list[str]) -> None:
+# 中文字体文件候选（按优先级）。WeasyPrint 对 macOS 的 PingFang（可变字体）子集化会损坏字形，
+# 故显式绑定到「能被正确子集化」的字体文件，绕过 fontconfig 对 CJK 的默认 fallback。
+_CJK_FONT_CANDIDATES = (
+    "/System/Library/Fonts/Hiragino Sans GB.ttc",                # macOS 首选
+    "/System/Library/Fonts/STHeiti Medium.ttc",                  # macOS 兜底
+    "/System/Library/Fonts/Supplemental/Songti.ttc",             # macOS 兜底
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",    # Debian/Ubuntu fonts-noto-cjk
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-VF.otf.ttc",
+    "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",         # 其他发行版
+    "/usr/share/fonts/google-noto-cjk/NotoSansCJK-Regular.ttc",
+)
+
+
+def _resolve_cjk_font_uri() -> str:
+    """探测本机可用的中文字体文件，返回 file:// URI 供模板 @font-face 直接绑定。
+
+    找不到时返回空串：模板会退回 fontconfig 默认匹配（Linux 容器装了 Noto 即可正常，
+    macOS 则可能回退到子集化有缺陷的 PingFang，但至少英文与版式正常）。
+    """
+    env_override = os.environ.get("REPORT_CJK_FONT_PATH", "").strip()
+    candidates = (env_override, *_CJK_FONT_CANDIDATES) if env_override else _CJK_FONT_CANDIDATES
+    for path in candidates:
+        if path and Path(path).is_file():
+            return "file://" + quote(path)
+    return ""
+
+
+def _ensure_weasyprint_lib_path() -> None:
+    """macOS 下让 WeasyPrint 找到 Homebrew 安装的 Pango/GObject/Cairo 等原生库。
+
+    Homebrew 把库装在 /opt/homebrew/lib（Apple Silicon）或 /usr/local/lib（Intel），
+    但 Python 的 dlopen 默认不搜索这些目录。在 import weasyprint 触发 dlopen 之前，
+    把存在的目录补进 DYLD_FALLBACK_LIBRARY_PATH，使本地开发也能渲染完整版式 PDF。
+    """
+    if sys.platform != "darwin":
+        return
+    existing = os.environ.get("DYLD_FALLBACK_LIBRARY_PATH", "")
+    parts = [segment for segment in existing.split(":") if segment]
+    changed = False
+    for candidate in ("/opt/homebrew/lib", "/usr/local/lib"):
+        if os.path.isdir(candidate) and candidate not in parts:
+            parts.append(candidate)
+            changed = True
+    if changed:
+        os.environ["DYLD_FALLBACK_LIBRARY_PATH"] = ":".join(parts)
+
+
+def _write_pdf(html: str, pdf_path: Path, fallback_lines: list[str], base_url: str) -> None:
+    _ensure_weasyprint_lib_path()
     try:
         with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
             from weasyprint import HTML
 
-            HTML(string=html).write_pdf(pdf_path)
+            # 用内存中的 html + 显式 base_url 渲染：base_url 必须是正确编码的 file:// 目录 URI
+            # （兼容含中文的项目路径），WeasyPrint 才能 fetch @font-face 里的 file:// 中文字体。
+            # 否则会静默回退到系统默认 CJK 字体（macOS 的 PingFang 是可变字体，子集化会损坏字形）。
+            HTML(string=html, base_url=base_url).write_pdf(pdf_path)
         return
-    except Exception:
+    except Exception as exc:
         # Local fallback for machines without WeasyPrint's native Pango/GObject stack.
+        # 记录可见告警，避免「PDF 不美观」却查不到原因。
+        log_event(
+            "report.pdf.weasyprint_unavailable",
+            error=f"{type(exc).__name__}: {exc}"[:200],
+            hint="macOS 可执行 `brew install pango gdk-pixbuf libffi` 启用完整版式 PDF",
+        )
         _write_text_fallback_pdf(fallback_lines, pdf_path)
 
 
@@ -359,6 +421,7 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
         speaker_labels=SPEAKER_LABELS,
         question_source_labels=QUESTION_SOURCE_LABELS,
         radar_chart_uri=_radar_chart_uri(score),
+        cjk_font_uri=_resolve_cjk_font_uri(),
     )
     settings = get_settings()
     settings.report_dir.mkdir(parents=True, exist_ok=True)
@@ -384,7 +447,12 @@ def build_report(ctx: InterviewContext, score: InterviewScore, aigc: list[AIGCRe
         ),
         encoding="utf-8",
     )
-    _write_pdf(html, pdf_path, _fallback_pdf_lines(ctx, score, aigc, summary))
+    _write_pdf(
+        html,
+        pdf_path,
+        _fallback_pdf_lines(ctx, score, aigc, summary),
+        base_url=html_path.parent.resolve().as_uri() + "/",
+    )
     artifact_store = get_artifact_store()
     html_artifact = artifact_store.put_file(
         f"reports/{basename}.html",

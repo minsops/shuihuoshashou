@@ -1371,6 +1371,7 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
     aliyun_reader_task: asyncio.Task[None] | None = None
     aliyun_result_seq = 1
     aliyun_audio_contexts: list[_AliyunAudioContext] = []
+    prebuild_task: asyncio.Task[None] | None = None
 
     def cancel_dialogue_silence_flush() -> None:
         if runtime.flush_task is not None and not runtime.flush_task.done():
@@ -1537,6 +1538,11 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
     try:
         record = start_interview(interview_id)
         record = await _send_initial_question_if_available(sender, runtime, interview_id, record)
+        # 预先建立流式 ASR 连接（握手 + Token 鉴权），避免开口第一句因临时建连而延迟。
+        # 用后台任务而非 await：不阻塞接收循环，建连缓慢或失败都不影响会话；
+        # 首个音频块到达时若连接已就绪则直接复用，否则按需重建。会话结束时取消。
+        if settings.asr_provider in STREAMING_ASR_PROVIDERS:
+            prebuild_task = asyncio.create_task(ensure_aliyun_session())
         while True:
             try:
                 event = await websocket.receive_json()
@@ -1806,6 +1812,8 @@ async def ws_interview(websocket: WebSocket, interview_id: str):
             await aliyun_session.close()
         await sender.send_json({"type": "error", "detail": str(exc)})
     finally:
+        if prebuild_task is not None and not prebuild_task.done():
+            prebuild_task.cancel()
         runtime.senders.discard(sender)
         asr_session_manager.close(interview_id, stream_id=asr_stream_id)
         if hasattr(engine, "close_session"):

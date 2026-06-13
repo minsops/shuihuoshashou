@@ -805,7 +805,7 @@
             <div class="card">
               <div class="transcript-zones">
                 <div>
-                  <p class="small">麦克风收音<span id="micRoleHint"> · 当前按候选人记录</span></p>
+                  <p class="small">麦克风收音<span id="micRoleHint"> · 面试官</span></p>
                   <div class="answer-box" id="micBox" role="log" aria-live="polite">
                     <p class="placeholder">等待麦克风声音，转写会实时出现在这里。</p>
                   </div>
@@ -1275,9 +1275,8 @@
       }
 
       function syncMicRoleHint() {
-        micRoleHint.textContent = state.loopback
-          ? " · 当前按面试官记录"
-          : " · 当前按候选人记录";
+        // 麦克风固定记录面试官本人发言；候选人语音走「接入会议声音」进入扬声器框。
+        micRoleHint.textContent = " · 面试官";
       }
 
       function speakerLabel(speaker) {
@@ -1733,8 +1732,8 @@
           session_id: state.interview.id,
           seq: state.seq,
           audio: samplesToBase64Pcm16(samples),
-          // 接入会议声音后，麦克风是本地面试官；否则按候选人记录（现场面试）
-          speaker: state.loopback ? "interviewer" : "candidate",
+          // 麦克风固定记录面试官本人发言；候选人语音走「接入会议声音」单独收录
+          speaker: "interviewer",
           format: "pcm16",
           sample_rate_hz: micSampleRate,
           channels: 1,
