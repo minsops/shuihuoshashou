@@ -57,6 +57,7 @@
       color: var(--teal-deep);
     }
     .score-stamp .num { font-size: 34px; font-weight: 800; line-height: 1.1; }
+    .of { font-size: 12px; font-weight: 600; color: var(--muted); margin-left: 2px; }
     .score-stamp .label { font-size: 11px; color: var(--muted); }
     .score-stamp .verdict { margin-top: 2px; font-size: 14px; font-weight: 800; }
     .score-stamp.tone-green { border-color: var(--green); }
@@ -212,8 +213,8 @@
       </div>
     </div>
     <div class="score-stamp tone-{{ recommendation_tone }}">
-      <div class="num">{{ score.total_score }}</div>
-      <div class="label">综合得分 / 100</div>
+      <div class="num">{{ score.total_score }}<span class="of">/100</span></div>
+      <div class="label">综合得分</div>
       <div class="verdict">{{ recommendation_label }}</div>
     </div>
   </header>
@@ -246,7 +247,7 @@
         <div class="dim-row">
           <div class="dim-top">
             <span class="name">{{ d.dimension }}<span class="meta">　权重 {{ d.weight }}</span></span>
-            <span class="value">{{ d.score }}</span>
+            <span class="value">{{ d.score }}<span class="of">/100</span></span>
           </div>
           <div class="bar"><i class="{{ 'low' if d.score < 40 else 'mid' if d.score < 70 else '' }}" style="width: {{ d.score }}%"></i></div>
           {% if d.evidence %}

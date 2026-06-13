@@ -202,9 +202,201 @@
         line-height: 1.5;
       }
 
+      .option-zones {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      @media (max-width: 640px) {
+        .option-zones {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .option-zone {
+        display: grid;
+        gap: 8px;
+        align-content: start;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 10px 12px;
+        background: oklch(0.985 0.008 178);
+      }
+
+      .option-zone.drill {
+        border-color: color-mix(in oklch, var(--teal), transparent 50%);
+      }
+
+      .zone-title {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        font-size: 13px;
+        font-weight: 750;
+        color: var(--teal-deep);
+      }
+
+      .option-zone.switch .zone-title {
+        color: var(--ink);
+      }
+
+      .zone-title span {
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 500;
+      }
+
+      .zone-refresh {
+        margin-left: auto;
+        min-height: 26px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 2px 10px;
+        background: var(--surface);
+        color: var(--teal-deep);
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .zone-empty {
+        color: var(--muted);
+        font-size: 12px;
+        margin: 0;
+      }
+
       .option-list {
         display: grid;
         gap: 8px;
+      }
+
+      .ref-zones {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      @media (max-width: 640px) {
+        .ref-zones {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .ref-panel {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: oklch(0.985 0.008 178);
+        overflow: hidden;
+      }
+
+      .ref-panel summary {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 12px;
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--ink);
+        cursor: pointer;
+        list-style: none;
+        user-select: none;
+      }
+
+      .ref-panel summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .ref-panel summary::before {
+        content: "";
+        width: 0;
+        height: 0;
+        border-left: 5px solid var(--muted);
+        border-top: 4px solid transparent;
+        border-bottom: 4px solid transparent;
+        transition: transform 0.15s ease;
+      }
+
+      .ref-panel[open] summary::before {
+        transform: rotate(90deg);
+      }
+
+      .ref-panel .ref-body {
+        max-height: 220px;
+        overflow: auto;
+        border-top: 1px solid var(--line);
+        padding: 10px 12px;
+        background: var(--surface);
+        color: var(--muted);
+        font-size: 12.5px;
+        line-height: 1.7;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .thinking {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .thinking .orb {
+        width: 14px;
+        height: 14px;
+        flex: 0 0 auto;
+        border: 2px solid var(--teal);
+        border-top-color: transparent;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+
+      .thinking .dots::after {
+        display: inline-block;
+        width: 18px;
+        content: "";
+        text-align: left;
+        animation: dots 1.2s steps(4, end) infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      @keyframes dots {
+        0% { content: ""; }
+        25% { content: "."; }
+        50% { content: ".."; }
+        75% { content: "..."; }
+      }
+
+      .transcript-zones {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      @media (max-width: 640px) {
+        .transcript-zones {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .transcript-zones > div {
+        display: grid;
+        gap: 6px;
+        align-content: start;
+      }
+
+      .answer-box .seg.pending {
+        color: var(--muted);
+      }
+
+      .answer-box .seg.pending::after {
+        content: "…";
       }
 
       .answer-box {
@@ -401,26 +593,66 @@
           </span>
         </label>
         <button type="button" id="startInterview">开始面试</button>
+        <div class="thinking" id="setupThinking" hidden>
+          <span class="orb"></span>
+          <span>AI 正在解析资料并准备面试<span class="dots"></span></span>
+        </div>
         <p class="small">点击后会自动生成题库、连接实时通道并打开麦克风。面试在微信或腾讯会议里进行也没问题：把声音外放，让麦克风同时听到双方即可。</p>
       </section>
 
       <section class="card" id="liveCard" hidden>
         <h2>2 · 面试进行中</h2>
+        <div class="ref-zones">
+          <details class="ref-panel">
+            <summary>候选人简历</summary>
+            <div class="ref-body" id="refResume"></div>
+          </details>
+          <details class="ref-panel">
+            <summary>岗位 JD</summary>
+            <div class="ref-body" id="refJd"></div>
+          </details>
+        </div>
         <div>
           <p class="small" id="currentQuestionMeta">当前问题</p>
           <p class="question-text" id="currentQuestionText">正在生成首题…</p>
         </div>
-        <div>
-          <p class="small">面试者回答（实时语音转写）</p>
-          <div class="answer-box" id="answerBox" role="log" aria-live="polite">
-            <p class="placeholder">等待语音输入…麦克风听到声音后，转写会实时出现在这里。</p>
+        <div class="transcript-zones">
+          <div>
+            <p class="small">麦克风收音<span id="micRoleHint"> · 当前按候选人记录</span></p>
+            <div class="answer-box" id="micBox" role="log" aria-live="polite">
+              <p class="placeholder">等待麦克风声音，转写会实时出现在这里。</p>
+            </div>
+          </div>
+          <div>
+            <p class="small">扬声器收音 · 会议对方（候选人）</p>
+            <div class="answer-box" id="speakerBox" role="log" aria-live="polite">
+              <p class="placeholder">微信/腾讯会议面试时，点击下方「接入会议声音」，对方语音会单独出现在这里。</p>
+            </div>
           </div>
         </div>
-        <div class="option-list" id="nextOptionList"></div>
+        <button type="button" class="subtle" id="captureSystemAudio">接入会议声音（共享标签页或屏幕的音频）</button>
+        <div class="option-zones">
+          <div class="option-zone drill">
+            <p class="zone-title">深挖追问<span>顺着回答往下钻</span><button type="button" class="zone-refresh" id="refreshDrill" title="换一批追问">↻ 刷新</button></p>
+            <div class="option-list" id="followUpList">
+              <p class="zone-empty">候选人回答后，这里会实时给出追问</p>
+            </div>
+          </div>
+          <div class="option-zone switch">
+            <p class="zone-title">换题备选<span>切换话题或验证简历</span><button type="button" class="zone-refresh" id="refreshSwitch" title="换一批问题">↻ 刷新</button></p>
+            <div class="option-list" id="switchList">
+              <p class="zone-empty">题库生成后，这里会列出可切换的问题</p>
+            </div>
+          </div>
+        </div>
         <div class="feed" id="liveFeed" role="log" aria-live="polite"></div>
         <div class="fallback-input" id="fallbackInput" hidden>
           <input type="text" id="fallbackText" placeholder="麦克风不可用时，可在这里手动输入候选人回答" />
           <button type="button" class="subtle" id="fallbackSend">发送</button>
+        </div>
+        <div class="thinking" id="scoreThinking" hidden>
+          <span class="orb"></span>
+          <span>AI 正在分析全部问答并打分，通常需要半分钟左右<span class="dots"></span></span>
         </div>
         <button type="button" class="danger" id="endInterview">结束面试，生成评分报告</button>
       </section>
@@ -445,8 +677,16 @@
       const newInterview = document.querySelector("#newInterview");
       const currentQuestionText = document.querySelector("#currentQuestionText");
       const currentQuestionMeta = document.querySelector("#currentQuestionMeta");
-      const nextOptionList = document.querySelector("#nextOptionList");
-      const answerBox = document.querySelector("#answerBox");
+      const followUpList = document.querySelector("#followUpList");
+      const switchList = document.querySelector("#switchList");
+      const refResume = document.querySelector("#refResume");
+      const refJd = document.querySelector("#refJd");
+      const setupThinking = document.querySelector("#setupThinking");
+      const scoreThinking = document.querySelector("#scoreThinking");
+      const micBox = document.querySelector("#micBox");
+      const speakerBox = document.querySelector("#speakerBox");
+      const micRoleHint = document.querySelector("#micRoleHint");
+      const captureSystemAudio = document.querySelector("#captureSystemAudio");
       const liveFeed = document.querySelector("#liveFeed");
       const fallbackInput = document.querySelector("#fallbackInput");
       const fallbackText = document.querySelector("#fallbackText");
@@ -478,6 +718,12 @@
         mic: null,
         micSamples: [],
         micSentSamples: 0,
+        loopback: null,
+        loopbackSocket: null,
+        loopbackSocketToken: 0,
+        loopbackSeq: 1,
+        loopbackSamples: [],
+        loopbackSentSamples: 0,
         reportPollTimer: null,
         reportPollAttempts: 0,
         parsingCount: 0,
@@ -629,7 +875,10 @@
           return;
         }
         startInterview.disabled = true;
-        setStatus("正在生成题库并创建面试…", "live");
+        setupThinking.hidden = false;
+        setStatus("正在解析资料并创建面试…", "live");
+        refResume.textContent = resume;
+        refJd.textContent = jd;
         try {
           await discoverGateway();
           const setup = await fetchGatewayJson("/api/interviews/quick-setup", {
@@ -642,7 +891,7 @@
           state.startedAt = Date.now();
           state.reconnectAttempt = 0;
           liveFeed.innerHTML = "";
-          nextOptionList.innerHTML = "";
+          resetZones();
           resetAnswerBox();
           currentQuestionText.textContent = "正在生成首题…";
           showPhase("live");
@@ -652,6 +901,8 @@
         } catch (error) {
           setStatus(`创建失败：${errorText(error)}`, "warn");
           syncControls();
+        } finally {
+          setupThinking.hidden = true;
         }
       }
 
@@ -682,6 +933,7 @@
         socket.addEventListener("close", () => {
           if (socketToken !== state.socketToken) return;
           stopMicCapture();
+          stopSystemAudioCapture();
           if (state.phase === "live") scheduleReconnect();
         });
         socket.addEventListener("message", (event) => {
@@ -753,7 +1005,9 @@
           return;
         }
         stopMicCapture();
+        stopSystemAudioCapture();
         state.phase = "scoring";
+        scoreThinking.hidden = false;
         syncControls();
         setStatus("正在评分，请稍候…", "live");
         sendPayload({ type: "end" });
@@ -761,6 +1015,7 @@
 
       function resetAll() {
         closeSocket();
+        stopSystemAudioCapture();
         stopMicCapture();
         clearReportPolling();
         state.interview = null;
@@ -770,8 +1025,12 @@
         state.probeTarget = null;
         state.probeChainId = null;
         liveFeed.innerHTML = "";
-        nextOptionList.innerHTML = "";
+        resetZones();
         resetAnswerBox();
+        setupThinking.hidden = true;
+        scoreThinking.hidden = true;
+        refResume.textContent = "";
+        refJd.textContent = "";
         reportPanel.innerHTML = "";
         reportLinks.innerHTML = "";
         fallbackInput.hidden = true;
@@ -792,28 +1051,85 @@
         renderLiveMessage(message);
       }
 
+      const liveSegments = new Map();
+
       function resetAnswerBox() {
-        answerBox.innerHTML =
-          '<p class="placeholder">等待语音输入…麦克风听到声音后，转写会实时出现在这里。</p>';
+        liveSegments.clear();
+        micBox.innerHTML =
+          '<p class="placeholder">等待麦克风声音，转写会实时出现在这里。</p>';
+        speakerBox.innerHTML =
+          '<p class="placeholder">微信/腾讯会议面试时，点击「接入会议声音」，对方语音会单独出现在这里。</p>';
+        syncMicRoleHint();
+      }
+
+      function syncMicRoleHint() {
+        micRoleHint.textContent = state.loopback
+          ? " · 当前按面试官记录"
+          : " · 当前按候选人记录";
       }
 
       function speakerLabel(speaker) {
         return { candidate: "候选人", interviewer: "面试官" }[speaker] || "声音";
       }
 
+      function transcriptBoxFor(speaker) {
+        if (!state.loopback) return micBox;
+        return speaker === "interviewer" ? micBox : speakerBox;
+      }
+
+      function setSegment(node, speaker, text) {
+        node.dataset.text = text;
+        node.innerHTML = `<span class="who">${escapeHtml(speakerLabel(speaker))}</span>${escapeHtml(text)}`;
+      }
+
       function appendTranscript(payload) {
         const text = String(payload.text || "").trim();
         if (!text) return;
-        const placeholder = answerBox.querySelector(".placeholder");
+        const box = transcriptBoxFor(payload.speaker);
+        const placeholder = box.querySelector(".placeholder");
         if (placeholder) placeholder.remove();
-        const node = document.createElement("p");
-        node.className = "seg";
-        node.innerHTML = `<span class="who">${escapeHtml(speakerLabel(payload.speaker))}</span>${escapeHtml(text)}`;
-        answerBox.append(node);
-        while (answerBox.children.length > 30) {
-          answerBox.firstChild.remove();
+        const isFinal = payload.is_final !== false;
+        let live = liveSegments.get(box);
+
+        if (!isFinal) {
+          // 流式中间结果：原地更新同一行，不新建对话
+          if (!live) {
+            live = document.createElement("p");
+            live.className = "seg pending";
+            box.append(live);
+            liveSegments.set(box, live);
+          }
+          setSegment(live, payload.speaker, text);
+          box.scrollTop = box.scrollHeight;
+          return;
         }
-        answerBox.scrollTop = answerBox.scrollHeight;
+
+        if (live) {
+          // 流式结果定稿：把进行中的行转为最终行
+          setSegment(live, payload.speaker, text);
+          live.classList.remove("pending");
+          liveSegments.delete(box);
+        } else {
+          // 服务端可能对同一句话发多个递进的 final：前缀匹配则原地替换
+          const last = box.querySelector(".seg:last-of-type");
+          const lastText = last ? last.dataset.text || "" : "";
+          if (
+            last &&
+            lastText &&
+            (text.startsWith(lastText) || lastText.startsWith(text))
+          ) {
+            setSegment(last, payload.speaker, text.length >= lastText.length ? text : lastText);
+          } else {
+            const node = document.createElement("p");
+            node.className = "seg";
+            setSegment(node, payload.speaker, text);
+            box.append(node);
+          }
+        }
+        while (box.children.length > 30) {
+          box.firstChild.remove();
+        }
+        box.scrollTop = box.scrollHeight;
       }
 
       function setCurrentQuestion(question, meta = {}) {
@@ -825,77 +1141,177 @@
         currentQuestionMeta.textContent = meta.label || "当前问题";
       }
 
+      function optionCard(kindLabel, question, reason, onPick) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "option-card";
+        button.innerHTML = `
+          <span class="kind">${escapeHtml(kindLabel)}</span>
+          <span>${escapeHtml(question)}</span>
+          ${reason ? `<span class="reason">${escapeHtml(reason)}</span>` : ""}
+        `;
+        button.addEventListener("click", onPick);
+        return button;
+      }
+
+      function clearZone(zone) {
+        zone.innerHTML = "";
+      }
+
+      // ----- 问题池：提前备好问题，点刷新立即换一批，不用等待 -----
+
+      const POOL_PAGE_SIZE = 3;
+      const POOL_TARGET = 9;
+      const POOL_MAX = 18;
+      const pools = {
+        drill: {
+          items: [],
+          page: 0,
+          list: () => followUpList,
+          empty: "候选人回答后，这里会实时给出追问",
+        },
+        switch: {
+          items: [],
+          page: 0,
+          list: () => switchList,
+          empty: "题库生成后，这里会列出可切换的问题",
+        },
+      };
+
+      function resetZones() {
+        pools.drill.items = [];
+        pools.drill.page = 0;
+        pools.switch.items = [];
+        pools.switch.page = 0;
+        renderPool("drill");
+        renderPool("switch");
+      }
+
+      function poolAdd(name, entry, { front = false } = {}) {
+        const pool = pools[name];
+        const key = entry.question.trim();
+        if (!key || pool.items.some((item) => item.question.trim() === key)) return;
+        if (front) {
+          pool.items.unshift(entry);
+        } else {
+          pool.items.push(entry);
+        }
+        if (pool.items.length > POOL_MAX) pool.items.length = POOL_MAX;
+      }
+
+      function renderPool(name) {
+        const pool = pools[name];
+        const list = pool.list();
+        clearZone(list);
+        if (!pool.items.length) {
+          list.innerHTML = `<p class="zone-empty">${pool.empty}</p>`;
+          return;
+        }
+        const pages = Math.max(1, Math.ceil(pool.items.length / POOL_PAGE_SIZE));
+        pool.page = pool.page % pages;
+        const start = pool.page * POOL_PAGE_SIZE;
+        pool.items.slice(start, start + POOL_PAGE_SIZE).forEach((entry) => {
+          list.append(
+            optionCard(entry.kindLabel, entry.question, entry.reason || "", () => {
+              entry.onPick();
+              pool.items = pool.items.filter((item) => item !== entry);
+              renderPool(name);
+            })
+          );
+        });
+      }
+
+      function refreshPool(name) {
+        pools[name].page += 1;
+        renderPool(name);
+      }
+
+      function pickEntry(option, label) {
+        return () => {
+          if (option.option_id) {
+            sendPayload({ type: "pick_option", option_id: option.option_id });
+          }
+          setCurrentQuestion(option.question, {
+            label,
+            questionSource: option.questionSource || "interviewer",
+            probeTarget: option.reason || option.target || null,
+            probeChainId: option.chain_id || null,
+          });
+        };
+      }
+
       function renderNextOptions(options) {
         const followUp = Array.isArray(options && options.follow_up) ? options.follow_up : [];
         const alternatives = Array.isArray(options && options.alternatives)
           ? options.alternatives
           : [];
-        const items = [
-          ...followUp.map((option) => ({ ...option, groupLabel: "深挖" })),
-          ...alternatives.map((option) => ({ ...option, groupLabel: "换题" })),
-        ];
-        nextOptionList.innerHTML = "";
-        items.forEach((option) => {
-          const button = document.createElement("button");
-          button.type = "button";
-          button.className = "option-card";
-          button.innerHTML = `
-            <span class="kind">${escapeHtml(option.groupLabel)}</span>
-            <span>${escapeHtml(option.question)}</span>
-            ${option.reason ? `<span class="reason">${escapeHtml(option.reason)}</span>` : ""}
-          `;
-          button.addEventListener("click", () => {
-            sendPayload({ type: "pick_option", option_id: option.option_id });
-            setCurrentQuestion(option.question, {
-              label: `${option.groupLabel} · 点击换题`,
-              probeTarget: option.reason || null,
-              probeChainId: option.chain_id || null,
-            });
-          });
-          nextOptionList.append(button);
+        followUp.forEach((option) => {
+          poolAdd(
+            "drill",
+            {
+              kindLabel: "深挖",
+              question: option.question,
+              reason: option.reason,
+              onPick: pickEntry(option, "深挖追问"),
+            },
+            { front: true }
+          );
         });
+        alternatives.forEach((option) => {
+          const kindLabel = option.kind === "bank" ? "题库" : "生成";
+          poolAdd(
+            "switch",
+            {
+              kindLabel: `${kindLabel}${option.category ? ` · ${option.category}` : ""}`,
+              question: option.question,
+              reason: option.reason,
+              onPick: pickEntry(option, "换题"),
+            },
+            { front: true }
+          );
+        });
+        pools.drill.page = 0;
+        pools.switch.page = 0;
+        renderPool("drill");
+        renderPool("switch");
       }
 
       function renderBankOptions(items) {
         const unasked = (Array.isArray(items) ? items : []).filter((item) => !item.asked);
-        unasked.slice(0, 4).forEach((item) => {
-          const button = document.createElement("button");
-          button.type = "button";
-          button.className = "option-card";
-          button.innerHTML = `
-            <span class="kind">题库${item.category ? ` · ${escapeHtml(item.category)}` : ""}</span>
-            <span>${escapeHtml(item.question)}</span>
-          `;
-          button.addEventListener("click", () => {
-            setCurrentQuestion(item.question, { label: "题库" });
-            button.remove();
+        unasked.slice(0, POOL_TARGET).forEach((item) => {
+          poolAdd("switch", {
+            kindLabel: `题库${item.category ? ` · ${item.category}` : ""}`,
+            question: item.question,
+            reason: "",
+            onPick: pickEntry({ question: item.question }, "题库"),
           });
-          nextOptionList.append(button);
         });
+        renderPool("switch");
       }
 
       function renderProbeSuggestions(suggestions) {
-        (suggestions || []).slice(0, 2).forEach((item) => {
-          const button = document.createElement("button");
-          button.type = "button";
-          button.className = "option-card";
-          button.innerHTML = `
-            <span class="kind">AI 追问 · ${escapeHtml(item.competency || "")}</span>
-            <span>${escapeHtml(item.question)}</span>
-          `;
-          button.addEventListener("click", () => {
-            setCurrentQuestion(item.question, {
-              label: "AI 追问",
-              questionSource: "ai_probe",
-              probeTarget: item.target || null,
-              probeChainId: item.chain_id || null,
-            });
-          });
-          nextOptionList.prepend(button);
+        (suggestions || []).slice(0, 3).forEach((item) => {
+          poolAdd(
+            "drill",
+            {
+              kindLabel: `AI 追问${item.competency ? ` · ${item.competency}` : ""}`,
+              question: item.question,
+              reason: item.target || "",
+              onPick: pickEntry(
+                {
+                  question: item.question,
+                  target: item.target,
+                  chain_id: item.chain_id,
+                  questionSource: "ai_probe",
+                },
+                "AI 追问"
+              ),
+            },
+            { front: true }
+          );
         });
-        while (nextOptionList.children.length > 6) {
-          nextOptionList.lastChild.remove();
-        }
+        pools.drill.page = 0;
+        renderPool("drill");
       }
 
       function renderLiveMessage(message) {
@@ -904,6 +1320,19 @@
           appendTranscript(payload);
         } else if (message.type === "current_question") {
           setCurrentQuestion(payload.question, { label: "系统首题" });
+        } else if (message.type === "question_matched") {
+          // 以面试官口头提出的问题为准；AI 建议只作辅助
+          const asked = String(payload.asked_text || "").trim();
+          if (asked) {
+            setCurrentQuestion(asked, {
+              label: payload.matched_option_id
+                ? "面试官口头提问 · 已匹配系统建议"
+                : "面试官口头提问",
+            });
+          }
+        } else if (message.type === "question_bank_update") {
+          renderBankOptions(payload.items);
+          appendEvent("题库", "AI 定制题库已生成，换题备选已更新。", "blue");
         } else if (message.type === "next_options" || message.type === "next_options_update") {
           renderNextOptions(payload);
         } else if (message.type === "turn") {
@@ -921,14 +1350,21 @@
             payload.level === "solid" ? "green" : "red"
           );
         } else if (message.type === "report") {
+          stopMicCapture();
+          stopSystemAudioCapture();
+          scoreThinking.hidden = true;
           state.phase = "report";
           renderReport(payload);
           showPhase("report");
           setStatus("报告已生成", "ready");
         } else if (message.type === "task_queued") {
+          stopMicCapture();
+          stopSystemAudioCapture();
+          scoreThinking.hidden = true;
           state.phase = "queued";
           showPhase("queued");
-          reportPanel.innerHTML = '<p class="small">后台评分中，报告会自动刷新…</p>';
+          reportPanel.innerHTML =
+            '<div class="thinking"><span class="orb"></span><span>AI 正在后台分析评分，报告会自动刷新<span class="dots"></span></span></div>';
           setStatus("后台评分中…", "live");
           scheduleReportPolling(state.interview.id);
         } else if (message.type === "asr_warning") {
@@ -936,6 +1372,7 @@
         } else if (message.type === "error") {
           if (state.phase === "scoring") {
             state.phase = "live";
+            scoreThinking.hidden = true;
             syncControls();
           }
           appendEvent("提示", escapeHtml(formatLiveError(message.detail)), "red");
@@ -1084,7 +1521,8 @@
           session_id: state.interview.id,
           seq: state.seq,
           audio: samplesToBase64Pcm16(samples),
-          speaker: "candidate",
+          // 接入会议声音后，麦克风是本地面试官；否则按候选人记录（现场面试）
+          speaker: state.loopback ? "interviewer" : "candidate",
           format: "pcm16",
           sample_rate_hz: micSampleRate,
           channels: 1,
@@ -1097,6 +1535,149 @@
         if (!sent) return;
         state.seq += 1;
         state.micSentSamples += samples.length;
+      }
+
+      // ----- 扬声器收音（会议对方，经第二条音频通道送 ASR）-----
+
+      function loopbackSocketReady() {
+        return state.loopbackSocket && state.loopbackSocket.readyState === WebSocket.OPEN;
+      }
+
+      async function startSystemAudioCapture() {
+        if (state.loopback || state.phase !== "live") return;
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+          appendEvent("会议声音", "当前浏览器不支持系统音频采集。", "red");
+          return;
+        }
+        let stream;
+        try {
+          stream = await navigator.mediaDevices.getDisplayMedia({
+            video: true,
+            audio: { channelCount: 1, echoCancellation: false },
+          });
+        } catch (error) {
+          appendEvent("会议声音", "已取消共享，或浏览器拒绝了音频采集。", "red");
+          return;
+        }
+        if (!stream.getAudioTracks().length) {
+          stream.getTracks().forEach((track) => track.stop());
+          appendEvent(
+            "会议声音",
+            "共享时没有勾选「分享音频」。请重新点击，并在弹窗里勾选共享音频（macOS 上建议共享会议所在的 Chrome 标签页）。",
+            "red"
+          );
+          return;
+        }
+        const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+        const context = new AudioContextCtor();
+        const source = context.createMediaStreamSource(stream);
+        const processor = context.createScriptProcessor(4096, 1, 1);
+        state.loopback = { stream, context, source, processor };
+        state.loopbackSamples = [];
+        state.loopbackSentSamples = 0;
+        state.loopbackSeq = 1;
+        stream.getVideoTracks().forEach((track) => {
+          track.addEventListener("ended", stopSystemAudioCapture);
+        });
+        stream.getAudioTracks()[0].addEventListener("ended", stopSystemAudioCapture);
+        processor.onaudioprocess = (event) => {
+          const input = event.inputBuffer.getChannelData(0);
+          event.outputBuffer.getChannelData(0).fill(0);
+          appendLoopbackSamples(downsampleBuffer(input, context.sampleRate, micSampleRate));
+        };
+        source.connect(processor);
+        processor.connect(context.destination);
+        openLoopbackSocket();
+        captureSystemAudio.textContent = "断开会议声音";
+        syncMicRoleHint();
+        appendEvent("会议声音", "已接入：对方语音按候选人记录，本地麦克风按面试官记录。", "green");
+      }
+
+      function stopSystemAudioCapture() {
+        const loopback = state.loopback;
+        state.loopback = null;
+        state.loopbackSamples = [];
+        state.loopbackSocketToken += 1;
+        if (state.loopbackSocket) {
+          try {
+            state.loopbackSocket.close();
+          } catch (error) {
+            /* already closed */
+          }
+          state.loopbackSocket = null;
+        }
+        captureSystemAudio.textContent = "接入会议声音（共享标签页或屏幕的音频）";
+        syncMicRoleHint();
+        if (!loopback) return;
+        if (loopback.processor) {
+          loopback.processor.disconnect();
+          loopback.processor.onaudioprocess = null;
+        }
+        if (loopback.source) loopback.source.disconnect();
+        if (loopback.stream) loopback.stream.getTracks().forEach((track) => track.stop());
+        if (loopback.context && loopback.context.state !== "closed") {
+          loopback.context.close().catch(() => {});
+        }
+      }
+
+      function openLoopbackSocket() {
+        if (!state.interview) return;
+        const socketToken = ++state.loopbackSocketToken;
+        let socket;
+        try {
+          socket = new WebSocket(wsUrl(`/ws/interview/${state.interview.id}`));
+        } catch (error) {
+          stopSystemAudioCapture();
+          return;
+        }
+        state.loopbackSocket = socket;
+        // 该连接只用来送音频；转写等消息由主连接渲染，这里全部忽略
+        socket.addEventListener("close", () => {
+          if (socketToken !== state.loopbackSocketToken) return;
+          if (state.loopback && state.phase === "live") {
+            openLoopbackSocket();
+          }
+        });
+      }
+
+      function appendLoopbackSamples(samples) {
+        for (let index = 0; index < samples.length; index += 1) {
+          state.loopbackSamples.push(samples[index]);
+        }
+        while (state.loopbackSamples.length >= micChunkSamples) {
+          sendLoopbackSamples(state.loopbackSamples.splice(0, micChunkSamples));
+        }
+      }
+
+      function sendLoopbackSamples(samples) {
+        if (!loopbackSocketReady() || samples.length === 0) return;
+        const startMs = Math.round((state.loopbackSentSamples / micSampleRate) * 1000);
+        const endMs = Math.round(
+          ((state.loopbackSentSamples + samples.length) / micSampleRate) * 1000
+        );
+        try {
+          state.loopbackSocket.send(
+            JSON.stringify({
+              type: "audio_chunk",
+              session_id: state.interview.id,
+              seq: state.loopbackSeq,
+              audio: samplesToBase64Pcm16(samples),
+              speaker: "candidate",
+              format: "pcm16",
+              sample_rate_hz: micSampleRate,
+              channels: 1,
+              start_ms: startMs,
+              end_ms: endMs,
+              is_final: true,
+              confidence: 0.95,
+              ...questionMeta(),
+            })
+          );
+        } catch (error) {
+          return;
+        }
+        state.loopbackSeq += 1;
+        state.loopbackSentSamples += samples.length;
       }
 
       // ----- 文本兜底 -----
@@ -1173,7 +1754,7 @@
             (dimension) => `
               <tr>
                 <td>${escapeHtml(dimension.dimension)}</td>
-                <td>${escapeHtml(dimension.score)}</td>
+                <td>${escapeHtml(dimension.score)} <span class="small">/100</span></td>
               </tr>
             `
           )
@@ -1200,7 +1781,7 @@
                 : ""
             }
             <div class="score-line">
-              <div class="score-main"><strong>${escapeHtml(score.total_score ?? "—")}</strong><span>${escapeHtml(recommendationLabel(score.recommendation || "待定"))}</span></div>
+              <div class="score-main"><strong>${escapeHtml(score.total_score ?? "—")}<span style="font-size:13px;opacity:0.75;font-weight:600;"> /100</span></strong><span>${escapeHtml(recommendationLabel(score.recommendation || "待定"))}</span></div>
               <p class="small">${escapeHtml(report.summary || "暂无总评。")}</p>
             </div>
             <div>${risks}</div>
@@ -1229,6 +1810,15 @@
       endInterview.addEventListener("click", requestEnd);
       newInterview.addEventListener("click", resetAll);
       fallbackSend.addEventListener("click", sendFallbackText);
+      document.querySelector("#refreshDrill").addEventListener("click", () => refreshPool("drill"));
+      document.querySelector("#refreshSwitch").addEventListener("click", () => refreshPool("switch"));
+      captureSystemAudio.addEventListener("click", () => {
+        if (state.loopback) {
+          stopSystemAudioCapture();
+        } else {
+          startSystemAudioCapture();
+        }
+      });
       fallbackText.addEventListener("keydown", (event) => {
         if (event.key === "Enter") sendFallbackText();
       });

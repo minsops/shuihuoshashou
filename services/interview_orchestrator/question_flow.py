@@ -8,6 +8,7 @@ from libs.common.prompts import load_prompt
 from libs.common.textsim import normalize_text
 from libs.llm_client import LLMMessage, get_llm_client
 from libs.schemas import NextOption, NextOptions, QATurn, QuestionBank, QuestionBankItem
+from services.jd_kb_service.service import get_job
 from services.probe_service.service import assess_credibility
 
 SteeringFocus = Literal["balanced", "resume_drill", "jd_professional"]
@@ -35,13 +36,38 @@ def fallback_next_options(
     *,
     steering: SteeringFocus = "balanced",
 ) -> NextOptions:
-    follow_up = _follow_up_option(record, after_turn)
+    follow_up = [_follow_up_option(record, after_turn)]
+    resume_drill = _resume_claim_follow_up(record)
+    if resume_drill is not None:
+        follow_up.append(resume_drill)
     alternatives = _alternative_options(record, bank, steering=steering)
     return NextOptions(
         interview_id=bank.interview_id,
         after_turn_id=after_turn.turn_id,
-        follow_up=[follow_up],
+        follow_up=follow_up[:2],
         alternatives=alternatives,
+    )
+
+
+def _resume_claim_follow_up(record) -> NextOption | None:
+    chain = next(
+        (
+            chain
+            for chain in record.context.probe_chains
+            if chain.origin == "resume_claim" and chain.verdict == "unresolved"
+        ),
+        None,
+    )
+    if chain is None:
+        return None
+    return NextOption(
+        kind="follow_up",
+        question=(
+            f"简历里写到「{chain.topic[:60]}」，请具体说明：这件事里你本人负责哪一段，"
+            "数据口径是什么，出过什么问题，怎么验证结果？"
+        ),
+        reason="简历高风险声明尚未验证，建议对质核实。",
+        chain_id=chain.chain_id,
     )
 
 
@@ -74,6 +100,8 @@ async def generate_next_options(
                     "interview_id": bank.interview_id,
                     "job_id": record.job_id,
                     "candidate_id": record.candidate_id,
+                    "jd_text": _job_jd_text(record.job_id),
+                    "resume_text": record.context.candidate_resume_text,
                     "latest_turn": after_turn.model_dump(),
                     "recent_turns": [turn.model_dump() for turn in record.context.turns[-5:]],
                     "probe_chains": [chain.model_dump() for chain in record.context.probe_chains],
@@ -92,6 +120,13 @@ async def generate_next_options(
     if draft.interview_id != bank.interview_id or draft.after_turn_id != after_turn.turn_id:
         return fallback
     return draft
+
+
+def _job_jd_text(job_id: str) -> str:
+    try:
+        return get_job(job_id).jd_text
+    except KeyError:
+        return ""
 
 
 def steering_instruction(focus: SteeringFocus) -> str:

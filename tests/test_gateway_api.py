@@ -351,8 +351,23 @@ def test_gateway_serves_demo_ui(tmp_path: Path, monkeypatch) -> None:
     assert "结束面试，生成评分报告" in response.text
     assert "开始新的面试" in response.text
     assert 'id="currentQuestionText"' in response.text
-    assert 'id="nextOptionList"' in response.text
-    assert 'id="answerBox"' in response.text
+    assert 'id="followUpList"' in response.text
+    assert 'id="switchList"' in response.text
+    assert "深挖追问" in response.text
+    assert "换题备选" in response.text
+    assert 'id="refreshDrill"' in response.text
+    assert 'id="refResume"' in response.text
+    assert 'id="refJd"' in response.text
+    assert 'id="setupThinking"' in response.text
+    assert 'id="scoreThinking"' in response.text
+    assert "question_bank_update" in response.text
+    assert 'id="refreshSwitch"' in response.text
+    assert "面试官口头提问" in response.text
+    assert "POOL_TARGET = 9" in response.text
+    assert 'id="micBox"' in response.text
+    assert 'id="speakerBox"' in response.text
+    assert 'id="captureSystemAudio"' in response.text
+    assert "startSystemAudioCapture" in response.text
     assert "renderBankOptions" in response.text
     assert "appendTranscript" in response.text
     assert 'id="liveFeed"' in response.text

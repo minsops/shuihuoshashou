@@ -93,12 +93,16 @@ from services.interview_orchestrator.service import (
 )
 from services.jd_kb_service.service import (
     create_job,
-    fallback_competency_model,
     get_job,
     retrieve_job_probe_patterns,
     update_job_title,
 )
-from services.probe_service.service import fallback_probe, generate_probe, generate_question_bank
+from services.probe_service.service import (
+    fallback_probe,
+    fallback_question_bank,
+    generate_probe,
+    generate_question_bank,
+)
 from services.report_service.service import build_report
 from services.scoring_service.service import score_interview
 from services.signal_service.service import extract_behavior_signal
@@ -650,7 +654,50 @@ def _resume_claims_for_probe(record) -> list[ResumeClaim]:
     return claims
 
 
-QUICK_SETUP_PENDING_INTERVIEW_ID = "pending-quick-setup"
+async def _refine_question_bank_in_background(
+    interview_id: str,
+    jd_text: str,
+    resume_text: str,
+    competency_model,
+    fallback_bank,
+) -> None:
+    try:
+        refined = await generate_question_bank(
+            interview_id, jd_text, resume_text, competency_model
+        )
+    except Exception:
+        return
+    # 按题目内容比较：mock/兜底场景下重新生成的题库只有随机 id 不同，不应覆盖
+    def bank_signature(bank) -> list[tuple[str, str, str]]:
+        return [(item.question, item.category, item.basis) for item in bank.items]
+
+    if bank_signature(refined) == bank_signature(fallback_bank):
+        return
+    try:
+        # 保留兜底题库中已经被问过的题（按题面匹配）
+        current = get_question_bank(interview_id)
+        asked_questions = {item.question.strip() for item in current.items if item.asked}
+        if asked_questions:
+            refined = refined.model_copy(
+                update={
+                    "items": [
+                        item.model_copy(update={"asked": item.question.strip() in asked_questions})
+                        for item in refined.items
+                    ]
+                }
+            )
+        save_question_bank(refined)
+    except (KeyError, ValueError):
+        return
+    runtime = _dialogue_runtimes.get(interview_id)
+    if runtime is None:
+        return
+    async with runtime.lock:
+        if runtime.question_flow is not None:
+            runtime.question_flow.bank = refined
+    await runtime.send_json(
+        {"type": "question_bank_update", "payload": refined.model_dump()}
+    )
 
 
 def _provisional_job_title(jd_text: str) -> str:
@@ -1066,8 +1113,8 @@ def api_create_interview(payload: InterviewCreate):
 
 @app.post("/api/interviews/quick-setup", response_model=QuickSetupResponse)
 async def api_quick_setup(payload: QuickSetupRequest) -> QuickSetupResponse:
-    # 三个 LLM 步骤互不等待：字段提取、胜任力模型（create_job 内部）、题库生成。
-    # 题库以确定性兜底胜任力模型为输入，避免串行等待真实模型的胜任力结果。
+    # 字段提取与胜任力模型并行；题库先用确定性兜底立即返回，
+    # 真实模型题库在后台生成，完成后入库并通过 WebSocket 推送补充。
     provisional_title = _provisional_job_title(payload.jd_text)
     extraction_task = asyncio.create_task(
         asyncio.to_thread(_extract_quick_setup_fields, payload)
@@ -1077,25 +1124,29 @@ async def api_quick_setup(payload: QuickSetupRequest) -> QuickSetupResponse:
             create_job, JobCreate(title=provisional_title, jd_text=payload.jd_text)
         )
     )
-    bank_task = asyncio.create_task(
-        generate_question_bank(
-            QUICK_SETUP_PENDING_INTERVIEW_ID,
-            payload.jd_text,
-            payload.resume_text,
-            fallback_competency_model("pending", provisional_title, payload.jd_text),
-        )
-    )
-    (extraction, extraction_confident), job, question_bank = await asyncio.gather(
-        extraction_task, job_task, bank_task
-    )
+    (extraction, extraction_confident), job = await asyncio.gather(extraction_task, job_task)
     if extraction.job_title != job.title:
         job = update_job_title(job.id, extraction.job_title)
     candidate = get_or_create_candidate(
         CandidateCreate(name=extraction.candidate_name, resume_text=payload.resume_text)
     )
     interview = create_interview(InterviewCreate(job_id=job.id, candidate_id=candidate.id))
-    question_bank = question_bank.model_copy(update={"interview_id": interview.id})
+    question_bank = fallback_question_bank(
+        interview.id,
+        payload.jd_text,
+        payload.resume_text,
+        job.competency_model,
+    )
     save_question_bank(question_bank)
+    asyncio.create_task(
+        _refine_question_bank_in_background(
+            interview.id,
+            payload.jd_text,
+            payload.resume_text,
+            job.competency_model,
+            question_bank,
+        )
+    )
     return QuickSetupResponse(
         interview_id=interview.id,
         job_id=job.id,
